@@ -1,0 +1,14 @@
+"use server";
+
+import { redirect } from "next/navigation";
+import { z } from "zod";
+import { login, logout } from "@/lib/auth";
+
+export async function signIn(form: FormData) {
+  const parsed = z.object({ role: z.enum(["team", "admin"]), id: z.string().trim().max(80), code: z.string().min(12).max(256) }).safeParse(Object.fromEntries(form));
+  if (!parsed.success) redirect("/login?error=1");
+  const { role, id, code } = parsed.data;
+  if (!await login(role, role === "admin" ? "organizer" : id, code)) redirect(`/login?role=${role}&error=1`);
+  redirect(role === "admin" ? "/admin" : "/play");
+}
+export async function signOut() { await logout(); redirect("/login"); }

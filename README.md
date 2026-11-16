@@ -1,10 +1,10 @@
 # OPERATION GHOST_404
 
-Phase 0 foundation for a fictional TechFest cybersecurity escape room. The UI runs without a database or credentials. No live game chapter is implemented yet.
+Phase 1 source for a fictional TechFest cybersecurity escape room. The landing page runs without a database; authenticated dashboards require Prisma and the local SQLite setup. No investigation chapter content is implemented yet. See [Phase 1 setup, limitations and verification](docs/phase-1.md).
 
 ## Run locally
 
-Requires Node.js 20.9 or newer. Run `npm install`, then `npm run dev` and open `http://localhost:3000`.
+Use Node.js 22.18+ LTS. Run `npm install`, configure private `.env` values from `.env.example`, then run `npm run db:generate`, `npm run db:migrate`, `npm run db:seed`, and `npm run dev`. Full setup and secure organizer bootstrap are documented in [the handoff](docs/phase-1.md).
 
 ## Checks
 
@@ -26,4 +26,4 @@ Requires Node.js 20.9 or newer. Run `npm install`, then `npm run dev` and open `
 - `tests`: fast data checks and browser route checks.
 - `docs`: phase plan and operator notes.
 
-The `/admin` route is a public visual shell. Add authentication before attaching sensitive team or event data. PostgreSQL and Prisma belong to Phase 1, when persistence is introduced.
+The `/admin` route and score export require an organizer session. `/play` requires a team session and only returns that team's data. SQLite is for local development; migrate to PostgreSQL before stateless multiple-instance hosting.

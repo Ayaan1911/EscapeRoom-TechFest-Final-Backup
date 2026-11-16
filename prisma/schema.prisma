@@ -1,0 +1,51 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "sqlite"
+  url = env("DATABASE_URL")
+}
+model Team {
+  id String @id
+  name String
+  participants String
+  codeHash String
+  variant String
+  progress String
+  sessions TeamSession[]
+}
+model TeamSession {
+  tokenHash String @id
+  teamId String?
+  team Team? @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  role String
+  expiresAt DateTime
+}
+model GameSession {
+  id Int @id
+  startsAt DateTime?
+  deadline DateTime?
+  endedAt DateTime?
+}
+model Submission {
+  id String @id @default(cuid())
+  teamId String
+  chapter Int
+  accepted Boolean
+  reason String
+  answer String?
+  createdAt DateTime @default(now())
+  @@index([teamId, createdAt])
+}
+model AuditLog {
+  id String @id @default(cuid())
+  actor String
+  action String
+  detail String
+  createdAt DateTime @default(now())
+}
+model LoginAttempt {
+  key String @id
+  failures Int
+  windowStart DateTime
+}
