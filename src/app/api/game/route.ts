@@ -22,6 +22,6 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   try {
     const result = await mutateTeam(auth.teamId, parsed.data.chapter, parsed.data.action, parsed.data.answer);
-    return NextResponse.json(result, { status: "error" in result ? 409 : 200 });
+    return NextResponse.json(result, { status: "retryAfter" in result ? 429 : "error" in result ? 409 : 200, headers: "retryAfter" in result ? { "Retry-After": String(result.retryAfter) } : undefined });
   } catch { return NextResponse.json({ error: "Unable to save request. Refresh and retry." }, { status: 409 }); }
 }

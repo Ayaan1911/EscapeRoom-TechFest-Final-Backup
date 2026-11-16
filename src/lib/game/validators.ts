@@ -1,4 +1,5 @@
 import type { ChapterValidator } from "./engine";
+import "server-only";
+import { inboxValidator } from "./inbox.server";
 
-// Server-only registry: Phase 2 supplies trusted validators, hints and evidence.
-export const validators: Partial<Record<number, ChapterValidator>> = {};
+export const validators: Partial<Record<number, ChapterValidator>> = { 0: inboxValidator };

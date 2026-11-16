@@ -1,6 +1,6 @@
 # OPERATION GHOST_404
 
-Phase 1 source for a fictional TechFest cybersecurity escape room. The landing page runs without a database; authenticated dashboards require Prisma and the local SQLite setup. No investigation chapter content is implemented yet. See [Phase 1 setup, limitations and verification](docs/phase-1.md).
+Chapter 1, The Inbox, is playable on the verified Phase 1 engine for this fictional TechFest cybersecurity escape room. The landing page runs without a database; authenticated investigations require Prisma and SQLite. See [the Chapter 1 demo, QR kit and verification guide](docs/phase-2-inbox.md) and [Phase 1 setup](docs/phase-1.md). Later chapter content remains pending.
 
 ## Run locally
 
@@ -13,6 +13,8 @@ Use Node.js 22.18+ LTS. Run `npm install`, configure private `.env` values from 
 - `npm test`
 - `npm run build`
 - `npx playwright install chromium` (once), then `npm run test:e2e`
+- `npm run test:e2e:inbox` (all browser cases with disposable A/B/C teams)
+- `npm run demo:inbox` (interactive disposable demo; prints test-only credentials)
 
 ## Structure
 

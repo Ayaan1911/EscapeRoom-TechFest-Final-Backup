@@ -9,7 +9,7 @@ export async function teamState(id: string) {
   const team = await db.team.findUniqueOrThrow({ where: { id } });
   const progress = progressSchema.parse(JSON.parse(team.progress));
   const round = await roundState();
-  return { id: team.id, name: team.name, participants: JSON.parse(team.participants) as string[], variant: team.variant, progress, score: score(progress), hints: hints(progress), current: current(progress), round, status: status(round), serverNow: Date.now() };
+  return { id: team.id, name: team.name, participants: JSON.parse(team.participants) as string[], variant: team.variant, progress, score: score(progress), hints: hints(progress), current: current(progress), round, status: status(round), serverNow: Date.now(), chapterHints: progress.chapters.map((chapter, i) => validators[i]?.hints.slice(0, chapter.hints) ?? []) };
 }
 export async function leaderboard() {
   const teams = await db.team.findMany({ select: { id: true, name: true, progress: true, variant: true, participants: true } });
@@ -39,14 +39,22 @@ export async function mutateTeam(id: string, chapter: number, action: "submit" |
       await tx.auditLog.create({ data: { actor: id, action: "hint", detail: JSON.stringify({ chapter, number: p.chapters[chapter].hints }) } });
       return { hint: validator!.hints[p.chapters[chapter].hints - 1] };
     }
+    const previous = await tx.submission.findFirst({ where: { teamId: id, chapter }, orderBy: { createdAt: "desc" } });
+    if (previous && now - previous.createdAt.getTime() < 3000) return { error: "Please wait between evidence submissions.", retryAfter: Math.max(1, Math.ceil((3000 - (now - previous.createdAt.getTime())) / 1000)) };
     const result = validator!.validate(answer, team.variant);
+    const tamperAwarded = !!result.tamperDetected && !p.bonus;
+    if (tamperAwarded) {
+      bonus(p);
+      await tx.auditLog.create({ data: { actor: id, action: "tamper-alert", detail: JSON.stringify({ chapter }) } });
+    }
     if (result.correct) {
       complete(p, chapter, result.points, now);
-      if (result.tamperDetected && !p.bonus) bonus(p);
+    }
+    if (result.correct || tamperAwarded) {
       await tx.team.update({ where: { id }, data: { progress: JSON.stringify(p) } });
     }
     await tx.submission.create({ data: { teamId: id, chapter, accepted: result.correct, reason: result.correct ? "completed" : "incorrect", answer: JSON.stringify(answer ?? null) } });
-    return { accepted: result.correct };
+    return { accepted: result.correct, tamperAwarded };
   }, { isolationLevel: "Serializable" });
 }
 export async function control(action: "start" | "stop" | "unlock", teamId?: string, reason?: string) {

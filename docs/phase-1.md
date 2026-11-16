@@ -1,12 +1,12 @@
 # Phase 1: local engine
 
-Source implementation is present, but runtime database verification is blocked until Prisma can be installed and generated. Do not treat this checkout as a verified playable build.
+The Phase 1 engine was verified and pushed at `bb052a8`. The later [Chapter 1 handoff](phase-2-inbox.md) documents the playable Inbox, isolated demo and expanded verification; this document describes the original engine foundation.
 
 ## Setup on a machine with network and Git write access
 
 Use Node 22.18+ LTS (the seed reads TypeScript with Node's native type stripping). The inspected environment has Node 25.2.1 and npm 11.6.2.
 
-1. Run `npm install` to install Prisma 6 and update the existing Phase 0 lockfile. The lockfile could not be updated in the restricted environment; `npm ci` is not appropriate until this step succeeds. Commit the resulting lockfile with this branch after checks pass.
+1. Run `npm ci` using the checked-in lockfile, then `npm run db:generate`. Network and build/Git operations may require supported environment approval.
 2. Copy `.env.example` to `.env` without replacing an existing `.env`.
 3. Run `npm run auth:hash`. It reads an organizer code using hidden PowerShell input and stores only its salted scrypt hash in ignored `.env`; the code is never printed. Use at least 12 characters. `.env` remains private.
 4. Set a private `DEV_TEAM_CODE` (12–256 characters) and `DEV_TEAM_COUNT` in `.env`. The development seed uses IDs DEV-001 onward and preserves existing records and hashes. All these test teams share the supplied development code. Never use this seed for competition credentials.
@@ -43,9 +43,9 @@ Rank by total score, combined gross Chapter 2 + 3 score, fewer hints, then earli
 
 Run `npm run lint`, `npm run typecheck`, `npm test`, and `npm run build`. Vitest only collects `*.test.ts`; Playwright only collects `*.spec.ts`. Vitest uses worker threads because child process creation is restricted in this environment.
 
-Database integration tests are explicitly enabled after client generation: in PowerShell, `$env:GHOST_DB_TEST='1'`, then `npm test`. They create a fresh temporary SQLite database, apply the checked-in migration, exercise session login/revocation, protected APIs, saved state, round control, hints, bonus, duplicate rejection and overrides, then remove that temporary database. They never use the development database. Otherwise three integration cases are visibly skipped. Test-only validator fixtures are never registered by the application.
+Database integration tests are explicitly enabled after client generation: in PowerShell, `$env:GHOST_DB_TEST='1'`, then `npm test`. They create a fresh temporary SQLite database, apply the checked-in migration, exercise session login/revocation, protected APIs, saved state, round control, hints, bonus, duplicate rejection and overrides, then remove that temporary database. They never use the development database. The expanded suite now has seven opt-in cases. Test-only validator fixtures are never registered by the application.
 
-Run `npm run test:e2e` separately. If Chromium is absent, run `npx playwright install chromium` once. Set private `GHOST_E2E_TEAM_ID` and `GHOST_E2E_TEAM_CODE` in the test runner environment to enable the authenticated browser refresh/logout test; otherwise it explicitly skips. Browser tests also verify landing, protected route redirects and anonymous API rejection. Browser and multi-team load verification remain to be performed after the Prisma installation blocker is resolved.
+Run `npm run test:e2e` separately. If Chromium is absent, run `npx playwright install chromium` once. Set private `GHOST_E2E_TEAM_ID` and `GHOST_E2E_TEAM_CODE` in the test runner environment to enable the authenticated browser refresh/logout test; otherwise it explicitly skips. `npm run test:e2e:inbox` now supplies isolated temporary fixtures for the full browser suite. Multi-team load verification remains outstanding.
 
 ## Phase 2
 
