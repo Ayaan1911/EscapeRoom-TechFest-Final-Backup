@@ -195,3 +195,29 @@ details { margin: 25px 0 0; } summary { cursor: pointer; padding: 10px 0; color:
 @media (max-width: 850px) { .mail-workspace, .artifact-grid, .inbox-actions-grid, .answer-grid, .investigation-brief { grid-template-columns: minmax(0, 1fr); } .mail-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-right: 0; border-bottom: 1px solid var(--line); } .mail-list-heading { grid-column: 1 / -1; } .mail-item { padding: 18px; } .investigation-brief .button-secondary { justify-self: start; } }
 @media (max-width: 450px) { .mail-list { grid-template-columns: minmax(0, 1fr); } .evidence-card, .print-card { padding: 20px; } .inbox-score { font-size: 12px; } }
 @media print { :root { color-scheme: light; } body, .kit-main { background: white; color: black; padding: 0; } .print-controls { display: none; } .print-card { margin: 0 auto; padding: 20px; max-width: 650px; break-inside: avoid; } }
+
+/* Trail identity-provider workspace. */
+.trail-main { max-width: 1700px; }
+.trail-links { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 20px; }
+.trail-filter-panel { padding: 12px 24px 24px; margin-bottom: 20px; }
+.trail-filters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 20px; }
+.trail-filters label { min-width: 0; }
+.trail-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; font-size: 13px; }
+.trail-toolbar strong { margin-right: auto; }
+.trail-log-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; align-items: start; }
+.trail-table-panel { min-width: 0; overflow: hidden; }
+.trail-table-scroll { max-height: 680px; }
+.trail-table-scroll table { min-width: 1040px; font-size: 12px; }
+.trail-table-scroll th { position: sticky; top: 0; background: #171d24; z-index: 1; }
+.trail-table-scroll td { padding: 14px 12px; line-height: 1.6; }
+.trail-table-scroll time, .trail-table-scroll small { display: block; color: #acb6c2; margin-top: 8px; }
+.trail-table-scroll tr[aria-selected=true] { background: #291c21; }
+.table-button { border: 0; border-bottom: 1px solid #a3aebc; color: #f3b5b5; padding: 6px 0; font: inherit; background: transparent; cursor: pointer; white-space: nowrap; }
+.trail-pagination { padding: 18px; justify-content: space-between; border-top: 1px solid var(--line); }
+.trail-inspector { max-height: 900px; overflow-y: auto; }
+.trail-inspector h2 { font: 22px 'Courier New', monospace; }
+.log-result { display: inline-block; padding: 3px 7px; border: 1px solid #677483; border-radius: 3px; }
+.result-success { color: #b8ebcf; border-color: #467963; }.result-failure { color: #f1aaa7; border-color: #865052; }.result-challenge { color: #f2d297; border-color: #9b7b47; }
+#trail-conclusion { scroll-margin-top: 25px; }
+@media (max-width: 1100px) { .trail-log-grid { grid-template-columns: minmax(0, 1fr); } .trail-inspector { max-height: none; } .trail-inspector .artifact-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; } }
+@media (max-width: 700px) { .trail-filters, .trail-inspector .artifact-facts { grid-template-columns: minmax(0, 1fr); } .trail-filter-panel { padding-inline: 18px; } }

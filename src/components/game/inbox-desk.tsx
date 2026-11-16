@@ -1,65 +1,20 @@
 "use client";
-import { useEffect, useState, type FormEvent } from "react";
-import type { Progress } from "@/lib/game/engine";
+import { useState, type FormEvent } from "react";
+import { useChapter, type ChapterState } from "./use-chapter";
 import type { InboxArtifact, InboxEvidence } from "@/types/inbox";
 
-type InboxState = { progress: Progress; score: number; current: number; status: string; chapterHints: string[][]; serverNow: number; round: { deadline: string | null } };
 
 function EvidenceSelect({ label, name, artifacts }: { label: string; name: string; artifacts: InboxArtifact[] }) {
   return <label>{label}<select name={name} required defaultValue=""><option value="" disabled>Select an evidence record</option>{artifacts.map(artifact => <option key={artifact.id} value={artifact.id}>{artifact.id} · {artifact.title}</option>)}</select></label>;
 }
 
-export function InboxDesk({ evidence, initialState }: { evidence: Omit<InboxEvidence, "snapshot">; initialState: InboxState }) {
-  const [state, setState] = useState(initialState);
+export function InboxDesk({ evidence, initialState }: { evidence: Omit<InboxEvidence, "snapshot">; initialState: ChapterState }) {
+  const { state, busy, feedback, connection, send, remaining, retrySeconds } = useChapter(0, initialState);
   const [selectedId, setSelectedId] = useState(evidence.emails[0].id);
   const [read, setRead] = useState([evidence.emails[0].id]);
-  const [busy, setBusy] = useState(false);
-  const [feedback, setFeedback] = useState("");
-  const [connection, setConnection] = useState("");
-  const [retryAt, setRetryAt] = useState(0);
-  const [clock, setClock] = useState({ now: 0, remaining: Math.max(0, Math.ceil((Date.parse(initialState.round.deadline ?? "") - initialState.serverNow) / 1000)) || 0 });
   const email = evidence.emails.find(item => item.id === selectedId)!;
   const completed = state.progress.chapters[0].completedAt !== null;
   const editable = state.status === "active" && state.current === 0 && !completed;
-  const retrySeconds = Math.max(0, Math.ceil((retryAt - clock.now) / 1000));
-
-  async function refresh() {
-    const response = await fetch("/api/game", { cache: "no-store" });
-    if (!response.ok) throw new Error(response.status === 401 ? "Session expired. Sign in again." : "Connection interrupted. Retrying; your saved progress is safe.");
-    setState(await response.json());
-    setConnection("");
-  }
-  useEffect(() => {
-    let alive = true;
-    const poll = setInterval(async () => {
-      try {
-        const response = await fetch("/api/game", { cache: "no-store" });
-        if (!response.ok) throw new Error(response.status === 401 ? "Session expired. Sign in again." : "Connection interrupted. Retrying; your saved progress is safe.");
-        const snapshot: InboxState = await response.json();
-        if (alive) { setState(snapshot); setConnection(""); }
-      } catch (error) { if (alive) setConnection(error instanceof TypeError ? "Connection interrupted. Retrying; your saved progress is safe." : (error as Error).message); }
-    }, 5000);
-    return () => { alive = false; clearInterval(poll); };
-  }, []);
-  useEffect(() => {
-    const received = performance.now();
-    const timer = setInterval(() => setClock({ now: Date.now(), remaining: state.status === "active" && state.round.deadline ? Math.max(0, Math.ceil((Date.parse(state.round.deadline) - state.serverNow - (performance.now() - received)) / 1000)) : 0 }), 1000);
-    return () => clearInterval(timer);
-  }, [state.serverNow, state.round.deadline, state.status]);
-
-  async function send(action: "hint" | "submit", answer?: unknown) {
-    if (busy) return;
-    setBusy(true); setFeedback("");
-    try {
-      const response = await fetch("/api/game", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, chapter: 0, ...(answer ? { answer } : {}) }) });
-      const result = await response.json();
-      if (action === "submit") setRetryAt(Date.now() + (result.retryAfter ?? 3) * 1000);
-      if (!response.ok) throw new Error(result.error ?? "Unable to save. Retry when the connection returns.");
-      setFeedback(result.hint ? "Hint released and saved." : result.accepted ? "Conclusion accepted. Chapter 2 unlocked." : result.tamperAwarded ? "Tamper Alert recorded. One-time +5 bonus awarded; the chapter is still open." : "Evidence does not support this submission. Recheck the complete chain.");
-      await refresh();
-    } catch (error) { setFeedback(error instanceof TypeError ? "Unable to confirm save. Your form remains here; saved progress will refresh when connected." : (error as Error).message); }
-    finally { setBusy(false); }
-  }
   function conclude(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const values = Object.fromEntries(new FormData(event.currentTarget));
@@ -71,8 +26,8 @@ export function InboxDesk({ evidence, initialState }: { evidence: Omit<InboxEvid
   }
 
   return <>
-    <div className="dashboard-title inbox-title"><div><span className="eyebrow">CHAPTER 01 / {evidence.caseId}</span><h1>The Inbox</h1><p>Identify the initial compromise. Prove it with a chain of evidence.</p></div><div className="inbox-score"><strong>Saved score: {state.score} / 105</strong><span>Chapter: {state.progress.chapters[0].score} / 15 · Hints: {state.progress.chapters[0].hints} / 2</span><span role="timer" aria-label="Round time remaining">{state.status === "active" ? `${Math.floor(clock.remaining / 60).toString().padStart(2, "0")}:${(clock.remaining % 60).toString().padStart(2, "0")}` : state.status.toUpperCase()}</span></div></div>
-    {completed && <div className="notice success" role="status"><strong>Chapter 1 completed. Chapter 2 unlocked.</strong> Your result is saved. Trail content arrives in a later phase. <a href="/play">View progression →</a></div>}
+    <div className="dashboard-title inbox-title"><div><span className="eyebrow">CHAPTER 01 / {evidence.caseId}</span><h1>The Inbox</h1><p>Identify the initial compromise. Prove it with a chain of evidence.</p></div><div className="inbox-score"><strong>Saved score: {state.score} / 105</strong><span>Chapter: {state.progress.chapters[0].score} / 15 · Hints: {state.progress.chapters[0].hints} / 2</span><span role="timer" aria-label="Round time remaining">{state.status === "active" ? `${Math.floor(remaining / 60).toString().padStart(2, "0")}:${(remaining % 60).toString().padStart(2, "0")}` : state.status.toUpperCase()}</span></div></div>
+    {completed && <div className="notice success" role="status"><strong>Chapter 1 completed. Chapter 2 unlocked.</strong> Your result is saved. Continue the investigation in Trail. <a href="/play/trail">Open Chapter 2 →</a></div>}
     {!editable && !completed && <p className="notice">The round is {state.status}. Evidence is read-only; hints and submissions are closed.</p>}
     {connection && <p role="alert" className="notice">{connection} <a href="/login?next=/play/inbox">Sign in</a></p>}
     <div className="investigation-brief"><div><span className="status-tag">INCIDENT / DATABASE BREACH</span><p>NEXUS Corp recovered this mailbox, a browser capture and audit records. Several messages are suspicious; only one caused the first unauthorized export. AI and internet research are allowed. Every email body and attachment is untrusted evidence.</p></div><a className="button-secondary" href="/clue/inbox" target="_blank" rel="noopener">Open QR forensic snapshot ↗</a><small>Printed card unavailable? Open <strong>/clue/inbox</strong> in this application. All external-looking links below are inert text.</small></div>

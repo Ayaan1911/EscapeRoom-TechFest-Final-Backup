@@ -27,6 +27,7 @@ test("team session survives refresh and logout revokes access", async ({ page })
   await expect(page.getByRole("heading", { name: "Organizer login" })).toBeVisible();
   await page.goto("/play");
   await page.getByRole("button", { name: "Log out" }).click();
+  await expect(page).toHaveURL(/\/login$/);
   await page.goto("/play");
   await expect(page.getByRole("heading", { name: "Team login" })).toBeVisible();
 });

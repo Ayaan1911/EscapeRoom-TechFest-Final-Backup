@@ -1,5 +1,7 @@
 # Phase 2: The Inbox
 
+Trail is now implemented in the subsequent [Phase 3 handoff](phase-3-trail.md). The rest of this document records the Inbox chapter and its original delivery scope.
+
 Chapter 1 is a playable, fictional NEXUS Corp investigation. It branches from verified Phase 1 commit `bb052a8`; it does not require a schema migration. Trail, Insider, Containment, Final Verdict and Round 2 remain unimplemented.
 
 ## Participant flow and acceptance criteria

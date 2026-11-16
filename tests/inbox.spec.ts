@@ -114,6 +114,7 @@ for (const variant of ["A", "B", "C"] as const) test(`team ${variant} investigat
   await expect(page.getByRole("heading", { name: "Organizer login" })).toBeVisible();
   await page.goto("/play/inbox");
   await page.getByRole("button", { name: "Log out", exact: true }).click();
+  await expect(page).toHaveURL(/\/login$/);
   await login(page, variant);
   await page.goto("/play/inbox");
   await expect(page.getByText("Saved score: 17 / 105", { exact: true })).toBeVisible();
@@ -123,5 +124,7 @@ for (const variant of ["A", "B", "C"] as const) test(`team ${variant} investigat
   const reopened = await browser.newContext({ storageState: await page.context().storageState() });
   const restored = await reopened.newPage(); await restored.goto("/play/inbox");
   await expect(restored.getByText("Saved score: 17 / 105", { exact: true })).toBeVisible();
+  await restored.goto("/play/trail");
+  await expect(restored.getByRole("heading", { name: "Trail", exact: true })).toBeVisible();
   await reopened.close();
 });

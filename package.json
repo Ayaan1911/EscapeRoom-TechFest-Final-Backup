@@ -15,7 +15,9 @@
     "db:seed": "node --env-file=.env scripts/seed.mjs",
     "auth:hash": "powershell -NoProfile -File scripts/hash.ps1",
     "demo:inbox": "node scripts/inbox-demo.mjs",
-    "test:e2e:inbox": "node scripts/inbox-demo.mjs --test"
+    "test:e2e:inbox": "node scripts/inbox-demo.mjs --test",
+    "demo:trail": "node scripts/inbox-demo.mjs --trail",
+    "test:e2e:trail": "node scripts/inbox-demo.mjs --test --trail"
   },
   "dependencies": {
     "@prisma/client": "^6.19.0",
