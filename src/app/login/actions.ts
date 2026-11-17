@@ -11,4 +11,5 @@ export async function signIn(form: FormData) {
   if (!await login(role, role === "admin" ? "organizer" : id, code)) redirect(`/login?role=${role}&error=1${next ? `&next=${encodeURIComponent(next)}` : ""}`);
   redirect(role === "admin" ? "/admin" : next ?? "/play");
 }
-export async function signOut() { await logout(); redirect("/login"); }
+export async function signOut() { await logout("team"); redirect("/login"); }
+export async function signOutAdmin() { await logout("admin"); redirect("/login"); }

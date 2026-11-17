@@ -128,3 +128,22 @@ for (const variant of ["A", "B", "C"] as const) test(`team ${variant} investigat
   await expect(restored.getByRole("heading", { name: "Trail", exact: true })).toBeVisible();
   await reopened.close();
 });
+
+test("team and organizer sessions coexist in one browser profile and log out independently", async ({ browser }) => {
+  const context = await browser.newContext(), teamTab = await context.newPage(), adminTab = await context.newPage();
+  await login(teamTab, "A");
+  await login(adminTab, "admin"); // admin sign-in must not end the team session
+  await teamTab.goto("/play"); await expect(teamTab.getByRole("heading", { name: "Investigation dashboard", exact: true })).toBeVisible();
+  expect((await teamTab.request.get("/api/game")).status()).toBe(200);
+  expect((await teamTab.request.get("/api/admin/scores")).status()).toBe(200); // same profile also holds the admin cookie
+  await adminTab.goto("/admin"); await expect(adminTab.getByRole("heading", { name: "Event operations", exact: true })).toBeVisible();
+  await adminTab.getByRole("button", { name: "Log out", exact: true }).click(); await expect(adminTab).toHaveURL(/\/login$/);
+  expect((await teamTab.request.get("/api/admin/scores")).status()).toBe(401);
+  expect((await teamTab.request.get("/api/game")).status()).toBe(200); // team survives admin logout
+  await login(adminTab, "admin");
+  await teamTab.goto("/play"); await teamTab.getByRole("button", { name: "Log out", exact: true }).click(); await expect(teamTab).toHaveURL(/\/login$/);
+  expect((await adminTab.request.get("/api/game")).status()).toBe(401);
+  expect((await adminTab.request.get("/api/admin/scores")).status()).toBe(200); // admin survives team logout
+  for (let i = 0; i < 12; i++) { await login(teamTab, "A"); await teamTab.getByRole("button", { name: "Log out", exact: true }).click(); } // successful logins never lock out
+  await context.close();
+});

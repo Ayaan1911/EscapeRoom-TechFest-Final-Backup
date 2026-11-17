@@ -44,9 +44,30 @@ describe.runIf(process.env.GHOST_DB_TEST === "1")("Prisma persistence and sessio
     expect((await auth.session("team"))?.teamId).toBe("A");
     expect(await auth.session("admin")).toBeNull();
     expect((await auth.session("team"))?.teamId).toBe("A");
-    const token = jar.get(auth.cookieName)!;
-    await auth.logout(); jar.set(auth.cookieName,token);
+    const token = jar.get(auth.cookieNames.team)!;
+    await auth.logout(); jar.set(auth.cookieNames.team,token);
     expect(await auth.session("team")).toBeNull(); jar.clear();
+  });
+  it("keeps team and admin sessions independent, ignores the legacy cookie, and does not count successful logins as failures", async () => {
+    await auth.login("team","A",code); await auth.login("admin","organizer",code);
+    expect((await auth.session("team"))?.teamId).toBe("A"); expect(await auth.session("admin")).not.toBeNull();
+    expect(jar.get(auth.cookieNames.team)).not.toBe(jar.get(auth.cookieNames.admin));
+    // a cookie of one role never authorizes the other role
+    const t = jar.get(auth.cookieNames.team)!, a = jar.get(auth.cookieNames.admin)!;
+    jar.set(auth.cookieNames.team, a); jar.set(auth.cookieNames.admin, t);
+    expect(await auth.session("team")).toBeNull(); expect(await auth.session("admin")).toBeNull();
+    jar.set(auth.cookieNames.team, t); jar.set(auth.cookieNames.admin, a);
+    await auth.logout("admin"); expect(await auth.session("admin")).toBeNull(); expect((await auth.session("team"))?.teamId).toBe("A");
+    await auth.login("admin","organizer",code); await auth.logout("team"); expect(await auth.session("team")).toBeNull(); expect(await auth.session("admin")).not.toBeNull();
+    // re-login rotates only that role's token
+    const before = jar.get(auth.cookieNames.admin)!; await auth.login("admin","organizer",code); expect(jar.get(auth.cookieNames.admin)).not.toBe(before);
+    await auth.login("team","A",code); jar.set("ghost_session", t); expect((await auth.session("team"))?.teamId).toBe("A");
+    jar.delete(auth.cookieNames.team); expect(await auth.session("team")).toBeNull(); // legacy cookie alone grants nothing
+    await auth.logout(); expect(await auth.session("admin")).toBeNull(); expect(jar.has("ghost_session")).toBe(false);
+    // 15 successful logins never lock the account; real brute force still does
+    for (let i = 0; i < 15; i++) expect(await auth.login("team","B",code)).toBe(true);
+    for (let i = 0; i < 10; i++) expect(await auth.login("team","B","wrong-code-"+i)).toBe(false);
+    expect(await auth.login("team","B",code)).toBe(false); jar.clear();
   });
   it("protects admin and participant APIs", async () => {
     const game = await import("../src/app/api/game/route");
