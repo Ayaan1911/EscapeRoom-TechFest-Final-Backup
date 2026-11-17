@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "./kit.css";
+import "./pages.css";
 
 export const metadata: Metadata = {
   title: "OPERATION GHOST_404 | NEXUS Incident Response",

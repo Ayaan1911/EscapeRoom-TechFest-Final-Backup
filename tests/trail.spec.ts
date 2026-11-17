@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { confirmDialog } from "./fixtures/admin-confirm";
 import { readFileSync } from "node:fs";
 import { trailAnswers, trailTamper } from "./fixtures/trail";
 
@@ -25,7 +26,7 @@ test("Trail page, JSON and CSV enforce sessions, progression and audited organiz
   const override = organizer.locator("section").filter({ has: organizer.getByRole("heading", { name: "Unlock next chapter", exact: true }) });
   await override.getByLabel("Team ID").fill("TRAIL-LOCKED");
   await override.getByLabel("Reason").fill("Browser regression: authorized Inbox progression override");
-  await override.getByRole("button", { name: "Record override" }).click();
+  await override.getByRole("button", { name: "Record override" }).click(); await confirmDialog(organizer);
   await expect(organizer.locator("section").filter({ has: organizer.getByRole("heading", { name: "Recent audit events", exact: true }) }).getByText(/Browser regression: authorized Inbox progression override/)).toBeVisible();
   await page.goto("/play/trail"); await expect(page.getByRole("heading", { name: "Trail", exact: true })).toBeVisible();
   await expect(page.getByText("Saved score: 0 / 105", { exact: true })).toBeVisible();
@@ -139,7 +140,7 @@ for (const variant of ["A", "B", "C"] as const) test(`Trail ${variant}: filters,
 test("closed rounds keep Trail history readable and reject further mutation", async ({ page, browser }) => {
   await login(page, "TRAIL-C");
   const context = await browser.newContext(); const organizer = await context.newPage(); await login(organizer, "admin");
-  await organizer.getByRole("button", { name: "Stop round", exact: true }).click();
+  await organizer.getByRole("button", { name: "Stop round", exact: true }).click(); await confirmDialog(organizer, "STOP");
   await expect(organizer.getByRole("button", { name: "Stop round", exact: true })).toBeDisabled();
   await page.goto("/play/trail"); await expect(page.getByRole("heading", { name: "Trail", exact: true })).toBeVisible();
   await expect(page.getByRole("timer", { name: "Round time remaining" })).toHaveText("FINISHED");

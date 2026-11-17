@@ -9,6 +9,7 @@ import { initialProgress, complete, bonus } from "../src/lib/game/engine.ts";
 const testing = process.argv.includes("--test");
 const rehearsal = process.argv.includes("--rehearsal");
 const verdict = process.argv.includes("--verdict");
+const journey = process.argv.includes("--journey"); // fresh zero-progress team plays all five chapters in one browser journey
 const containment = process.argv.includes("--containment") || verdict;
 const insider = process.argv.includes("--insider") || containment;
 const trail = process.argv.includes("--trail") || insider;
@@ -20,7 +21,7 @@ assert.ok(!origin.username && !origin.password && !origin.search && !origin.hash
 const temp = await createTempDatabase("demo"); // disposable local PostgreSQL database with the shipped migrations applied
 const databaseUrl = temp.url;
 const code = randomBytes(18).toString("hex");
-const env = { ...process.env, DATABASE_URL: databaseUrl, DIRECT_URL: databaseUrl, ADMIN_ACCESS_HASH: hashPassword(code), APP_ORIGIN: origin.origin, GHOST_E2E_TEAM_ID: "DEMO-A", GHOST_E2E_TEAM_CODE: code, GHOST_E2E_ADMIN_CODE: code, GHOST_E2E_INBOX: "1", GHOST_E2E_TRAIL: trail ? "1" : "", GHOST_E2E_INSIDER: insider ? "1" : "", GHOST_E2E_CONTAINMENT: containment ? "1" : "", GHOST_E2E_VERDICT: verdict ? "1" : "", ...(testing ? { CI: "1" } : {}) };
+const env = { ...process.env, DATABASE_URL: databaseUrl, DIRECT_URL: databaseUrl, ADMIN_ACCESS_HASH: hashPassword(code), APP_ORIGIN: origin.origin, GHOST_E2E_TEAM_ID: "DEMO-A", GHOST_E2E_TEAM_CODE: code, GHOST_E2E_ADMIN_CODE: code, GHOST_E2E_INBOX: "1", ...(journey ? { GHOST_E2E_JOURNEY: "1" } : {}), GHOST_E2E_TRAIL: trail ? "1" : "", GHOST_E2E_INSIDER: insider ? "1" : "", GHOST_E2E_CONTAINMENT: containment ? "1" : "", GHOST_E2E_VERDICT: verdict ? "1" : "", ...(testing ? { CI: "1" } : {}) };
 const db = new PrismaClient({ datasourceUrl: databaseUrl });
 let child;
 function stop() {
@@ -114,7 +115,7 @@ Ctrl+C drops the temporary PostgreSQL database. After a forced close run: node -
     process.stdin.setRawMode(true);
     process.stdin.on("data", data => { if (data.includes(3)) interrupt(); });
   }
-  const commands = testing ? trail ? [["node_modules/@playwright/test/cli.js", "test", "tests/routes.spec.ts", "tests/inbox.spec.ts"], ["node_modules/@playwright/test/cli.js", "test", "tests/trail.spec.ts"], ...(insider ? [["node_modules/@playwright/test/cli.js", "test", "tests/insider.spec.ts", "--output", "test-results/insider-main"], ["node_modules/@playwright/test/cli.js", "test", "tests/insider-restart.spec.ts", "--output", "test-results/insider-restart"]] : [])] : [["node_modules/@playwright/test/cli.js", "test"]] : [["node_modules/next/dist/bin/next", "dev", "--hostname", origin.hostname, "--port", origin.port || "80"]];
+  const commands = testing && journey ? [["node_modules/@playwright/test/cli.js", "test", "tests/journey.spec.ts", "--output", "test-results/journey"]] : testing ? trail ? [["node_modules/@playwright/test/cli.js", "test", "tests/routes.spec.ts", "tests/inbox.spec.ts"], ["node_modules/@playwright/test/cli.js", "test", "tests/trail.spec.ts"], ...(insider ? [["node_modules/@playwright/test/cli.js", "test", "tests/insider.spec.ts", "--output", "test-results/insider-main"], ["node_modules/@playwright/test/cli.js", "test", "tests/insider-restart.spec.ts", "--output", "test-results/insider-restart"]] : [])] : [["node_modules/@playwright/test/cli.js", "test"]] : [["node_modules/next/dist/bin/next", "dev", "--hostname", origin.hostname, "--port", origin.port || "80"]];
   if (testing && containment) commands.push(["node_modules/@playwright/test/cli.js", "test", "tests/containment.spec.ts", "--output", "test-results/containment-main"], ["node_modules/@playwright/test/cli.js", "test", "tests/containment-restart.spec.ts", "--output", "test-results/containment-restart"]);
   if (testing && verdict) commands.push(["node_modules/@playwright/test/cli.js", "test", "tests/verdict.spec.ts", "--output", "test-results/verdict-main"], ["node_modules/@playwright/test/cli.js", "test", "tests/verdict-restart.spec.ts", "--output", "test-results/verdict-restart"]);
   for (const [index, args] of commands.entries()) {

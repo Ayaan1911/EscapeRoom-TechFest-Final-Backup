@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { confirmDialog } from "./fixtures/admin-confirm";
 import jsQR from "jsqr";
 import { inboxAnswers } from "./fixtures/inbox";
 
@@ -38,8 +39,17 @@ test("organizer starts a waiting round and prints a scannable phone QR", async (
   });
   expect(jsQR(new Uint8ClampedArray(pixels.data), pixels.width, pixels.height)?.data).toBe("https://event.nexus.example/clue/inbox");
   await organizer.goto("/admin");
-  await organizer.getByRole("button", { name: "Start 60-minute round" }).click();
+  await organizer.getByRole("button", { name: "Start 60-minute round" }).click(); await confirmDialog(organizer);
   await expect(organizer.getByRole("button", { name: "Stop round" })).toBeEnabled();
+  // Danger-zone safeguard: the stop dialog needs the typed word, and Escape cancels without stopping anything.
+  await organizer.getByRole("button", { name: "Stop round" }).click();
+  const stopDialog = organizer.getByRole("dialog");
+  await expect(stopDialog).toBeVisible();
+  await expect(stopDialog.getByRole("button", { name: /^Confirm stop/ })).toBeDisabled();
+  await stopDialog.getByLabel(/^Type /).fill("stop"); await expect(stopDialog.getByRole("button", { name: /^Confirm stop/ })).toBeDisabled(); // exact, case-sensitive word
+  await organizer.keyboard.press("Escape"); await expect(stopDialog).toBeHidden();
+  await expect(organizer.getByRole("button", { name: "Stop round" })).toBeEnabled();
+  await expect(organizer.getByRole("group", { name: "Dangerous operations" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Open Chapter 1" })).toBeVisible({ timeout: 10000 });
   const scanningContext = await browser.newContext();
   const scanningPhone = await scanningContext.newPage();
