@@ -29,7 +29,7 @@ test("Containment enforces sessions, waiting round, exact team isolation and an 
   await page.getByRole("button", { name: "Log out", exact: true }).click(); await expect(page).toHaveURL(/\/login$/); await login(page, "CONTAIN-LOCKED");
   expect((await page.request.get("/api/game/containment")).status()).toBe(403); expect((await page.request.get("/api/game/containment?teamId=CONTAIN-A")).status()).toBe(403);
   const override = admin.locator("section").filter({ has: admin.getByRole("heading", { name: "Unlock next chapter", exact: true }) }); await override.getByLabel("Team ID", { exact: true }).fill("CONTAIN-LOCKED"); await override.getByLabel("Reason", { exact: true }).fill("Containment browser regression: approved Insider progression override"); await override.getByRole("button", { name: "Record override", exact: true }).click();
-  await expect(admin.getByText(/Containment browser regression: approved Insider progression override/)).toBeVisible(); await page.goto("/play/containment"); await expect(page.getByRole("heading", { name: "Containment", exact: true })).toBeVisible(); await expect(page.getByText("Saved score: 40 / 105", { exact: true })).toBeVisible();
+  await expect(admin.locator("section").filter({ has: admin.getByRole("heading", { name: "Recent audit events", exact: true }) }).getByText(/Containment browser regression: approved Insider progression override/)).toBeVisible(); await page.goto("/play/containment"); await expect(page.getByRole("heading", { name: "Containment", exact: true })).toBeVisible(); await expect(page.getByText("Saved score: 40 / 105", { exact: true })).toBeVisible();
   const own = await (await page.request.get("/api/game/containment")).json(); expect(own.evidence.caseId).toBe("NEXUS-CONTAINMENT-C"); expect(own.fallbackCctv).toBeNull(); expect(JSON.stringify(own)).not.toMatch(/fragmentA|fragmentB/);
   await page.goto("/admin/containment-kit"); await expect(page).toHaveURL(/\/login\?role=admin/); organizerCookies = await context.cookies(); await context.close();
 });
@@ -89,6 +89,7 @@ for (const variant of ["A", "B", "C"] as const) test(`Containment ${variant}: ke
   await page.getByRole("button", { name: "Log out", exact: true }).click(); await expect(page).toHaveURL(/\/login$/); await login(page, id); await expect(page.locator(".briefing-panel").getByRole("heading", { name: "Final Verdict", exact: true })).toBeVisible();
   const saved = await (await page.request.get("/api/game")).json(); expect(saved.current).toBe(4); expect(saved.score).toBe(score); expect(saved.progress.chapters[3].score).toBe(20); expect(saved.progress.bonus).toBe(variant === "A" ? 5 : 0);
   await page.goto("/play/containment"); await expect(page.getByText("Chapter 4 completed. Final Verdict unlocked.", { exact: true })).toBeVisible(); expect(external).toEqual([]);
+  await page.getByRole("link", { name: "Open Chapter 5", exact: true }).click(); await expect(page.getByRole("heading", { name: "Final Verdict", exact: true })).toBeVisible(); expect((await page.request.get("/api/game/verdict")).status()).toBe(200);
 });
 
 test("closed rounds preserve authorized historical evidence and block new plans and hints", async ({ page, browser }) => {

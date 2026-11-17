@@ -21,7 +21,9 @@
     "demo:insider": "node scripts/inbox-demo.mjs --insider",
     "test:e2e:insider": "node scripts/inbox-demo.mjs --test --insider",
     "demo:containment": "node scripts/inbox-demo.mjs --containment",
-    "test:e2e:containment": "node scripts/inbox-demo.mjs --test --containment"
+    "test:e2e:containment": "node scripts/inbox-demo.mjs --test --containment",
+    "demo:verdict": "node scripts/inbox-demo.mjs --verdict",
+    "test:e2e:verdict": "node scripts/inbox-demo.mjs --test --verdict"
   },
   "dependencies": {
     "@prisma/client": "^6.19.0",

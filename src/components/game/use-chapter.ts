@@ -4,7 +4,7 @@ import type { Progress } from "@/lib/game/engine";
 
 export type ChapterState = { progress: Progress; score: number; current: number; status: string; chapterHints: string[][]; serverNow: number; round: { deadline: string | null }; insiderUnlocked?: boolean };
 
-export function useChapter(chapter: 0 | 1 | 2 | 3, initialState: ChapterState) {
+export function useChapter(chapter: 0 | 1 | 2 | 3 | 4, initialState: ChapterState) {
   const [state, setState] = useState(initialState);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState("");
@@ -41,7 +41,7 @@ export function useChapter(chapter: 0 | 1 | 2 | 3, initialState: ChapterState) {
       const result = await response.json();
       if (action !== "hint") setRetryAt(Date.now() + (result.retryAfter ?? 3) * 1000);
       if (!response.ok) throw new Error(result.error ?? "Unable to save. Retry when the connection returns.");
-      setFeedback(action === "unlock" ? result.unlocked ? "Dossier unlocked and saved." : "These fragments do not unlock this dossier. Check both printed pieces." : result.hint ? "Hint released and saved." : result.accepted ? `Conclusion accepted. Chapter ${chapter + 2} unlocked.` : result.tamperAwarded ? "Tamper Alert recorded. One-time +5 bonus awarded; the chapter is still open." : "Evidence does not support this submission. Recheck the complete chain.");
+      setFeedback(action === "unlock" ? result.unlocked ? "Dossier unlocked and saved." : "These fragments do not unlock this dossier. Check both printed pieces." : result.hint ? "Hint released and saved." : result.accepted ? chapter === 4 ? "Verdict accepted. Investigation complete." : `Conclusion accepted. Chapter ${chapter + 2} unlocked.` : result.tamperAwarded ? "Tamper Alert recorded. One-time +5 bonus awarded; the chapter is still open." : "Evidence does not support this submission. Recheck the complete chain.");
       await refresh();
     } catch (error) { setFeedback(error instanceof TypeError ? action === "unlock" ? "Unable to confirm unlock. Saved progress will refresh when connected; re-enter the printed pieces if still sealed." : "Unable to confirm save. Your form remains here; saved progress will refresh when connected." : (error as Error).message); }
     finally { setBusy(false); }

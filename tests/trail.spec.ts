@@ -26,7 +26,7 @@ test("Trail page, JSON and CSV enforce sessions, progression and audited organiz
   await override.getByLabel("Team ID").fill("TRAIL-LOCKED");
   await override.getByLabel("Reason").fill("Browser regression: authorized Inbox progression override");
   await override.getByRole("button", { name: "Record override" }).click();
-  await expect(organizer.getByText(/Browser regression: authorized Inbox progression override/)).toBeVisible();
+  await expect(organizer.locator("section").filter({ has: organizer.getByRole("heading", { name: "Recent audit events", exact: true }) }).getByText(/Browser regression: authorized Inbox progression override/)).toBeVisible();
   await page.goto("/play/trail"); await expect(page.getByRole("heading", { name: "Trail", exact: true })).toBeVisible();
   await expect(page.getByText("Saved score: 0 / 105", { exact: true })).toBeVisible();
   const own = await (await page.request.get("/api/game/trail?variant=C&teamId=TRAIL-C")).json();

@@ -1,6 +1,6 @@
 # OPERATION GHOST_404
 
-Inbox, Trail, Insider and Containment are playable in sequence on the verified game engine for this fictional TechFest cybersecurity escape room. The landing page runs without a database; authenticated investigations require Prisma and SQLite. See [the Containment gameplay and operator guide](docs/phase-5-containment.md), [the Insider Evidence Wall guide](docs/phase-4-insider.md), [the Trail guide](docs/phase-3-trail.md), [the Inbox and QR guide](docs/phase-2-inbox.md), and [Phase 1 setup](docs/phase-1.md). Final Verdict and Round 2 remain pending. Local gameplay verification does not establish production readiness.
+All five Round 1 chapters are playable: Inbox, Trail, Insider, Containment and Final Verdict, followed by saved case closure and organizer qualification review. The landing page runs without a database; authenticated investigations require Prisma and SQLite. See [the Final Verdict and qualification guide](docs/phase-6-final-verdict.md), [the Containment guide](docs/phase-5-containment.md), [the Insider Evidence Wall guide](docs/phase-4-insider.md), [the Trail guide](docs/phase-3-trail.md), [the Inbox guide](docs/phase-2-inbox.md), and [Phase 1 setup](docs/phase-1.md). Round 2 and deployment remain outside scope. Local gameplay verification does not establish production readiness.
 
 ## Run locally
 
@@ -21,6 +21,8 @@ Use Node.js 22.18+ LTS. Run `npm install`, configure private `.env` values from 
 - `npm run demo:insider` (temporary Inbox/Trail-completed teams and organizer-only printable fragments)
 - `npm run test:e2e:containment` (all preserved browser suites, simulated response workflows and restart persistence)
 - `npm run demo:containment` (temporary ready teams, fictional CCTV kit and inert response decisions)
+- `npm run test:e2e:verdict` (all prior suites, final synthesis, case closure, qualification and restart)
+- `npm run demo:verdict` (temporary A/B/C teams ready for Final Verdict; organizer review demo)
 
 ## Structure
 

@@ -4,5 +4,6 @@ import { inboxValidator } from "./inbox.server";
 import { trailValidator } from "./trail.server";
 import { insiderValidator } from "./insider.server";
 import { containmentValidator } from "./containment.server";
+import { verdictValidator } from "./verdict.server";
 
-export const validators: Partial<Record<number, ChapterValidator>> = { 0: inboxValidator, 1: trailValidator, 2: insiderValidator, 3: containmentValidator };
+export const validators: Partial<Record<number, ChapterValidator>> = { 0: inboxValidator, 1: trailValidator, 2: insiderValidator, 3: containmentValidator, 4: verdictValidator };

@@ -9,7 +9,8 @@ import { hashPassword } from "../src/lib/password.mjs";
 import { initialProgress, complete, bonus } from "../src/lib/game/engine.ts";
 
 const testing = process.argv.includes("--test");
-const containment = process.argv.includes("--containment");
+const verdict = process.argv.includes("--verdict");
+const containment = process.argv.includes("--containment") || verdict;
 const insider = process.argv.includes("--insider") || containment;
 const trail = process.argv.includes("--trail") || insider;
 const origin = new URL(testing ? "http://127.0.0.1:3000" : process.env.DEMO_ORIGIN ?? "http://127.0.0.1:3000");
@@ -20,7 +21,7 @@ assert.ok(!origin.username && !origin.password && !origin.search && !origin.hash
 const folder = mkdtempSync(join(tmpdir(), "ghost-inbox-demo-"));
 const databaseUrl = `file:${join(folder, "test.db").replaceAll("\\", "/")}`;
 const code = randomBytes(18).toString("hex");
-const env = { ...process.env, DATABASE_URL: databaseUrl, ADMIN_ACCESS_HASH: hashPassword(code), APP_ORIGIN: origin.origin, GHOST_E2E_TEAM_ID: "DEMO-A", GHOST_E2E_TEAM_CODE: code, GHOST_E2E_ADMIN_CODE: code, GHOST_E2E_INBOX: "1", GHOST_E2E_TRAIL: trail ? "1" : "", GHOST_E2E_INSIDER: insider ? "1" : "", GHOST_E2E_CONTAINMENT: containment ? "1" : "", ...(testing ? { CI: "1" } : {}) };
+const env = { ...process.env, DATABASE_URL: databaseUrl, ADMIN_ACCESS_HASH: hashPassword(code), APP_ORIGIN: origin.origin, GHOST_E2E_TEAM_ID: "DEMO-A", GHOST_E2E_TEAM_CODE: code, GHOST_E2E_ADMIN_CODE: code, GHOST_E2E_INBOX: "1", GHOST_E2E_TRAIL: trail ? "1" : "", GHOST_E2E_INSIDER: insider ? "1" : "", GHOST_E2E_CONTAINMENT: containment ? "1" : "", GHOST_E2E_VERDICT: verdict ? "1" : "", ...(testing ? { CI: "1" } : {}) };
 const db = new PrismaClient({ datasourceUrl: databaseUrl });
 let child;
 function stop() {
@@ -65,22 +66,24 @@ async function seedInsider() {
   if (testing) await db.team.create({ data: { id: "INSIDER-LOCKED", name: "Premature access fixture", participants: '[]', codeHash: hashPassword(code), variant: "A", progress: JSON.stringify(initialProgress()) } });
   await db.$disconnect();
 }
-async function seedContainment() {
+async function seedContainment(verdictReady = false) {
   const now = new Date();
+  const prefix = verdictReady ? "VERDICT" : "CONTAIN";
+  const completedPoints = verdictReady ? [15, 25, 25, 20] : [15, 25, 25];
+  const fragment = part => `${part}-${randomBytes(12).toString("hex").toUpperCase().match(/.{6}/g).join("-")}`;
   await db.gameSession.upsert({ where: { id: 1 }, create: { id: 1, ...(testing ? {} : { startsAt: now, deadline: new Date(Date.now() + 3600000) }) }, update: { startsAt: testing ? null : now, deadline: testing ? null : new Date(Date.now() + 3600000), endedAt: null } });
   for (const variant of ["A", "B", "C"]) {
-    const id = `CONTAIN-${variant}`, progress = initialProgress();
-    for (const [chapter, points] of [15, 25, 25].entries()) complete(progress, chapter, points, Date.now());
+    const id = `${prefix}-${variant}`, progress = initialProgress();
+    for (const [chapter, points] of completedPoints.entries()) complete(progress, chapter, points, Date.now());
     if (variant === "A") bonus(progress);
-    const fragment = part => `${part}-${randomBytes(12).toString("hex").toUpperCase().match(/.{6}/g).join("-")}`;
-    await db.team.create({ data: { id, name: `Containment demo ${variant}`, participants: '["Investigator One","Investigator Two","Investigator Three"]', codeHash: hashPassword(code), variant, progress: JSON.stringify(progress), insiderAccess: { create: { fragmentA: fragment("A"), fragmentB: fragment("B"), unlockedAt: now } } } });
-    for (const chapter of [0, 1, 2]) await db.submission.create({ data: { teamId: id, chapter, accepted: true, reason: "Temporary demo fixture: earlier chapter completed" } });
+    await db.team.create({ data: { id, name: `${verdictReady ? "Verdict" : "Containment"} demo ${variant}`, participants: '["Investigator One","Investigator Two","Investigator Three"]', codeHash: hashPassword(code), variant, progress: JSON.stringify(progress), insiderAccess: { create: { fragmentA: fragment("A"), fragmentB: fragment("B"), unlockedAt: now } } } });
+    for (const chapter of completedPoints.keys()) await db.submission.create({ data: { teamId: id, chapter, accepted: true, reason: "Temporary demo fixture: earlier chapter completed" } });
     await db.auditLog.create({ data: { actor: id, action: "dossier-unlock", detail: JSON.stringify({ chapter: 2, fixture: true }) } });
     if (variant === "A") await db.auditLog.create({ data: { actor: id, action: "tamper-alert", detail: JSON.stringify({ chapter: 0, fixture: true }) } });
   }
   if (testing) {
-    const p = initialProgress(); complete(p, 0, 15, Date.now()); complete(p, 1, 25, Date.now());
-    await db.team.create({ data: { id: "CONTAIN-LOCKED", name: "Insider incomplete regression fixture", participants: '[]', codeHash: hashPassword(code), variant: "C", progress: JSON.stringify(p) } });
+    const p = initialProgress(); for (const [i, points] of completedPoints.slice(0, -1).entries()) complete(p, i, points, Date.now());
+    await db.team.create({ data: { id: `${prefix}-LOCKED`, name: "Previous chapter incomplete regression fixture", participants: '[]', codeHash: hashPassword(code), variant: "C", progress: JSON.stringify(p), ...(verdictReady ? { insiderAccess: { create: { fragmentA: fragment("A"), fragmentB: fragment("B"), unlockedAt: now } } } : {}) } });
   }
   await db.$disconnect();
 }
@@ -88,7 +91,7 @@ try {
   assert.ok(resolve(folder).startsWith(resolve(tmpdir()) + sep));
   for (const migration of readdirSync(new URL("../prisma/migrations/", import.meta.url)).sort().filter(name => /^\d/.test(name))) for (const sql of readFileSync(new URL(`../prisma/migrations/${migration}/migration.sql`, import.meta.url), "utf8").split(";").filter(value => value.trim())) await db.$executeRawUnsafe(sql);
   if (!trail || testing) for (const variant of ["A", "B", "C"]) await db.team.create({ data: { id: `DEMO-${variant}`, name: `Inbox demo ${variant}`, participants: JSON.stringify(["Investigator One", "Investigator Two", "Investigator Three"]), codeHash: hashPassword(code), variant, progress: JSON.stringify(initialProgress()) } });
-  if (containment && !testing) await seedContainment();
+  if (containment && !testing) await seedContainment(verdict);
   else if (insider && !testing) await seedInsider();
   else if (trail && !testing) {
     await db.gameSession.create({ data: { id: 1, startsAt: new Date(), deadline: new Date(Date.now() + 3600000) } });
@@ -96,7 +99,7 @@ try {
   }
   await db.$disconnect();
   if (testing) console.log("Browser verification uses a fresh temporary database and generated test-only credentials.");
-  else console.log(`Temporary ${containment ? "Containment" : insider ? "Insider" : trail ? "Trail" : "Chapter 1"} demo: ${origin.origin}\nTeams: ${containment ? "CONTAIN-A, CONTAIN-B, CONTAIN-C (Inbox + Trail + Insider completed; round active)" : insider ? "INSIDER-01, INSIDER-02, INSIDER-03 (Inbox + Trail completed; round active)" : trail ? "TRAIL-A, TRAIL-B, TRAIL-C (Inbox completed; round already started)" : "DEMO-A, DEMO-B, DEMO-C"}\nOrganizer: ${origin.origin}/login?role=admin\nGenerated demo-only access code for teams and organizer: ${code}\n${containment ? "As organizer print /admin/containment-kit and authorize an accessible copy if needed. As a team open /play/containment. All response decisions are inert simulations." : insider ? "As organizer open /admin/insider-kit, prepare PRIVATE A and PUBLIC B separately, then unlock /play/insider as the matching team." : trail ? "Open Chapter 2 as a Trail team. TRAIL-A already has the global bonus; B/C can earn it in Trail." : "Start Round 1 as organizer, then investigate as a team."} Ctrl+C removes this temporary database. Existing .env and development data are untouched.`);
+  else console.log(`Temporary ${verdict ? "Final Verdict" : containment ? "Containment" : insider ? "Insider" : trail ? "Trail" : "Chapter 1"} demo: ${origin.origin}\nTeams: ${verdict ? "VERDICT-A, VERDICT-B, VERDICT-C (all four prior chapters completed; round active)" : containment ? "CONTAIN-A, CONTAIN-B, CONTAIN-C (Inbox + Trail + Insider completed; round active)" : insider ? "INSIDER-01, INSIDER-02, INSIDER-03 (Inbox + Trail completed; round active)" : trail ? "TRAIL-A, TRAIL-B, TRAIL-C (Inbox completed; round already started)" : "DEMO-A, DEMO-B, DEMO-C"}\nOrganizer: ${origin.origin}/login?role=admin\nGenerated demo-only access code for teams and organizer: ${code}\n${verdict ? "As a team open /play/verdict, link evidence and close the case. As organizer review provisional results, stop the demo round and inspect final qualification review. No automatic Round 2 advancement occurs." : containment ? "As organizer print /admin/containment-kit and authorize an accessible copy if needed. As a team open /play/containment. All response decisions are inert simulations." : insider ? "As organizer open /admin/insider-kit, prepare PRIVATE A and PUBLIC B separately, then unlock /play/insider as the matching team." : trail ? "Open Chapter 2 as a Trail team. TRAIL-A already has the global bonus; B/C can earn it in Trail." : "Start Round 1 as organizer, then investigate as a team."} Ctrl+C removes this temporary database. Existing .env and development data are untouched.`);
   process.on("SIGINT", interrupt);
   process.on("SIGTERM", interrupt);
   // Own Ctrl+C input on Windows so npm cannot terminate the process tree before cleanup.
@@ -106,10 +109,12 @@ try {
   }
   const commands = testing ? trail ? [["node_modules/@playwright/test/cli.js", "test", "tests/routes.spec.ts", "tests/inbox.spec.ts"], ["node_modules/@playwright/test/cli.js", "test", "tests/trail.spec.ts"], ...(insider ? [["node_modules/@playwright/test/cli.js", "test", "tests/insider.spec.ts", "--output", "test-results/insider-main"], ["node_modules/@playwright/test/cli.js", "test", "tests/insider-restart.spec.ts", "--output", "test-results/insider-restart"]] : [])] : [["node_modules/@playwright/test/cli.js", "test"]] : [["node_modules/next/dist/bin/next", "dev", "--hostname", origin.hostname, "--port", origin.port || "80"]];
   if (testing && containment) commands.push(["node_modules/@playwright/test/cli.js", "test", "tests/containment.spec.ts", "--output", "test-results/containment-main"], ["node_modules/@playwright/test/cli.js", "test", "tests/containment-restart.spec.ts", "--output", "test-results/containment-restart"]);
+  if (testing && verdict) commands.push(["node_modules/@playwright/test/cli.js", "test", "tests/verdict.spec.ts", "--output", "test-results/verdict-main"], ["node_modules/@playwright/test/cli.js", "test", "tests/verdict-restart.spec.ts", "--output", "test-results/verdict-restart"]);
   for (const [index, args] of commands.entries()) {
     if (testing && trail && index === 1) await seedTrail();
     if (testing && insider && index === 2) await seedInsider();
     if (testing && containment && index === 4) await seedContainment();
+    if (testing && verdict && index === 6) await seedContainment(true);
     child = spawn(process.execPath, args, { env, stdio: [testing ? "inherit" : "ignore", "inherit", "inherit"], windowsHide: true });
     process.exitCode = await new Promise((accept, reject) => { child.once("error", reject); child.once("exit", code => accept(code ?? 1)); });
     if (process.exitCode !== 0) break;

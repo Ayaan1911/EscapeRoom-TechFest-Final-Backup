@@ -9,6 +9,7 @@ import { NextRequest } from "next/server";
 import { trailAnswers, trailTamper } from "./fixtures/trail";
 import { insiderAnswers } from "./fixtures/insider";
 import { containmentAnswers } from "./fixtures/containment";
+import { verdictAnswers, maintenanceRejections } from "./fixtures/verdict";
 
 const jar = vi.hoisted(() => new Map<string,string>());
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: (key: string) => jar.has(key) ? { value: jar.get(key) } : undefined, set: (key: string,value: string) => jar.set(key,value), delete: (key: string) => jar.delete(key) }) }));
@@ -22,6 +23,8 @@ describe.runIf(process.env.GHOST_DB_TEST === "1")("Prisma persistence and sessio
   const code = "temporary-test-access-only";
   const containmentPairs = new Map<string, { fragmentA: string; fragmentB: string }>();
   let preservedTeams = "", preservedAccess = "";
+  const verdictPriorChapters = new Map<string, string>();
+  let verdictAccessSnapshot = "";
   beforeAll(async () => {
     folder = mkdtempSync(join(tmpdir(), "ghost-test-"));
     process.env.DATABASE_URL = `file:${join(folder,"test.db").replaceAll("\\","/")}`;
@@ -271,7 +274,7 @@ describe.runIf(process.env.GHOST_DB_TEST === "1")("Prisma persistence and sessio
     expect(race[0]).toEqual(race[1]);
     expect(await insiderPrintData("B", [b[0].teamId])).toEqual([b[0]]);
     await auth.logout();
-  });
+  }, 20_000);
   it.each(["A", "B", "C"] as const)("plays Insider %s through real prior chapters, gates the dossier, persists unlock and caps concurrent scoring", async variant => {
     const id = `INSIDER-${variant}`, answer = insiderAnswers[variant];
     const game = await import("../src/app/api/game/route"), insider = await import("../src/app/api/game/insider/route");
@@ -397,7 +400,7 @@ describe.runIf(process.env.GHOST_DB_TEST === "1")("Prisma persistence and sessio
     await Promise.allSettled([service.mutateTeam(id, 3, "submit", safe), service.mutateTeam(id, 3, "submit", safe)]);
     const saved = await service.teamState(id); expect(saved.current).toBe(4); expect(saved.progress.chapters[3].score).toBe(20); expect(saved.score).toBe(variant === "A" ? 87 : variant === "B" ? 82 : 76); expect(saved.progress.bonus).toBe(variant === "A" ? 5 : 0);
     expect(await db.submission.count({ where: { teamId: id, chapter: 3, accepted: true } })).toBe(1); expect((await service.mutateTeam(id, 3, "submit", answer)).error).toMatch(/locked/);
-    expect((await service.mutateTeam(id, 4, "submit", {})).error).toMatch(/not implemented/);
+    expect((await service.mutateTeam(id, 4, "submit", {})).accepted).toBe(false);
     await auth.logout(); await auth.login("team", id, code); await db.$disconnect(); expect((await service.teamState((await auth.session("team"))!.teamId!)).score).toBe(saved.score); expect((await get()).status).toBe(200);
     const stored = (await db.insiderAccess.findUnique({ where: { teamId: id } }))!; expect(stored.fragmentA).toBe(pair.fragmentA); expect(stored.fragmentB).toBe(pair.fragmentB);
     expect(JSON.stringify(await db.team.findMany({ where: { id: { not: { startsWith: "CONTAIN-" } } }, select: { id: true, progress: true }, orderBy: { id: "asc" } }))).toBe(preservedTeams);
@@ -423,5 +426,68 @@ describe.runIf(process.env.GHOST_DB_TEST === "1")("Prisma persistence and sessio
     await db.gameSession.update({ where: { id: 1 }, data: { deadline: new Date(Date.now() - 1) } });
     await auth.logout(); await auth.login("team", id, code); expect((await (await get()).json()).fallbackCctv.id).toBe("CCTV-B-08");
     await auth.logout(); await auth.login("admin", "organizer", code); await expect(authorizeContainmentCopy("CONTAIN-C", "Expired new grant")).rejects.toThrow("active Containment"); await auth.logout();
+  });
+  it("prepares Final Verdict scenarios without changing earlier scores, physical access or authentication policy", async () => {
+    await db.loginAttempt.updateMany({ data: { windowStart: new Date(0) } }); // Fresh test-only rate window for the new chapter scenarios.
+    for (const variant of ["A", "B", "C"]) { const team = await service.teamState(`CONTAIN-${variant}`); verdictPriorChapters.set(team.id, JSON.stringify(team.progress.chapters.slice(0, 4))); }
+    verdictAccessSnapshot = JSON.stringify(await db.insiderAccess.findMany({ orderBy: { teamId: "asc" } }));
+  });
+  it("does not award a verdict if the authoritative deadline passes during validation", async () => {
+    const id = "VERDICT-DEADLINE", progress = initialProgress(); for (const [i, points] of [15, 25, 25, 20].entries()) { progress.chapters[i].score = points; progress.chapters[i].completedAt = 1; }
+    await db.team.create({ data: { id, name: id, participants: '[]', codeHash: hashPassword(code), variant: "A", progress: JSON.stringify(progress) } });
+    await service.roundState(); const deadline = new Date(Date.now() + 60_000); await db.gameSession.update({ where: { id: 1 }, data: { startsAt: new Date(), deadline, endedAt: null } });
+    const { validators } = await import("../src/lib/game/validators"); const original = validators[4]!; const clock = vi.spyOn(Date, "now");
+    validators[4] = { ...original, validate: (answer, variant) => { const result = original.validate(answer, variant); clock.mockReturnValue(deadline.getTime()); return result; } };
+    try { expect((await service.mutateTeam(id, 4, "submit", verdictAnswers.A)).error).toMatch(/not active/); }
+    finally { validators[4] = original; clock.mockRestore(); }
+    const saved = await service.teamState(id); expect(saved.progress.chapters[4].score).toBe(0); expect(saved.progress.completedAt).toBeNull(); expect(saved.current).toBe(4);
+  });
+  it.each(["A", "B", "C"] as const)("closes Final Verdict %s only after Containment, with exact saved completion, hints, immutable earlier results and concurrent replay protection", async variant => {
+    const id = `CONTAIN-${variant}`, answer = verdictAnswers[variant];
+    const endpoint = await import("../src/app/api/game/verdict/route"), game = await import("../src/app/api/game/route"); const get = (query = "") => endpoint.GET(new Request(`http://127.0.0.1:3000/api/game/verdict${query}`));
+    await auth.logout(); expect((await get()).status).toBe(401); await auth.login("team", id, code);
+    await db.gameSession.update({ where: { id: 1 }, data: { startsAt: null, deadline: null, endedAt: null } });
+    expect((await get()).status).toBe(403); expect((await service.mutateTeam(id, 4, "hint", null)).error).toMatch(/not active/); await service.control("start");
+    const read = await get(); expect(read.status).toBe(200); expect(read.headers.get("Cache-Control")).toBe("no-store"); const data = await read.json(); expect(data.evidence.caseId).toBe(`NEXUS-VERDICT-${variant}`); expect(JSON.stringify(data)).not.toMatch(/evidenceMap|answerKey|verdictSolution|fragmentA|fragmentB/);
+    expect((await get("?teamId=CONTAIN-B")).status).toBe(403); expect((await get("?variant=A")).status).toBe(403);
+    const age = () => db.submission.updateMany({ where: { teamId: id, chapter: 4 }, data: { createdAt: new Date(0) } });
+    await age(); expect((await service.mutateTeam(id, 4, "submit", { ...answer, chain: { ...answer.chain, sessionId: "wrong-session" } })).accepted).toBe(false); expect((await service.teamState(id)).progress.completedAt).toBeNull();
+    await db.$disconnect(); const request = (body: unknown) => new NextRequest("http://127.0.0.1:3000/api/game", { method: "POST", headers: { origin: "http://127.0.0.1:3000", "Content-Type": "application/json" }, body: JSON.stringify(body) }); const body = { action: "submit", chapter: 4, answer };
+    const throttled = await game.POST(request(body)); expect(throttled.status).toBe(429); expect(Number(throttled.headers.get("Retry-After"))).toBeGreaterThan(0);
+    for (const extra of [{ teamId: "CONTAIN-B" }, { points: 105 }, { variant: "A" }]) expect((await game.POST(request({ ...body, ...extra }))).status).toBe(400);
+    if (variant !== "A") expect((await service.mutateTeam(id, 4, "hint", null)).hint).toBeDefined();
+    if (variant === "C") { expect((await service.mutateTeam(id, 4, "hint", null)).hint).toBeDefined(); expect((await service.mutateTeam(id, 4, "hint", null)).error).toMatch(/Maximum two/); }
+    await db.gameSession.update({ where: { id: 1 }, data: { deadline: new Date(Date.now() - 1) } }); for (const action of ["hint", "submit"] as const) expect((await service.mutateTeam(id, 4, action, answer)).error).toMatch(/not active/);
+    expect((await get()).status).toBe(200); await db.gameSession.update({ where: { id: 1 }, data: { deadline: new Date(Date.now() + 3600000) } }); await age();
+    const accepted = await Promise.allSettled([service.mutateTeam(id, 4, "submit", { ...answer, rejected: maintenanceRejections[variant] }), service.mutateTeam(id, 4, "submit", { ...answer, rejected: maintenanceRejections[variant] })]); expect(accepted.some(item => item.status === "fulfilled" && item.value.accepted)).toBe(true);
+    const saved = await service.teamState(id); expect(saved.current).toBe(-1); expect(saved.progress.chapters[4].score).toBe(15); expect(saved.score).toBe(variant === "A" ? 102 : variant === "B" ? 94 : 82); expect(saved.progress.completedAt).toBe(saved.progress.chapters[4].completedAt); expect(saved.progress.completedAt).toBeGreaterThan(0); expect(saved.progress.completedAt!).toBeLessThan(saved.round.deadline!.getTime());
+    expect(await db.submission.count({ where: { teamId: id, chapter: 4, accepted: true } })).toBe(1); expect((await service.mutateTeam(id, 4, "submit", answer)).error).toMatch(/locked/); expect((await service.mutateTeam(id, 4, "hint", null)).error).toMatch(/locked/);
+    await auth.logout(); await auth.login("team", id, code); await db.$disconnect(); const recovered = await service.teamState(id); expect(recovered.progress.completedAt).toBe(saved.progress.completedAt); expect(recovered.score).toBe(saved.score); expect((await get()).status).toBe(200);
+    expect(JSON.stringify(recovered.progress.chapters.slice(0, 4))).toBe(verdictPriorChapters.get(id)); expect(JSON.stringify(await db.insiderAccess.findMany({ orderBy: { teamId: "asc" } }))).toBe(verdictAccessSnapshot);
+    await auth.logout();
+  });
+  it("gates direct verdict access and permits an audited zero-point Containment override without exposing physical fragments", async () => {
+    const id = "CONTAIN-OVERRIDE", endpoint = await import("../src/app/api/game/verdict/route"), get = () => endpoint.GET(new Request("http://127.0.0.1:3000/api/game/verdict"));
+    await db.gameSession.update({ where: { id: 1 }, data: { startsAt: new Date(), deadline: new Date(Date.now() + 3600000), endedAt: null } }); await auth.login("team", id, code); expect((await get()).status).toBe(403); expect((await service.mutateTeam(id, 4, "submit", verdictAnswers.B)).error).toMatch(/locked/);
+    await service.control("unlock", id, "Organizer confirmed Containment progression for Final Verdict"); expect((await get()).status).toBe(200); expect((await service.teamState(id)).score).toBe(0); expect((await service.teamState(id)).insiderUnlocked).toBe(false); expect(await db.auditLog.count({ where: { action: "unlock", detail: { contains: id } } })).toBe(4); await auth.logout();
+  });
+  it("caps a real accepted case at 105 and rejects concurrent duplicate completion without changing its timestamp", async () => {
+    const id = "VERDICT-MAX", p = initialProgress(); for (const [i, points] of [15, 25, 25, 20].entries()) { p.chapters[i].score = points; p.chapters[i].completedAt = 1; } p.bonus = 5;
+    await db.team.create({ data: { id, name: id, participants: '[]', codeHash: hashPassword(code), variant: "A", progress: JSON.stringify(p) } }); await Promise.allSettled([service.mutateTeam(id, 4, "submit", verdictAnswers.A), service.mutateTeam(id, 4, "submit", verdictAnswers.A)]);
+    const saved = await service.teamState(id); expect(saved.score).toBe(105); expect(saved.current).toBe(-1); expect((await service.mutateTeam(id, 4, "submit", { ...verdictAnswers.A, points: 200 })).error).toMatch(/locked/); expect((await service.teamState(id)).progress.completedAt).toBe(saved.progress.completedAt); expect(await db.submission.count({ where: { teamId: id, chapter: 4, accepted: true } })).toBe(1);
+  });
+  it("reviews provisional/final rankings and formula-safe CSV without mutation, audits confirmation and invalidates changed snapshots", async () => {
+    const { qualificationReport, confirmQualification } = await import("../src/lib/game/qualification.server"), scores = await import("../src/app/api/admin/scores/route");
+    expect(await qualificationReport()).toBeNull(); expect((await scores.GET()).status).toBe(401); await expect(confirmQualification("Unauthorized")).rejects.toThrow("Organizer");
+    await auth.login("team", "CONTAIN-A", code); expect(await qualificationReport()).toBeNull(); expect((await scores.GET()).status).toBe(401); await auth.logout(); await auth.login("admin", "organizer", code);
+    await db.team.create({ data: { id: "+VERDICT-CSV", name: "=SUM(1,2)", participants: '[]', codeHash: hashPassword(code), variant: "A", progress: JSON.stringify(initialProgress()) } });
+    const before = JSON.stringify(await db.team.findMany({ orderBy: { id: "asc" } })), roundBefore = JSON.stringify(await db.gameSession.findUnique({ where: { id: 1 } })), auditBefore = await db.auditLog.count();
+    const provisional = (await qualificationReport())!; expect(provisional.label).toBe("PROVISIONAL"); expect(provisional.rows.some(row => row.id === "+VERDICT-CSV" && row.completedAt === null)).toBe(true); expect(provisional.rows.find(row => row.id === "CONTAIN-OVERRIDE")!.overrides).toEqual([1, 2, 3, 4]); await expect(confirmQualification("Too early review")).rejects.toThrow("closed");
+    const response = await scores.GET(); expect(response.status).toBe(200); expect(response.headers.get("Cache-Control")).toBe("no-store"); const csv = await response.text(); expect(csv.split("\r\n")[0]).toMatch(/^"Rank","Team ID","Team","Score","Hints","Completed",/); expect(csv).toContain("\"'+VERDICT-CSV\""); expect(csv).toContain("\"'=SUM(1,2)\""); expect(csv).toContain("PROVISIONAL"); expect(csv).not.toMatch(/codeHash|fragmentA|fragmentB|tokenHash/);
+    expect(JSON.stringify(await db.team.findMany({ orderBy: { id: "asc" } }))).toBe(before); expect(JSON.stringify(await db.gameSession.findUnique({ where: { id: 1 } }))).toBe(roundBefore); expect(await db.auditLog.count()).toBe(auditBefore);
+    await service.control("stop"); const final = (await qualificationReport())!; expect(final.label).toBe("FINAL / PENDING ORGANIZER CONFIRMATION"); expect(final.rows.map(row => row.id)).toEqual(provisional.rows.map(row => row.id)); expect(final.rows.slice(0, 10)).toHaveLength(10); expect(final.rows.slice(10, 12)).toHaveLength(2);
+    const completed = (await service.teamState("CONTAIN-A")).progress.completedAt; expect((await service.mutateTeam("VERDICT-DEADLINE", 4, "submit", verdictAnswers.A)).error).toMatch(/not active/); expect((await service.teamState("CONTAIN-A")).progress.completedAt).toBe(completed);
+    const rowsBeforeConfirmation = JSON.stringify(await db.team.findMany({ orderBy: { id: "asc" } })); await Promise.allSettled([confirmQualification("Reviewed incomplete investigations and overrides"), confirmQualification("Reviewed incomplete investigations and overrides")]); expect((await qualificationReport())!.label).toBe("FINAL / ORGANIZER CONFIRMED"); expect(await db.auditLog.count({ where: { action: "qualification-confirmed" } })).toBe(1); expect(JSON.stringify(await db.team.findMany({ orderBy: { id: "asc" } }))).toBe(rowsBeforeConfirmation); expect(await (await scores.GET()).text()).toContain("FINAL / ORGANIZER CONFIRMED");
+    await db.team.update({ where: { id: "+VERDICT-CSV" }, data: { name: "Roster label corrected" } }); expect((await qualificationReport())!.label).toBe("FINAL / PENDING ORGANIZER CONFIRMATION"); await auth.logout();
   });
 });

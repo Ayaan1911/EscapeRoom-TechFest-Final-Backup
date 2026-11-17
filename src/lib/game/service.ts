@@ -56,13 +56,19 @@ export async function mutateTeam(id: string, chapter: number, action: "submit" |
       return { unlocked };
     }
     const result = validator!.validate(answer, team.variant);
+    const decidedAt = Date.now();
+    if (status(round, decidedAt) !== "active") {
+      const error = "Round is not active";
+      await tx.submission.create({ data: { teamId: id, chapter, accepted: false, reason: error, answer: JSON.stringify(answer ?? null) } });
+      return { error };
+    }
     const tamperAwarded = !!result.tamperDetected && !p.bonus;
     if (tamperAwarded) {
       bonus(p);
       await tx.auditLog.create({ data: { actor: id, action: "tamper-alert", detail: JSON.stringify({ chapter }) } });
     }
     if (result.correct) {
-      complete(p, chapter, result.points, now);
+      complete(p, chapter, result.points, decidedAt);
     }
     if (result.correct || tamperAwarded) {
       await tx.team.update({ where: { id }, data: { progress: JSON.stringify(p) } });
