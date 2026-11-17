@@ -41,7 +41,8 @@ class Client {
     try { res = await fetch(ORIGIN + path, { method, body, redirect: "manual", headers: { ...(this.cookie ? { cookie: this.cookie } : {}), origin: ORIGIN, ...headers } }); }
     catch (e) { record(name, performance.now() - t, "NETERR"); errors.push(`${name}: ${e.message}`); return { status: 0, text: "" }; }
     const text = await res.text();
-    const setCookie = res.headers.get("set-cookie"); if (setCookie) this.cookie = setCookie.split(";")[0];
+    for (const c of res.headers.getSetCookie()) { const [pair, ...attrs] = c.split(";"), i = pair.indexOf("="), gone = /max-age=0|expires=thu, 01 jan 1970/i.test(attrs.join(";")) || pair.slice(i + 1) === ""; (this.jar ??= new Map())[gone ? "delete" : "set"](...(gone ? [pair.slice(0, i)] : [pair.slice(0, i), pair.slice(i + 1)])); }
+    this.cookie = [...(this.jar ?? [])].map(([k, v]) => `${k}=${v}`).join("; ");
     record(name, performance.now() - t, res.status);
     if (!ok.includes(res.status)) errors.push(`${name} -> ${res.status}`);
     return { status: res.status, text };

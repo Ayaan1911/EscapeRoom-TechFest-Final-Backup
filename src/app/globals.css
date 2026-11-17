@@ -285,3 +285,40 @@ details { margin: 25px 0 0; } summary { cursor: pointer; padding: 10px 0; color:
 .fragment-card small { display: block; font: 8px/1.25 Arial, sans-serif; }
 @media (max-width: 750px) { .insider-record-grid, .suspect-profile, .kit-team-selector { grid-template-columns: minmax(0, 1fr); } .insider-record-list { max-height: 440px; } .fragment-card code { font-size: 9px; } }
 @media print { @page { size: A4; margin: 12mm; } .insider-kit-main { max-width: none; margin: 0; padding: 0; background: white; color: black; } .print-kit-page { width: 186mm; max-width: none; margin: 0; break-after: page; break-inside: avoid; } .print-kit-page:last-child { break-after: auto; } .fragment-card code { font-size: 13px; } .print-controls { display: none !important; } }
+
+/* ===== Phase 8 design system layer (tokens, type, controls, motion). Presentation only. ===== */
+:root {
+  --bg: #0b0f17; --surface: #121826; --surface-2: #182033; --line: #2a3446;
+  --text: #f1ece2; --muted: #aab2c0; --amber: #e3a93b; --amber-ink: #1a1305; --red: #c9474d; --alert: #e06a70; --ok: #6fbf8f;
+  --font-sans: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", Consolas, "Courier New", monospace;
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px; --s7: 48px;
+}
+body { background: var(--bg); color: var(--text); font-family: var(--font-sans); font-size: 16px; line-height: 1.6; }
+.site-shell { background: radial-gradient(circle at 78% 0%, rgba(227,169,59,.07), transparent 32%), var(--bg); }
+.site-header { border-bottom-color: var(--line); }
+.panel { background: var(--surface); border-color: var(--line); border-radius: 8px; }
+.panel-heading h2 { font-size: 16px; }
+.briefing-panel p, .panel p { color: var(--muted); font-size: 16px; line-height: 1.65; max-width: 72ch; }
+form label { font-size: 16px; }
+input, select, textarea { font-size: 16px; background: var(--bg); border-color: #5b6a82; border-radius: 6px; color: var(--text); }
+table { font-size: 15px; }
+th { color: var(--amber); }
+th, td { border-bottom-color: var(--line); }
+.eyebrow { color: var(--amber); font-size: 12px; }
+.red-line { background: var(--amber); }
+.brand-copy small, .header-meta, .muted, .back-link, .status-tag { font-size: 12px; }
+.button-primary { background: var(--amber); border-color: var(--amber); color: var(--amber-ink); border-radius: 6px; font-size: 15px; min-height: 48px; letter-spacing: .01em; gap: var(--s3); }
+.button-primary:hover { background: #f0bb52; }
+.button-primary:disabled { background: #3a4254; border-color: #3a4254; color: #c4cad6; }
+:focus-visible { outline: 3px solid var(--amber); outline-offset: 3px; }
+.live-dot { background: var(--alert); }
+[role="alert"] { color: var(--alert); font-size: 16px; }
+.text-link, .back-link { color: var(--amber); text-decoration: underline; text-underline-offset: 3px; }
+img, svg, canvas, video { max-width: 100%; }
+main, .dashboard-main { overflow-wrap: anywhere; }
+.table-scroll { max-width: 100%; }
+@keyframes ghost-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.hero-copy, .panel, .login-panel, .dashboard-title { animation: ghost-rise .35s ease-out both; }
+@media (max-width: 640px) { .site-header { height: auto; min-height: 72px; padding: 12px 16px; flex-wrap: wrap; } .hero { padding: 48px 16px; } .briefing-panel { padding: 16px; } }
+@media (prefers-reduced-motion: reduce) { .hero-copy, .panel, .login-panel, .dashboard-title { animation: none; } }
