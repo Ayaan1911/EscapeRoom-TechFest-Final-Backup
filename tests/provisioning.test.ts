@@ -3,6 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
+import { createTempDatabase } from "../scripts/pg-temp.mjs";
 import { generateCode, generatedTeams, parseCsv, planTeams, teamsFromCsv, csvField } from "../scripts/provision-lib.mjs";
 import { hashPassword, verifyPassword, verifyPasswordAsync } from "../src/lib/password.mjs";
 
@@ -50,15 +51,12 @@ describe("real-team provisioning", () => {
 });
 
 describe("provisioning CLI and backup/restore against disposable databases", () => {
-  it("dry-run writes nothing; apply registers teams hashed, refuses reuse of credentials file and existing IDs", () => {
-    const dir = mkdtempSync(join(tmpdir(), "ghost-prov-"));
+  it("dry-run writes nothing; apply registers teams hashed, refuses reuse of credentials file and existing IDs; backup/verify/restore round-trips", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "ghost-prov-")), temp = await createTempDatabase("prov");
     try {
-      const dbFile = join(dir, "t.db").replaceAll("\\", "/");
-      const env = { ...process.env, DATABASE_URL: `file:${dbFile}` };
+      const env = { ...process.env, DATABASE_URL: temp.url, DIRECT_URL: temp.url };
       const run = (...args: string[]) => spawnSync(process.execPath, ["scripts/provision-teams.mjs", ...args], { env, encoding: "utf8" });
-      // schema via the same migrations the app ships
-      const setup = `import {PrismaClient} from "@prisma/client";import {readdirSync,readFileSync} from "node:fs";const db=new PrismaClient();for(const m of readdirSync("prisma/migrations").sort().filter(x=>/^[0-9]/.test(x)))for(const s of readFileSync("prisma/migrations/"+m+"/migration.sql","utf8").split(";").filter(v=>v.trim()))await db.$executeRawUnsafe(s);await db.$disconnect();`;
-      expect(spawnSync(process.execPath, ["--input-type=module", "-e", setup], { env, encoding: "utf8" }).status).toBe(0);
+      const backupCli = (...args: string[]) => spawnSync(process.execPath, ["scripts/db-backup.mjs", ...args], { env, encoding: "utf8" });
       const out = join(dir, "private", "creds.csv");
       const dry = run("--generate", "50", "--out", out); expect(dry.stdout, dry.stderr).toContain("DRY RUN");
       expect(run("--list").stdout).toContain("0 registered");
@@ -74,13 +72,20 @@ describe("provisioning CLI and backup/restore against disposable databases", () 
       const dup = run("--input", csv, "--out", join(dir, "c2.csv"), "--apply");
       expect(dup.status).not.toBe(0); expect(dup.stderr).toContain("already registered");
       expect(run("--list").stdout).toContain("50 registered");
-      // backup -> verify -> restore round trip
-      const backup = spawnSync(process.execPath, ["scripts/db-backup.mjs", "backup", dbFile, join(dir, "bk")], { encoding: "utf8" });
+      // backup -> verify -> restore (refused into a populated database; allowed into an empty one)
+      const backup = backupCli("backup", join(dir, "bk"));
       expect(backup.status, backup.stderr).toBe(0);
-      const file = /Backup written: (.+\.db)/.exec(backup.stdout)![1];
+      const file = /Backup written: (.+\.json)/.exec(backup.stdout)![1];
       expect(backup.stdout).toContain("teams: 50");
-      expect(spawnSync(process.execPath, ["scripts/db-backup.mjs", "restore", file, dbFile], { encoding: "utf8" }).status).not.toBe(0); // needs --yes
-      expect(spawnSync(process.execPath, ["scripts/db-backup.mjs", "restore", file, dbFile, "--yes"], { encoding: "utf8" }).status).toBe(0);
-    } finally { rmSync(dir, { recursive: true, force: true }); }
-  }, 120_000);
+      expect(backupCli("verify", file).stdout).toContain("team: 50");
+      expect(backupCli("restore", file).status).not.toBe(0); // needs --yes
+      expect(backupCli("restore", file, "--yes").status).not.toBe(0); // populated database refused
+      const empty = await createTempDatabase("restore");
+      try {
+        const restored = spawnSync(process.execPath, ["scripts/db-backup.mjs", "restore", file, "--yes"], { env: { ...process.env, DATABASE_URL: empty.url, DIRECT_URL: empty.url }, encoding: "utf8" });
+        expect(restored.status, restored.stderr).toBe(0); expect(restored.stdout).toContain("Restored 50 teams");
+        expect(spawnSync(process.execPath, ["scripts/provision-teams.mjs", "--list"], { env: { ...process.env, DATABASE_URL: empty.url, DIRECT_URL: empty.url }, encoding: "utf8" }).stdout).toContain("50 registered");
+      } finally { await empty.drop(); }
+    } finally { rmSync(dir, { recursive: true, force: true }); await temp.drop(); }
+  }, 180_000);
 });

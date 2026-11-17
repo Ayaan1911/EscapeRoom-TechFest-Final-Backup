@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { randomBytes } from "node:crypto";
-import { db } from "./db";
+import { db, serializable } from "./db";
 import { digest, verifyPasswordAsync } from "./password.mjs";
 import { authorized } from "./auth-policy";
 
@@ -16,7 +16,7 @@ export async function session(role: Role) {
 export async function login(role: Role, id: string, code: string) {
   const key = digest(`${role}:${id}`);
   // Persistent throttling also covers unknown IDs; no credentials enter audit logs.
-  const allowed = await db.$transaction(async tx => {
+  const allowed = await serializable(async tx => {
     const old = await tx.loginAttempt.findUnique({ where: { key } });
     const fresh = !old || Date.now() - old.windowStart.getTime() >= 15 * 60_000;
     if (!fresh && old.failures >= 10) return false;

@@ -1,4 +1,4 @@
-import { db } from "../db";
+import { db, serializable } from "../db";
 import { bonus, complete, current, hints, permit, progressSchema, ranking, score, start, status, useHint } from "./engine";
 import { validators } from "./validators";
 import { matchesInsiderFragments } from "./insider-fragments.server";
@@ -20,7 +20,7 @@ export async function recentAudit() {
   return db.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: 100 });
 }
 export async function mutateTeam(id: string, chapter: number, action: "submit" | "hint" | "unlock", answer: unknown) {
-  return db.$transaction(async tx => {
+  return serializable(async tx => {
     const team = await tx.team.findUniqueOrThrow({ where: { id }, include: { insiderAccess: { select: { unlockedAt: true } } } });
     const round = await tx.gameSession.findUniqueOrThrow({ where: { id: 1 } });
     const p = progressSchema.parse(JSON.parse(team.progress));
@@ -75,10 +75,10 @@ export async function mutateTeam(id: string, chapter: number, action: "submit" |
     }
     await tx.submission.create({ data: { teamId: id, chapter, accepted: result.correct, reason: result.correct ? "completed" : "incorrect", answer: JSON.stringify(answer ?? null) } });
     return { accepted: result.correct, tamperAwarded };
-  }, { isolationLevel: "Serializable" });
+  });
 }
 export async function control(action: "start" | "stop" | "unlock", teamId?: string, reason?: string) {
-  return db.$transaction(async tx => {
+  return serializable(async tx => {
     const round = await tx.gameSession.upsert({ where: { id: 1 }, create: { id: 1 }, update: {} });
     if (action === "start") await tx.gameSession.update({ where: { id: 1 }, data: start(round) });
     if (action === "stop") {
@@ -95,5 +95,5 @@ export async function control(action: "start" | "stop" | "unlock", teamId?: stri
       await tx.team.update({ where: { id: teamId }, data: { progress: JSON.stringify(p) } });
     }
     await tx.auditLog.create({ data: { actor: "organizer", action, detail: JSON.stringify({ teamId, reason }) } });
-  }, { isolationLevel: "Serializable" });
+  });
 }

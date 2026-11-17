@@ -1,7 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { createTempDatabase } from "../scripts/pg-temp.mjs";
 import { initialProgress } from "../src/lib/game/engine";
 import { hashPassword } from "../src/lib/password.mjs";
 import { inboxAnswers, tamperAnswer } from "./fixtures/inbox";
@@ -16,7 +14,7 @@ vi.mock("next/headers", () => ({ cookies: async () => ({ get: (key: string) => j
 
 // Opt in only after installing Prisma and generating the client; always uses a fresh temporary DB.
 describe.runIf(process.env.GHOST_DB_TEST === "1")("Prisma persistence and session integration", () => {
-  let folder: string;
+  let temp: Awaited<ReturnType<typeof createTempDatabase>>;
   let db: typeof import("../src/lib/db").db;
   let auth: typeof import("../src/lib/auth");
   let service: typeof import("../src/lib/game/service");
@@ -26,17 +24,16 @@ describe.runIf(process.env.GHOST_DB_TEST === "1")("Prisma persistence and sessio
   const verdictPriorChapters = new Map<string, string>();
   let verdictAccessSnapshot = "";
   beforeAll(async () => {
-    folder = mkdtempSync(join(tmpdir(), "ghost-test-"));
-    process.env.DATABASE_URL = `file:${join(folder,"test.db").replaceAll("\\","/")}`;
+    temp = await createTempDatabase("dbtest");
+    process.env.DATABASE_URL = temp.url; process.env.DIRECT_URL = temp.url;
     process.env.ADMIN_ACCESS_HASH = hashPassword(code);
     process.env.APP_ORIGIN = "http://127.0.0.1:3000";
     ({ db } = await import("../src/lib/db"));
     auth = await import("../src/lib/auth");
     service = await import("../src/lib/game/service");
-    for (const migration of readdirSync("prisma/migrations").sort().filter(name => /^\d/.test(name))) for (const statement of readFileSync(`prisma/migrations/${migration}/migration.sql`, "utf8").split(";").filter(sql => sql.trim())) await db.$executeRawUnsafe(statement);
     for (const id of ["A","B"]) await db.team.create({ data: { id, name:id, participants:JSON.stringify(["One","Two","Three"]), codeHash:hashPassword(code), variant:"A", progress:JSON.stringify(initialProgress()) } });
   });
-  afterAll(async () => { if(db) await db.$disconnect(); if(folder) rmSync(folder, { recursive:true, force:true }); });
+  afterAll(async () => { if(db) await db.$disconnect(); await temp?.drop(); });
   it("logs in, isolates team identity, survives reads and invalidates logout", async () => {
     expect(await auth.session("team")).toBeNull();
     expect(await auth.login("team","A","wrong-code")).toBe(false);

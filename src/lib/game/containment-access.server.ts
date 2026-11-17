@@ -1,6 +1,6 @@
 import "server-only";
 import { session } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { db, serializable } from "@/lib/db";
 import { progressSchema, status } from "./engine";
 import { teamState } from "./service";
 import { containmentCctv, containmentEvidence } from "./containment.server";
@@ -16,12 +16,12 @@ export async function containmentAccess() {
 }
 export async function authorizeContainmentCopy(teamId: string, reason: string) {
   if (!await session("admin")) throw new Error("Organizer authorization required");
-  return db.$transaction(async tx => {
+  return serializable(async tx => {
     const team = await tx.team.findUniqueOrThrow({ where: { id: teamId } });
     const round = await tx.gameSession.findUniqueOrThrow({ where: { id: 1 } });
     if (status(round) !== "active" || progressSchema.parse(JSON.parse(team.progress)).chapters[2].completedAt === null) throw new Error("Team must have access to active Containment");
     if (!await tx.auditLog.findFirst({ where: grantWhere(teamId) })) await tx.auditLog.create({ data: { actor: "organizer", action: "containment-copy", detail: JSON.stringify({ teamId, reason }) } });
-  }, { isolationLevel: "Serializable" });
+  });
 }
 export async function containmentPrintData(variants: string[]) {
   if (!await session("admin")) return null;

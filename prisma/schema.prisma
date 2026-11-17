@@ -2,8 +2,9 @@ generator client {
   provider = "prisma-client-js"
 }
 datasource db {
-  provider = "sqlite"
-  url = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL") // pooled (Neon pgbouncer) connection used by the application
+  directUrl = env("DIRECT_URL")   // direct connection used by prisma migrate
 }
 model Team {
   id String @id

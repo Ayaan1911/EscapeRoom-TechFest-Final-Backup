@@ -1,7 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join, resolve, sep } from "node:path";
+import { createTempDatabase } from "./pg-temp.mjs";
 import { randomBytes } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
 import { PrismaClient } from "@prisma/client";
@@ -19,10 +17,10 @@ assert.equal(origin.protocol, "http:", "The local demo uses HTTP; deployed produ
 assert.match(origin.hostname, /^[a-z\d.:-]+$/i);
 assert.equal(origin.pathname, "/");
 assert.ok(!origin.username && !origin.password && !origin.search && !origin.hash);
-const folder = mkdtempSync(join(tmpdir(), "ghost-inbox-demo-"));
-const databaseUrl = `file:${join(folder, "test.db").replaceAll("\\", "/")}`;
+const temp = await createTempDatabase("demo"); // disposable local PostgreSQL database with the shipped migrations applied
+const databaseUrl = temp.url;
 const code = randomBytes(18).toString("hex");
-const env = { ...process.env, DATABASE_URL: databaseUrl, ADMIN_ACCESS_HASH: hashPassword(code), APP_ORIGIN: origin.origin, GHOST_E2E_TEAM_ID: "DEMO-A", GHOST_E2E_TEAM_CODE: code, GHOST_E2E_ADMIN_CODE: code, GHOST_E2E_INBOX: "1", GHOST_E2E_TRAIL: trail ? "1" : "", GHOST_E2E_INSIDER: insider ? "1" : "", GHOST_E2E_CONTAINMENT: containment ? "1" : "", GHOST_E2E_VERDICT: verdict ? "1" : "", ...(testing ? { CI: "1" } : {}) };
+const env = { ...process.env, DATABASE_URL: databaseUrl, DIRECT_URL: databaseUrl, ADMIN_ACCESS_HASH: hashPassword(code), APP_ORIGIN: origin.origin, GHOST_E2E_TEAM_ID: "DEMO-A", GHOST_E2E_TEAM_CODE: code, GHOST_E2E_ADMIN_CODE: code, GHOST_E2E_INBOX: "1", GHOST_E2E_TRAIL: trail ? "1" : "", GHOST_E2E_INSIDER: insider ? "1" : "", GHOST_E2E_CONTAINMENT: containment ? "1" : "", GHOST_E2E_VERDICT: verdict ? "1" : "", ...(testing ? { CI: "1" } : {}) };
 const db = new PrismaClient({ datasourceUrl: databaseUrl });
 let child;
 function stop() {
@@ -30,14 +28,14 @@ function stop() {
   if (process.platform === "win32") spawnSync("taskkill", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
   else child.kill("SIGTERM");
 }
-function cleanup() {
+async function cleanup() {
   if (!testing && process.stdin.isTTY) { process.stdin.setRawMode(false); process.stdin.pause(); }
-  assert.ok(resolve(folder).startsWith(resolve(tmpdir()) + sep) && folder.includes("ghost-inbox-demo-"));
-  rmSync(folder, { recursive: true, force: true });
+  await temp.drop();
 }
-function interrupt() {
+async function interrupt() {
   stop();
-  cleanup();
+  await db.$disconnect().catch(() => undefined);
+  await cleanup();
   process.exit(0);
 }
 async function seedTrail() {
@@ -89,8 +87,6 @@ async function seedContainment(verdictReady = false) {
   await db.$disconnect();
 }
 try {
-  assert.ok(resolve(folder).startsWith(resolve(tmpdir()) + sep));
-  for (const migration of readdirSync(new URL("../prisma/migrations/", import.meta.url)).sort().filter(name => /^\d/.test(name))) for (const sql of readFileSync(new URL(`../prisma/migrations/${migration}/migration.sql`, import.meta.url), "utf8").split(";").filter(value => value.trim())) await db.$executeRawUnsafe(sql);
   if (!trail || testing) for (const variant of ["A", "B", "C"]) await db.team.create({ data: { id: `DEMO-${variant}`, name: `Inbox demo ${variant}`, participants: JSON.stringify(["Investigator One", "Investigator Two", "Investigator Three"]), codeHash: hashPassword(code), variant, progress: JSON.stringify(initialProgress()) } });
   if (containment && !testing) await seedContainment(verdict);
   else if (insider && !testing) await seedInsider();
@@ -110,7 +106,7 @@ Teams DEMO-A / DEMO-B / DEMO-C start with ZERO progress (variants A/B/C), same c
  4. Play Inbox -> Trail -> Insider (enter both physical fragments) -> Containment (organizer may authorize accessible CCTV copy) -> Final Verdict.
  5. See CASE CLOSED; refresh and log in again to confirm the saved score (max 105 with Tamper Alert).
  6. Organizer: review the leaderboard, Stop the round, inspect qualification (Top 10 + 2 standby) and CSV export.
-Ctrl+C removes the temporary database. If the window is force-closed, delete only the folder named ghost-inbox-demo-* in %TEMP%.`);
+Ctrl+C drops the temporary PostgreSQL database. After a forced close run: node -e "import('./scripts/pg-temp.mjs').then(m=>m.dropStaleTempDatabases())" (drops only ghostt_* databases on the local test server).`);
   process.on("SIGINT", interrupt);
   process.on("SIGTERM", interrupt);
   // Own Ctrl+C input on Windows so npm cannot terminate the process tree before cleanup.
@@ -133,5 +129,5 @@ Ctrl+C removes the temporary database. If the window is force-closed, delete onl
 } finally {
   stop();
   await db.$disconnect();
-  cleanup();
+  await cleanup();
 }

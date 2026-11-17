@@ -1,40 +1,63 @@
-// Consistent online SQLite backup / verified restore (no extra dependencies; uses node:sqlite).
-//   node scripts/db-backup.mjs backup  <database.db> [backups-dir]      -> backups/ghost-<UTC>.db (VACUUM INTO: safe while the app runs)
-//   node scripts/db-backup.mjs verify  <backup.db>                      -> integrity + row counts
-//   node scripts/db-backup.mjs restore <backup.db> <database.db> --yes  -> STOP THE APP FIRST; current DB is kept as <db>.before-restore-<UTC>
-import { copyFileSync, existsSync, mkdirSync, rmSync } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
-import { DatabaseSync } from "node:sqlite";
-const [cmd, a, b] = process.argv.slice(2);
-const stamp = () => new Date().toISOString().replace(/[-:]/g, "").replace(/\..*/, "Z");
-const fail = m => { console.error(m); process.exit(1); };
-function inspect(file) {
-  const db = new DatabaseSync(file, { readOnly: true });
+// Logical PostgreSQL backup / verify / restore for the Ghost_404 tables (works against Neon or any PostgreSQL).
+//   node scripts/db-backup.mjs backup [dir]                 -> dir/ghost-<UTC stamp>.json (default ./backups); read-only, safe while the app runs
+//   node scripts/db-backup.mjs verify <file>                -> structure + counts, no database access
+//   node scripts/db-backup.mjs restore <file> --yes         -> only into a database with NO teams
+//   node scripts/db-backup.mjs restore <file> --yes --replace  -> replaces ALL rows (asks for the exact database name via GHOST_CONFIRM_DB)
+// Connection: DIRECT_URL (preferred) or DATABASE_URL. The file holds team data and password hashes: never commit or publish it.
+import { PrismaClient } from "@prisma/client";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { createHash } from "node:crypto";
+
+const [command, a] = process.argv.slice(2);
+const flag = name => process.argv.includes(name);
+const url = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
+const TABLES = ["team", "insiderAccess", "teamSession", "gameSession", "submission", "auditLog", "loginAttempt"];
+const dateKeys = new Set(["unlockedAt", "expiresAt", "startsAt", "deadline", "endedAt", "createdAt", "windowStart"]);
+const revive = rows => rows.map(row => Object.fromEntries(Object.entries(row).map(([k, v]) => [k, dateKeys.has(k) && typeof v === "string" ? new Date(v) : v])));
+const need = () => { if (!url) throw new Error("Set DIRECT_URL or DATABASE_URL."); return new PrismaClient({ datasourceUrl: url }); };
+
+async function backup(dir = "backups") {
+  const db = need();
   try {
-    const check = db.prepare("PRAGMA integrity_check").get().integrity_check;
-    if (check !== "ok") fail(`Integrity check FAILED for ${file}: ${check}`);
-    const n = t => db.prepare(`SELECT COUNT(*) AS n FROM ${t}`).get().n;
-    return { teams: n("Team"), submissions: n("Submission"), audit: n("AuditLog"), sessions: n("GameSession") };
-  } finally { db.close(); }
+    const data = {};
+    await db.$transaction(async tx => { for (const t of TABLES) data[t] = await tx[t].findMany(); }, { isolationLevel: "RepeatableRead" }); // one consistent snapshot
+    const body = { format: "ghost404-backup-1", createdAt: new Date().toISOString(), counts: Object.fromEntries(TABLES.map(t => [t, data[t].length])), data };
+    const text = JSON.stringify(body);
+    mkdirSync(dir, { recursive: true });
+    const file = resolve(join(dir, `ghost-${body.createdAt.replace(/[:.]/g, "-")}.json`));
+    writeFileSync(file, text, { flag: "wx" }); // never overwrite
+    console.log(`Backup written: ${file}\nteams: ${body.counts.team}, submissions: ${body.counts.submission}, audit: ${body.counts.auditLog}, sha256: ${createHash("sha256").update(text).digest("hex").slice(0, 16)}`);
+  } finally { await db.$disconnect(); }
 }
-if (cmd === "backup") {
-  if (!a || !existsSync(a)) fail("Usage: backup <database.db> [backups-dir]");
-  const dir = resolve(b ?? "backups"); mkdirSync(dir, { recursive: true });
-  const out = join(dir, `ghost-${stamp()}.db`);
-  if (existsSync(out)) fail(`${out} already exists`);
-  const db = new DatabaseSync(a);
-  try { db.exec("PRAGMA busy_timeout=10000"); db.exec(`VACUUM INTO '${out.replaceAll("'", "''")}'`); } finally { db.close(); }
-  console.log(`Backup written: ${out}`, inspect(out));
-} else if (cmd === "verify") {
-  if (!a || !existsSync(a)) fail("Usage: verify <backup.db>");
-  console.log("Backup OK", inspect(a));
-} else if (cmd === "restore") {
-  if (!a || !b || !existsSync(a)) fail("Usage: restore <backup.db> <database.db> --yes");
-  if (!process.argv.includes("--yes")) fail("Restore replaces the live database file. Stop the app, then re-run with --yes.");
-  inspect(a);
-  if (existsSync(b)) { const keep = `${b}.before-restore-${stamp()}`; copyFileSync(b, keep); console.log(`Current database preserved as ${keep}`); }
-  for (const ext of ["-wal", "-shm"]) if (existsSync(b + ext)) rmSync(b + ext); // stale WAL must not replay over the restored file
-  mkdirSync(dirname(resolve(b)), { recursive: true });
-  copyFileSync(a, b);
-  console.log(`Restored ${basename(a)} -> ${b}`, inspect(b));
-} else fail("Commands: backup | verify | restore");
+function load(file) {
+  const body = JSON.parse(readFileSync(file, "utf8"));
+  if (body.format !== "ghost404-backup-1") throw new Error("Not a Ghost_404 backup file");
+  for (const t of TABLES) if (!Array.isArray(body.data[t]) || body.data[t].length !== body.counts[t]) throw new Error(`Backup is damaged: table ${t} count mismatch`);
+  return body;
+}
+function verify(file) {
+  const body = load(file);
+  console.log(`Backup OK (${body.createdAt})\n${TABLES.map(t => `${t}: ${body.counts[t]}`).join("\n")}`);
+}
+async function restore(file) {
+  if (!flag("--yes")) throw new Error("Restore changes the database. Re-run with --yes after stopping the application.");
+  const body = load(file), db = need();
+  try {
+    const [{ name }] = await db.$queryRawUnsafe("SELECT current_database() AS name");
+    const existing = await db.team.count();
+    if (existing > 0 && !flag("--replace")) throw new Error(`Database "${name}" already holds ${existing} teams. Restore only into an empty database, or pass --replace (and set GHOST_CONFIRM_DB=${name}).`);
+    if (existing > 0 && process.env.GHOST_CONFIRM_DB !== name) throw new Error(`--replace needs GHOST_CONFIRM_DB=${name} to confirm the target database.`);
+    await db.$transaction(async tx => {
+      for (const t of [...TABLES].reverse()) await tx[t].deleteMany();
+      for (const t of TABLES) if (body.data[t].length) await tx[t].createMany({ data: revive(body.data[t]) });
+    }, { timeout: 120_000, maxWait: 30_000 });
+    console.log(`Restored ${body.counts.team} teams into "${name}".`);
+  } finally { await db.$disconnect(); }
+}
+try {
+  if (command === "backup") await backup(a);
+  else if (command === "verify" && a) verify(a);
+  else if (command === "restore" && a) await restore(a);
+  else { console.error("Usage: backup [dir] | verify <file> | restore <file> --yes [--replace]"); process.exit(2); }
+} catch (error) { console.error(error.message); process.exit(1); }
