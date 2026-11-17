@@ -32,17 +32,35 @@ Consequences for an event: (1) the service **must be warmed and kept awake** for
 
 The start command `npm run start:render` runs `prisma migrate deploy` *before* `next start`, so the schema is applied before traffic (it is idempotent and also runs on every cold start).
 
-## Remote load and recovery test (after deploy, before any demo)
+## Remote load and recovery test (separate disposable environment only)
 
-Use a **fresh, empty** preview database (the harness refuses a database that already has teams, seeds 50 fictional `GH-nn` teams directly, plays the game over HTTPS, then deletes everything it created).
+**Never run the load test against the preview or event service/database.** The harness is fail-closed and refuses anything that is not a dedicated test environment (rules enforced and unit-tested in `scripts/load-safety.mjs`, `tests/load-safety.test.ts`).
+
+### Test environment (preferred design)
+
+* A **separate Neon project** (Free allows many; each has its own compute and storage quota) with a database named with `loadtest`, e.g. `ghost404_loadtest`. Nothing connects it to the preview database.
+* A **separate Render Free service** whose hostname contains `loadtest`, e.g. `ghost404-loadtest.onrender.com`, with its own `DATABASE_URL`/`DIRECT_URL` (the loadtest database), its own `ADMIN_ACCESS_HASH`, `APP_ORIGIN`. Apply the schema with `prisma migrate deploy` (the start command does it). Create **no** teams.
+* Quotas (vendor pages, checked 2026-11-18, re-check): Neon Free 100 CU-hours and 1 GB per project (older pages say 0.5 GB), no overage billing, computes suspend at the cap; Render Free 750 instance hours per workspace per month shared by all free services (a second always-on free service roughly doubles hour use: 2 x 744 h > 750 h, so keep the test service **suspended** except during a run and keep the preview service for demos only), 512 MB / 0.1 CPU, spin-down after 15 idle minutes. Everything stays on free plans; nothing here enables a paid service.
+* Delete or suspend the test service and database after the run (owner action in the dashboards; the harness never drops a hosted database).
+
+### What the harness guarantees
+
+1. Remote mode needs **all** of: `--origin https://<host containing "loadtest">`, `--yes-remote`, `--authorize-round-control` (it starts, then expires, the round on the TEST service), `GHOST_LOAD_ENV=disposable-loadtest`, `GHOST_LOAD_TARGET_DB=<exact database name>`, `GHOST_LOAD_DATABASE_URL`, `GHOST_LOAD_ADMIN_CODE`. The database name must contain `loadtest` and must not contain preview/prod/event/live/round1/real.
+2. The database must be **completely empty** (no teams, sessions, submissions, audit rows, login attempts, and no started round) or the run aborts before writing.
+3. **Identity proof:** it seeds a nonce-named marker team in the target database and logs in to the hosted origin as that team; if the service does not see that team, it stops. (A wrong origin therefore costs at most one failed-login throttle row with a random key there; it never starts a round or seeds game data on an unverified service.)
+4. **Scoped cleanup only:** it deletes exact tracked ids/keys/tokens (its teams `GH-nn`/`GHZ-ID-*`, their submissions and audit rows by actor, their login-attempt keys, its own organizer session by token hash) and compare-and-restores the round row only if it still holds exactly what the run wrote. There is no unfiltered or time-window delete anywhere; failure, Ctrl-C and the `--max-minutes` timeout (default 40) all run the same scoped cleanup and nothing else. Errors and logs are redacted (connection strings, passwords, the organizer code).
+
+### Run (owner shell; values are never printed or committed)
 
 ```powershell
-$env:GHOST_LOAD_DATABASE_URL = "<direct url>"   # preview DB only
-$env:GHOST_LOAD_ADMIN_CODE   = "<organizer code>"
-node scripts/load-test.mjs --origin https://<service>.onrender.com --teams 50 --storm --yes-remote --pause-for-restart
+$env:GHOST_LOAD_ENV = "disposable-loadtest"
+$env:GHOST_LOAD_TARGET_DB = "ghost404_loadtest"
+$env:GHOST_LOAD_DATABASE_URL = "<direct url of the loadtest database>"
+$env:GHOST_LOAD_ADMIN_CODE = "<organizer code of the TEST service>"
+node scripts/load-test.mjs --origin https://ghost404-loadtest.onrender.com --teams 50 --storm --yes-remote --authorize-round-control --pause-for-restart
 ```
 
-It reports error rate, login/submission/poll latency, PostgreSQL connections, payload volume and recovery. At the prompt, restart the service from the Render dashboard to prove state survives a restart. Read CPU/memory from the Render *Metrics* tab and data transfer/compute hours from the Neon *Usage* page; the client cannot measure those. Run **before** provisioning demo teams.
+It reports error rate, login/submission/poll latency, PostgreSQL connections, payload volume, completion and recovery. At the prompt, restart the test service from the Render dashboard to prove persistence. CPU/memory come from Render *Metrics*; compute hours and transfer from Neon *Usage*. Local mode (default, no flags) uses a disposable local PostgreSQL database and is unchanged.
 
 ## Fictional demo teams (after the load test)
 

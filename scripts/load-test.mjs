@@ -1,13 +1,17 @@
 // Reproducible load/rehearsal harness.
 // LOCAL (default): runs the REAL production build (`next start`) against a DISPOSABLE local PostgreSQL database (needs the local test server, see docs).
 //   npm run build && node scripts/load-test.mjs [--teams 50] [--participants 3] [--speed 1] [--port 3100] [--storm] [--connection-limit N]
-// REMOTE: drives an already-deployed HTTPS origin whose database is a DEDICATED FICTIONAL preview database (must contain no teams).
-//   GHOST_LOAD_DATABASE_URL=<preview direct url> GHOST_LOAD_ADMIN_CODE=<organizer code> node scripts/load-test.mjs --origin https://x.onrender.com --yes-remote [--pause-for-restart]
-//   It seeds fictional GH-nn teams directly in that database, runs the game through the public HTTP routes, then deletes everything it created.
+// REMOTE (fail-closed; see docs/phase-8-render-neon-deployment.md): drives a DEDICATED, DISPOSABLE test service + test database ONLY.
+//   Needs: --origin https://<host containing "loadtest"> --yes-remote --authorize-round-control, GHOST_LOAD_ENV=disposable-loadtest,
+//   GHOST_LOAD_TARGET_DB=<db name containing "loadtest">, GHOST_LOAD_DATABASE_URL, GHOST_LOAD_ADMIN_CODE (all read from the environment, never printed).
+//   The database must be completely empty; target identity is proven by logging in over HTTPS as a nonce-named marker team seeded in that database.
+//   It starts then expires the round on the TEST service (authorized by the flag) and removes ONLY the rows it created (exact ids/keys/tokens).
 // --speed N compresses think-time (1 = realistic 5s polling). --storm holds every team before its final submission and releases them together.
 import assert from "node:assert/strict";
 import { createInterface } from "node:readline/promises";
 import { createTempDatabase } from "./pg-temp.mjs";
+import { Scope, assertEmpty, assertRemoteTarget, cleanup, databaseName, redact, writeRound } from "./load-safety.mjs";
+import { randomBytes } from "node:crypto";
 import { spawn, spawnSync, execFileSync } from "node:child_process";
 import { PrismaClient } from "@prisma/client";
 import { hashPassword } from "../src/lib/password.mjs";
@@ -24,11 +28,7 @@ const TEAMS = Number(arg("teams", 50)), PARTICIPANTS = Number(arg("participants"
 const STORM = process.argv.includes("--storm"), CONN = arg("connection-limit", "");
 const REMOTE_ORIGIN = arg("origin", ""), REMOTE = !!REMOTE_ORIGIN, PAUSE = process.argv.includes("--pause-for-restart");
 const ORIGIN = REMOTE ? new URL(REMOTE_ORIGIN).origin : `http://127.0.0.1:${PORT}`;
-if (REMOTE) {
-  assert.ok(ORIGIN.startsWith("https://"), "remote origin must be https");
-  assert.ok(process.argv.includes("--yes-remote"), "remote mode drives real traffic at a hosted service: pass --yes-remote to confirm it is the FICTIONAL preview");
-  assert.ok(process.env.GHOST_LOAD_DATABASE_URL && process.env.GHOST_LOAD_ADMIN_CODE, "set GHOST_LOAD_DATABASE_URL (preview DB direct url) and GHOST_LOAD_ADMIN_CODE");
-}
+if (REMOTE) assertRemoteTarget({ origin: ORIGIN, databaseUrl: process.env.GHOST_LOAD_DATABASE_URL, adminCode: process.env.GHOST_LOAD_ADMIN_CODE, argv: process.argv, env: process.env });
 const sleep = ms => new Promise(r => setTimeout(r, ms / SPEED));
 const cool = () => new Promise(r => setTimeout(r, 3200)); // server submission cooldown is real-time, never compressed
 const temp = REMOTE ? null : await createTempDatabase("load");
@@ -36,7 +36,11 @@ const databaseUrl = REMOTE ? process.env.GHOST_LOAD_DATABASE_URL : temp.url;
 const adminCode = REMOTE ? process.env.GHOST_LOAD_ADMIN_CODE : generateCode();
 const serverUrl = `${databaseUrl}${CONN ? `${databaseUrl.includes("?") ? "&" : "?"}connection_limit=${CONN}` : ""}`;
 const env = { ...process.env, DATABASE_URL: serverUrl, DIRECT_URL: databaseUrl, ADMIN_ACCESS_HASH: hashPassword(adminCode), APP_ORIGIN: ORIGIN, NODE_ENV: "production" };
+if (!REMOTE) assert.ok(/^ghostt_/.test(databaseName(databaseUrl)) && ["127.0.0.1", "localhost"].includes(new URL(databaseUrl).hostname), "local mode only targets its own disposable ghostt_ database");
 const db = new PrismaClient({ datasourceUrl: databaseUrl });
+const scope = new Scope(), clients = [], secrets = [databaseUrl, adminCode, process.env.GHOST_LOAD_DATABASE_URL, process.env.GHOST_LOAD_ADMIN_CODE, process.env.DATABASE_URL, process.env.DIRECT_URL];
+try { secrets.push(new URL(databaseUrl).password, new URL(databaseUrl).hostname); } catch { /* validated earlier */ }
+const safe = t => redact(t, secrets);
 let server, bytes = 0;
 const dbSamples = [];
 const stats = new Map(), errors = [], samples = [];
@@ -45,11 +49,12 @@ const pct = (a, p) => a.length ? [...a].sort((x, y) => x - y)[Math.min(a.length 
 
 class Client {
   cookie = "";
+  constructor() { clients.push(this); }
   async req(name, path, { method = "GET", body, headers = {}, ok = [200] } = {}) {
     const t = performance.now();
     let res;
     try { res = await fetch(ORIGIN + path, { method, body, redirect: "manual", headers: { ...(this.cookie ? { cookie: this.cookie } : {}), origin: ORIGIN, ...headers } }); }
-    catch (e) { record(name, performance.now() - t, "NETERR"); errors.push(`${name}: ${e.message}`); return { status: 0, text: "" }; }
+    catch (e) { record(name, performance.now() - t, "NETERR"); errors.push(`${name}: ${safe(e.message)}`); return { status: 0, text: "" }; }
     const text = await res.text(); bytes += text.length;
     for (const c of res.headers.getSetCookie()) { const [pair, ...attrs] = c.split(";"), i = pair.indexOf("="), gone = /max-age=0|expires=thu, 01 jan 1970/i.test(attrs.join(";")) || pair.slice(i + 1) === ""; (this.jar ??= new Map())[gone ? "delete" : "set"](...(gone ? [pair.slice(0, i)] : [pair.slice(0, i), pair.slice(i + 1)])); }
     this.cookie = [...(this.jar ?? [])].map(([k, v]) => `${k}=${v}`).join("; ");
@@ -118,17 +123,32 @@ async function organizer(flag) {
 }
 function stop() { if (!REMOTE && server?.pid) spawnSync("taskkill", ["/PID", String(server.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true }); }
 async function waitUp() { for (let i = 0; i < 240; i++) { try { if ((await fetch(ORIGIN + (REMOTE ? "/api/health" : "/login"))).ok) return; } catch { /* not up yet */ } await new Promise(r => setTimeout(r, 500)); } throw new Error("server did not start"); }
-let exitCode = 1;
+let exitCode = 1, cleaning = null;
+const finish = () => cleaning ??= (async () => {
+  const r = await cleanup(db, scope); // exact-scope only; a failure is reported, never escalated to a broader delete
+  if (!r.ok) { console.error(`CLEANUP INCOMPLETE (${r.failed.join(", ")}). Rows created by this run all have ids GH-nn / GHZ-ID-*; remove only those by hand.`); exitCode = 1; }
+  return r;
+})();
+const abort = code => async () => { console.error(`
+Aborted (${code}); removing only this run's rows.`); stop(); await finish(); await db.$disconnect().catch(() => {}); await temp?.drop().catch(() => {}); process.exit(code); };
+process.on("SIGINT", abort(130)); process.on("SIGTERM", abort(143));
+const watchdog = setTimeout(abort(124), Number(arg("max-minutes", 40)) * 60_000); watchdog.unref();
 try {
-  if (REMOTE) { // dedicated fictional preview only: refuse to touch a database that already holds teams
-    const existing = await db.team.count(); assert.equal(existing, 0, `preview database already has ${existing} teams; use a fresh fictional database`);
+  if (REMOTE) {
+    await assertEmpty(db); // nothing real can exist in a database that is completely empty
     await waitUp();
+    // Target identity: seed a nonce-named marker team in THIS database and log in to the hosted origin as it. Success proves the service reads this very database.
+    const nonce = randomBytes(4).toString("hex").toUpperCase(), markId = `GHZ-ID-${nonce}`, markCode = generateCode();
+    scope.addTeam(markId);
+    await db.team.create({ data: { id: markId, name: markId, participants: JSON.stringify(["A", "B", "C"]), codeHash: hashPassword(markCode), variant: "A", progress: JSON.stringify(initialProgress()) } });
+    assert.ok(await new Client().login("team", markId, markCode), "IDENTITY CHECK FAILED: the hosted service does not see the target database. Nothing was run.");
   }
   const hex = () => [...Array(24)].map(() => "0123456789ABCDEF"[Math.floor(Math.random() * 16)]).join("");
   const creds = planTeams(generatedTeams(TEAMS), []).map(t => ({ ...t, code: generateCode() }));
+  for (const t of creds) scope.addTeam(t.id);
   for (const t of creds) await db.team.create({ data: { id: t.id, name: t.name, participants: JSON.stringify(t.participants), codeHash: hashPassword(t.code), variant: t.variant, progress: JSON.stringify(initialProgress()), insiderAccess: { create: { fragmentA: "A" + hex(), fragmentB: "B" + hex() } } } });
   const now = Date.now();
-  await db.gameSession.upsert({ where: { id: 1 }, create: { id: 1, startsAt: new Date(now), deadline: new Date(now + 3600_000) }, update: { startsAt: new Date(now), deadline: new Date(now + 3600_000) } });
+  await writeRound(db, scope, { startsAt: new Date(now), deadline: new Date(now + 3600_000) });
   let serverErr = "";
   if (!REMOTE) { server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "start", "-p", String(PORT), "-H", "127.0.0.1"], { env, stdio: ["ignore", "ignore", "pipe"], windowsHide: true }); server.stderr.on("data", d => { serverErr += d; }); }
   await waitUp();
@@ -139,7 +159,7 @@ try {
   const results = await Promise.all(creds.map((t, i) => team(i + 1, t.id, t.code, t.variant)));
   flag.done = true; const admin = await orgP; stopSampling(); stopDbSampling();
   const wall = (Date.now() - started) / 1000;
-  const rows = await db.team.findMany(); const subs = await db.submission.findMany({ where: { accepted: true } });
+  const ids = [...scope.teamIds].filter(i => i.startsWith("GH-")); const rows = await db.team.findMany({ where: { id: { in: ids } } }); const subs = await db.submission.findMany({ where: { accepted: true, teamId: { in: ids } } });
   const round = await db.gameSession.findUnique({ where: { id: 1 } });
   let bad = 0, completed = 0, bonus = 0;
   for (const r of rows) {
@@ -168,7 +188,7 @@ try {
   const saved = JSON.parse((await again.req("recovery:state", "/api/game")).text);
   const expectSaved = 100 - (1 % 3 === 0 ? 15 : 0);
   const recovered = relogin && saved.score === expectSaved && saved.current === -1;
-  await db.gameSession.update({ where: { id: 1 }, data: { deadline: new Date(Date.now() - 1000) } });
+  await writeRound(db, scope, { startsAt: round.startsAt, deadline: new Date(Date.now() - 1000) });
   const late = new Client(); await late.login("team", creds[1].id, creds[1].code);
   const lateRes = await late.api("recovery:late-submit", { action: "submit", chapter: 4, answer: verdictAnswers[creds[1].variant] });
   const rejected = lateRes.status === 409 && /not active/i.test(lateRes.text);
@@ -186,17 +206,18 @@ try {
   if (!recovered || !rejected || !unchanged) errors.push("RECOVERY CHECK FAILED");
   const [{ size }] = await db.$queryRawUnsafe("SELECT pg_database_size(current_database())::int AS size");
   console.log(`Mode: ${REMOTE ? "REMOTE " + ORIGIN : "local production build"}; database size ${(size / 1024).toFixed(0)} KiB; PostgreSQL connections seen (this DB): peak ${Math.max(0, ...dbSamples)}, avg ${(dbSamples.reduce((a, b) => a + b, 0) / Math.max(1, dbSamples.length)).toFixed(1)}; HTTP payload received by clients: ${(bytes / 1024 / 1024).toFixed(1)} MiB; errors: ${errors.length}`);
-  if (errors.length) console.log([...new Set(errors)].slice(0, 15).join("\n"));
+  if (errors.length) console.log(safe([...new Set(errors)].slice(0, 15).join("\n")));
   const lockLines = serverErr.split("\n").filter(l => /locked|BUSY|Timed out|P2034|P1008|P2028/i.test(l));
   if (lockLines.length) console.log(`SERVER LOG: ${lockLines.length} contention lines, e.g. ${lockLines[0].slice(0, 300)}`);
   if (results.some(r => !r)) console.log(`${results.filter(r => !r).length} teams failed to log in`);
   exitCode = bad || errors.length ? 1 : 0;
+} catch (e) {
+  console.error(`LOAD TEST STOPPED: ${safe(e?.message ?? e)}`); exitCode = 1;
 } finally {
-  stop();
-  if (REMOTE) { // remove everything this run created (the database was required to hold no teams at the start)
-    await db.teamSession.deleteMany(); await db.submission.deleteMany(); await db.auditLog.deleteMany(); await db.loginAttempt.deleteMany(); await db.team.deleteMany({ where: { id: { startsWith: "GH-" } } }); await db.gameSession.deleteMany();
-  }
-  await db.$disconnect(); await new Promise(r => setTimeout(r, 800));
+  stop(); clearTimeout(watchdog);
+  for (const c of clients) { const m = /(?:^|; )ghost_admin_session=([^;]+)/.exec(c.cookie); if (m) scope.adminTokens.add(m[1]); }
+  await finish(); // exact-scope cleanup only (remote and local); local additionally drops its disposable database below
+  await db.$disconnect().catch(() => {}); await new Promise(r => setTimeout(r, 800));
   await temp?.drop();
 }
 process.exit(exitCode);
