@@ -109,3 +109,9 @@
 .k-group ol { margin: 0; padding-left: 1.6em; list-style: decimal; display: grid; gap: var(--s2); }
 .k-group ol li::marker { color: var(--amber); font-family: var(--font-mono); }
 .k-desk code, .k-card code { overflow-wrap: anywhere; word-break: break-word; }
+
+/* Post-completion continue action (bottom of every chapter) */
+.k-continue { display: flex; margin-top: var(--s4); }
+.k-continue .k-btn { min-width: 260px; }
+#case-closed { scroll-margin-top: var(--s5); }
+@media (max-width: 600px) { .k-continue .k-btn { width: 100%; min-width: 0; } }

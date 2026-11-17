@@ -26,6 +26,15 @@ async function arrange(page: Page, kind: "event" | "recovery", target: readonly 
   }
   await expect(page.locator(`input[name=${kind === "event" ? "eventOrder" : "recoveryOrder"}]`)).toHaveValue(JSON.stringify(target));
 }
+// Post-completion navigation: the Continue action sits under the submission message (below the submit button), appears only once the server says the chapter is done, and never navigates by itself.
+async function expectContinue(page: Page, next: number, from: string) {
+  const link = page.getByRole("link", { name: `Continue to Chapter ${next} →`, exact: true });
+  await expect(link).toBeVisible();
+  const submit = await page.locator(".k-submit-row button").first().boundingBox(), box = await link.boundingBox();
+  expect(box!.y).toBeGreaterThan(submit!.y); // directly below the form, not at the top of the page
+  await page.waitForTimeout(1500); expect(new URL(page.url()).pathname).toBe(from); // never auto-navigates
+  await page.reload(); await expect(link).toBeVisible(); // persists across a refresh (derived from saved server state)
+}
 async function openChapter(page: Page, n: number) { await page.goto("/play"); await page.getByRole("link", { name: `Open Chapter ${n}`, exact: true }).click(); }
 /** Cumulative layout shift of the current document (buffered entries). */
 const layoutShift = (page: Page) => page.evaluate(() => new Promise<number>(resolve => {
@@ -67,6 +76,7 @@ test("fresh team plays Login → Inbox → Trail → Insider → Containment →
   await team.getByLabel("Database export evidence").selectOption(inbox.databaseId); await team.getByLabel("Correlated session ID").fill(inbox.sessionId);
   await expect(team.getByRole("button", { name: "Submit conclusion" })).toBeEnabled({ timeout: 8000 }); await team.getByRole("button", { name: "Submit conclusion" }).click();
   await expect(team.getByText("Chapter 1 completed. Chapter 2 unlocked.", { exact: true })).toBeVisible();
+  await expectContinue(team, 2, "/play/inbox");
 
   // 4. Trail
   await openChapter(team, 2); await expect(team.getByRole("heading", { name: "Trail", exact: true })).toBeVisible(); shifts.trail = await layoutShift(team);
@@ -76,6 +86,7 @@ test("fresh team plays Login → Inbox → Trail → Insider → Containment →
   await team.getByLabel("Supporting evidence IDs (exactly three)", { exact: true }).fill(trail.supportingEvidenceIds.join(", "));
   await expect(team.getByRole("button", { name: "Submit Trail conclusion", exact: true })).toBeEnabled({ timeout: 8000 }); await team.getByRole("button", { name: "Submit Trail conclusion", exact: true }).click();
   await expect(team.getByText("Chapter 2 completed. Chapter 3 unlocked.", { exact: true })).toBeVisible();
+  await expectContinue(team, 3, "/play/trail");
 
   // 5. Insider: the organizer prints this team's private fragment (A) and the public wall fragment (B)
   await admin.goto("/admin/insider-kit"); await admin.getByRole("checkbox", { name: new RegExp(`^${TEAM} `) }).check();
@@ -93,6 +104,7 @@ test("fresh team plays Login → Inbox → Trail → Insider → Containment →
   await team.getByRole("combobox", { name: "Insider employee", exact: true }).selectOption(insider.employeeId); await team.getByRole("combobox", { name: "Unauthorized policy action", exact: true }).selectOption(insider.actionId);
   await expect(team.getByRole("button", { name: "Submit Insider conclusion", exact: true })).toBeEnabled({ timeout: 8000 }); await team.getByRole("button", { name: "Submit Insider conclusion", exact: true }).click();
   await expect(team.getByText("Chapter 3 completed. Chapter 4 unlocked.", { exact: true })).toBeVisible();
+  await expectContinue(team, 4, "/play/insider");
 
   // 6. Containment: drag AND keyboard ordering
   await openChapter(team, 4); await expect(team.getByRole("heading", { name: "Containment", exact: true })).toBeVisible(); shifts.containment = await layoutShift(team);
@@ -110,6 +122,7 @@ test("fresh team plays Login → Inbox → Trail → Insider → Containment →
   await team.getByLabel("Affected account", { exact: true }).fill(cont.account); await team.getByLabel("Affected session", { exact: true }).fill(cont.sessionId);
   await expect(team.getByRole("button", { name: "Submit containment plan", exact: true })).toBeEnabled({ timeout: 8000 }); await team.getByRole("button", { name: "Submit containment plan", exact: true }).click();
   await expect(team.getByText("Chapter 4 completed. Final Verdict unlocked.", { exact: true })).toBeVisible();
+  await expectContinue(team, 5, "/play/containment");
 
   // 7. Final Verdict
   await openChapter(team, 5); await expect(team.getByRole("heading", { name: "Final Verdict", exact: true })).toBeVisible(); shifts.verdict = await layoutShift(team);
@@ -121,6 +134,7 @@ test("fresh team plays Login → Inbox → Trail → Insider → Containment →
   await expect(team.getByRole("button", { name: "Submit Final Verdict", exact: true })).toBeEnabled({ timeout: 8000 }); await team.getByRole("button", { name: "Submit Final Verdict", exact: true }).click();
   await expect(team.getByRole("heading", { name: "CASE CLOSED — INVESTIGATION COMPLETE", exact: true })).toBeVisible();
   await expect(team.locator(".case-closed")).toContainText("105 / 105");
+  await expect(team.getByRole("link", { name: "View CASE CLOSED ↑", exact: true })).toBeVisible();
 
   // 8. the finished team stays signed in (no "Session expired"), the organizer session is independent, and the board shows the result
   await team.waitForTimeout(11_000);

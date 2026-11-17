@@ -50,6 +50,7 @@ async function seedTrail() {
     if (variant === "A") await db.auditLog.create({ data: { actor: id, action: "tamper-alert", detail: JSON.stringify({ chapter: 0, fixture: true }) } });
   }
   if (testing) await db.team.create({ data: { id: "TRAIL-LOCKED", name: "Locked regression fixture", participants: '[]', codeHash: hashPassword(code), variant: "A", progress: JSON.stringify(initialProgress()) } });
+  if (testing) await db.team.create({ data: { id: "TRAIL-FRESH", name: "Fresh zero-progress fixture", participants: '[]', codeHash: hashPassword(code), variant: "B", progress: JSON.stringify(initialProgress()) } });
   await db.$disconnect();
 }
 async function seedInsider() {
@@ -115,7 +116,7 @@ Ctrl+C drops the temporary PostgreSQL database. After a forced close run: node -
     process.stdin.setRawMode(true);
     process.stdin.on("data", data => { if (data.includes(3)) interrupt(); });
   }
-  const commands = testing && journey ? [["node_modules/@playwright/test/cli.js", "test", "tests/journey.spec.ts", "--output", "test-results/journey"]] : testing ? trail ? [["node_modules/@playwright/test/cli.js", "test", "tests/routes.spec.ts", "tests/inbox.spec.ts"], ["node_modules/@playwright/test/cli.js", "test", "tests/trail.spec.ts"], ...(insider ? [["node_modules/@playwright/test/cli.js", "test", "tests/insider.spec.ts", "--output", "test-results/insider-main"], ["node_modules/@playwright/test/cli.js", "test", "tests/insider-restart.spec.ts", "--output", "test-results/insider-restart"]] : [])] : [["node_modules/@playwright/test/cli.js", "test"]] : [["node_modules/next/dist/bin/next", "dev", "--hostname", origin.hostname, "--port", origin.port || "80"]];
+  const commands = testing && journey ? [["node_modules/@playwright/test/cli.js", "test", "tests/journey.spec.ts", "--output", "test-results/journey"]] : testing ? trail ? [["node_modules/@playwright/test/cli.js", "test", "tests/routes.spec.ts", "tests/inbox.spec.ts"], ["node_modules/@playwright/test/cli.js", "test", "tests/trail.spec.ts", "tests/continue.spec.ts"], ...(insider ? [["node_modules/@playwright/test/cli.js", "test", "tests/insider.spec.ts", "--output", "test-results/insider-main"], ["node_modules/@playwright/test/cli.js", "test", "tests/insider-restart.spec.ts", "--output", "test-results/insider-restart"]] : [])] : [["node_modules/@playwright/test/cli.js", "test"]] : [["node_modules/next/dist/bin/next", "dev", "--hostname", origin.hostname, "--port", origin.port || "80"]];
   if (testing && containment) commands.push(["node_modules/@playwright/test/cli.js", "test", "tests/containment.spec.ts", "--output", "test-results/containment-main"], ["node_modules/@playwright/test/cli.js", "test", "tests/containment-restart.spec.ts", "--output", "test-results/containment-restart"]);
   if (testing && verdict) commands.push(["node_modules/@playwright/test/cli.js", "test", "tests/verdict.spec.ts", "--output", "test-results/verdict-main"], ["node_modules/@playwright/test/cli.js", "test", "tests/verdict-restart.spec.ts", "--output", "test-results/verdict-restart"]);
   for (const [index, args] of commands.entries()) {

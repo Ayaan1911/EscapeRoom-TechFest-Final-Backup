@@ -5,7 +5,7 @@ const MAX = [15, 25, 25, 20, 15];
 export function CaseClosed({ teamId, teamName, progress }: { teamId: string; teamName: string; progress: Progress }) {
   const result = resultTotals(progress);
   const pct = Math.min(100, Math.round((result.total / 105) * 100));
-  return <section className="k-closed case-closed" aria-labelledby="case-closed-heading">
+  return <section id="case-closed" className="k-closed case-closed" aria-labelledby="case-closed-heading">
     <div className="k-burst" aria-hidden="true">{Array.from({ length: 14 }, (_, i) => <i key={i} style={{ ["--a" as string]: `${i * (360 / 14)}deg`, ["--d" as string]: `${(i % 3) * 40}ms` }} />)}</div>
     <div className="k-closed-hero">
       <div className="k-ring" style={{ ["--pct" as string]: `${pct}%` }} role="img" aria-label={`Final score ${result.total} out of 105`}><div><strong className="case-total">{result.total} / 105</strong><span>FINAL SCORE</span></div></div>

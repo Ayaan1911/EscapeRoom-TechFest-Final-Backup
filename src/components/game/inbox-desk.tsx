@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useChapter, type ChapterState } from "./use-chapter";
-import { Badge, Card, Feedback, MissionBar, Tabs } from "@/components/ui/kit";
+import { Badge, Card, Feedback, MissionBar, Tabs, ContinueBar } from "@/components/ui/kit";
 import type { InboxArtifact, InboxEmail, InboxEvidence } from "@/types/inbox";
 
 type Form = { emailId: string; deliveryId: string; snapshotId: string; authenticationId: string; databaseId: string; sessionId: string; explanation: string };
@@ -121,7 +121,7 @@ export function InboxDesk({ evidence, initialState }: { evidence: Omit<InboxEvid
         <label>Short explanation (optional, not keyword-scored)<textarea value={form.explanation} onChange={e => set("explanation", e.target.value)} maxLength={800} rows={3} placeholder="Explain the timestamp, redirect and session correlation in your own words." /></label>
         <div className="k-submit-row"><button className="k-btn k-btn-primary k-btn-lg" disabled={ready < SLOTS.length}>Submit conclusion</button>{ready < SLOTS.length && !completed && <small>Fill all six evidence slots to submit.</small>}</div>
       </fieldset></form>
-      <Feedback busy={busy} text={feedback} extra={retrySeconds > 0 && editable ? `Next submission available in ${retrySeconds}s.` : ""} />
+      <Feedback busy={busy} text={feedback} extra={retrySeconds > 0 && editable ? `Next submission available in ${retrySeconds}s.` : ""} /><ContinueBar chapter={0} state={state} />
     </Card>
   </div>;
 }

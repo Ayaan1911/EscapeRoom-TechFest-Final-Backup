@@ -2,7 +2,7 @@
 import { useState, type FormEvent } from "react";
 import { useChapter, type ChapterState } from "./use-chapter";
 import { ContainmentCctv } from "./containment-cctv";
-import { Badge, Card, Feedback, MissionBar } from "@/components/ui/kit";
+import { Badge, Card, Feedback, MissionBar, ContinueBar } from "@/components/ui/kit";
 import type { ContainmentCctv as Snapshot, ContainmentEvidence } from "@/types/containment";
 
 type Option = { id: string; title: string; detail: string };
@@ -112,7 +112,7 @@ export function ContainmentDesk({ evidence, initialCctv, initialState }: { evide
             <label>Response explanation (optional)<textarea name="explanation" maxLength={1000} rows={4} /></label>
             <div className="k-submit-row"><button className="k-btn k-btn-primary k-btn-lg" disabled={support.length < 5 || immediate.length === 0 || recovery.length === 0}>Submit containment plan</button>{!ready && !completed && <small>Complete steps 2–4 to submit.</small>}</div>
           </fieldset>
-          <Feedback busy={busy} text={feedback} extra={retrySeconds > 0 && editable ? `Next submission available in ${retrySeconds}s.` : ""} />
+          <Feedback busy={busy} text={feedback} extra={retrySeconds > 0 && editable ? `Next submission available in ${retrySeconds}s.` : ""} /><ContinueBar chapter={3} state={state} />
         </Card>
       </form>
 

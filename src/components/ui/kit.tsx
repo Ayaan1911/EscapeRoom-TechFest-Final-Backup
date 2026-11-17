@@ -47,6 +47,15 @@ export function Feedback({ busy, text, extra }: { busy: boolean; text: string; e
   return <p role="status" className={`k-feedback ${message ? `k-feedback-${busy ? "busy" : feedbackTone(text)}` : ""}`}>{message}{extra ? ` ${extra}` : ""}</p>;
 }
 
+const CHAPTER_ROUTES = ["/play/inbox", "/play/trail", "/play/insider", "/play/containment", "/play/verdict"] as const;
+/** Shown under the submission message once the SERVER state says this chapter is complete and the next one is unlocked. Never navigates by itself. */
+export function ContinueBar({ chapter, state }: { chapter: 0 | 1 | 2 | 3 | 4; state: ChapterState }) {
+  if (state.progress.chapters[chapter].completedAt === null) return null;
+  if (chapter === 4) return state.current === -1 && state.progress.completedAt !== null ? <nav className="k-continue" aria-label="Case closed"><a className="k-btn k-btn-primary k-btn-lg" href="#case-closed">View CASE CLOSED ↑</a></nav> : null;
+  if (state.current !== -1 && state.current <= chapter) return null;
+  return <nav className="k-continue" aria-label="Next chapter"><a className="k-btn k-btn-primary k-btn-lg" href={CHAPTER_ROUTES[chapter + 1]}>Continue to Chapter {chapter + 2} →</a></nav>;
+}
+
 export function formatClock(seconds: number) { return `${Math.floor(seconds / 60).toString().padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`; }
 
 /** Persistent mission bar: chapter stepper, objective, clock, score and hint status. */

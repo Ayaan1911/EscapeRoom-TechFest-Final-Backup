@@ -1,7 +1,7 @@
 "use client";
 import { useState, type FormEvent } from "react";
 import { useChapter, type ChapterState } from "./use-chapter";
-import { Badge, Card, Feedback, MissionBar } from "@/components/ui/kit";
+import { Badge, Card, Feedback, MissionBar, ContinueBar } from "@/components/ui/kit";
 import { emptyTrailFilters, filterTrailRows } from "@/lib/game/trail-view";
 import type { TrailEvidence } from "@/types/trail";
 
@@ -127,7 +127,7 @@ export function TrailDesk({ evidence, initialState }: { evidence: TrailEvidence;
         <label>Short explanation (optional)<textarea name="explanation" maxLength={800} rows={3} /></label>
         <div className="k-submit-row"><button className="k-btn k-btn-primary k-btn-lg">Submit Trail conclusion</button></div>
       </fieldset></form>
-      <Feedback busy={busy} text={feedback} extra={retrySeconds > 0 && editable ? `Next submission available in ${retrySeconds}s.` : ""} />
+      <Feedback busy={busy} text={feedback} extra={retrySeconds > 0 && editable ? `Next submission available in ${retrySeconds}s.` : ""} /><ContinueBar chapter={1} state={state} />
     </Card>
   </div>;
 }

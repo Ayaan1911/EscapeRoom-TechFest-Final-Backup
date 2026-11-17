@@ -2,7 +2,7 @@
 import { useState, type FormEvent } from "react";
 import { useChapter, type ChapterState } from "./use-chapter";
 import { CaseClosed } from "./case-closed";
-import { Badge, Card, Feedback, MissionBar } from "@/components/ui/kit";
+import { Badge, Card, Feedback, MissionBar, ContinueBar } from "@/components/ui/kit";
 import { verdictRoles, type VerdictEvidence, type VerdictRole } from "@/types/verdict";
 
 const labels: Record<VerdictRole, string> = { entry: "Entry point", session: "Authentication / session abuse", impact: "Data impact", assistance: "Insider assistance", response: "Containment rationale" };
@@ -107,7 +107,7 @@ export function VerdictDesk({ evidence, initialState, team }: { evidence: Verdic
             <p>The server validates the structured claims, independent evidence roles and contradiction. Optional notes are ungraded observations, not verified claims or keyword-scored answers. Review source facts before submitting.</p>
             <fieldset disabled={disabled}><label>Review explanation (optional)<textarea name="explanation" rows={4} maxLength={1000} /></label>
               <div className="k-submit-row"><button className="k-btn k-btn-primary k-btn-lg" disabled={retrySeconds > 0 || pinned.length < NEED || counterEvidence.length !== 2}>Submit Final Verdict</button>{!completed && !checks.every(c => c.done) && <small>Complete the checklist to submit.</small>}</div></fieldset>
-            <Feedback busy={busy} text={feedback} extra={retrySeconds > 0 && editable ? `Next submission available in ${retrySeconds}s.` : ""} />
+            <Feedback busy={busy} text={feedback} extra={retrySeconds > 0 && editable ? `Next submission available in ${retrySeconds}s.` : ""} /><ContinueBar chapter={4} state={state} />
           </Card>
         </form>
       </div>

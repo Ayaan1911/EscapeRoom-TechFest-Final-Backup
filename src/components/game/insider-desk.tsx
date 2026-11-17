@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, type FormEvent } from "react";
 import { useChapter, type ChapterState } from "./use-chapter";
-import { Badge, Card, Feedback, MissionBar } from "@/components/ui/kit";
+import { Badge, Card, Feedback, MissionBar, ContinueBar } from "@/components/ui/kit";
 import type { InsiderDossier, InsiderRecord } from "@/types/insider";
 
 const KIND: Record<InsiderRecord["kind"], { label: string; icon: string; tone: "info" | "amber" | "alert" | "ok" | "neutral" }> = {
@@ -117,7 +117,7 @@ export function InsiderDesk({ initialDossier, initialState }: { initialDossier: 
       <ol className="released-hints k-hints">{state.chapterHints[2].map((hint, index) => <li key={hint}><strong>Hint {index + 1}</strong><p>{hint}</p></li>)}</ol>
       <button className="k-btn" disabled={!editable || busy || state.progress.chapters[2].hints >= 2} onClick={() => void send("hint")}>Request Insider hint {Math.min(2, state.progress.chapters[2].hints + 1)} (−{state.progress.chapters[2].hints === 0 ? 3 : 6} points)</button>
     </Card>
-    <Feedback busy={busy} text={feedback} extra={retrySeconds > 0 && editable ? `Next submission available in ${retrySeconds}s.` : ""} />
+    <Feedback busy={busy} text={feedback} extra={retrySeconds > 0 && editable ? `Next submission available in ${retrySeconds}s.` : ""} /><ContinueBar chapter={2} state={state} />
     <p className="k-feedback" role="status">{copyStatus}</p>
   </div>;
 }
