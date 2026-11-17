@@ -8,8 +8,8 @@ export const CHAPTERS = [
   { n: 4, name: "Containment", max: 20 }, { n: 5, name: "Final Verdict", max: 15 },
 ] as const;
 
-export function Badge({ tone = "neutral", children }: { tone?: "neutral" | "amber" | "alert" | "ok" | "info"; children: ReactNode }) {
-  return <span className={`k-badge k-badge-${tone}`}>{children}</span>;
+export function Badge({ tone = "neutral", className = "", children }: { tone?: "neutral" | "amber" | "alert" | "ok" | "info"; className?: string; children: ReactNode }) {
+  return <span className={`k-badge k-badge-${tone} ${className}`}>{children}</span>;
 }
 
 export function Card({ title, eyebrow, aside, children, className = "", id }: { title?: ReactNode; eyebrow?: ReactNode; aside?: ReactNode; children: ReactNode; className?: string; id?: string }) {

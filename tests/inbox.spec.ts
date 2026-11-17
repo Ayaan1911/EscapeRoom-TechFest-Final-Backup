@@ -134,6 +134,7 @@ for (const variant of ["A", "B", "C"] as const) test(`team ${variant} investigat
 });
 
 test("team and organizer sessions coexist in one browser profile and log out independently", async ({ browser }) => {
+  test.setTimeout(120_000); // includes 12 sequential real login/logout cycles
   const context = await browser.newContext(), teamTab = await context.newPage(), adminTab = await context.newPage();
   await login(teamTab, "A");
   await login(adminTab, "admin"); // admin sign-in must not end the team session
