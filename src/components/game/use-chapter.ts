@@ -4,7 +4,7 @@ import type { Progress } from "@/lib/game/engine";
 
 export type ChapterState = { progress: Progress; score: number; current: number; status: string; chapterHints: string[][]; serverNow: number; round: { deadline: string | null }; insiderUnlocked?: boolean };
 
-export function useChapter(chapter: 0 | 1 | 2, initialState: ChapterState) {
+export function useChapter(chapter: 0 | 1 | 2 | 3, initialState: ChapterState) {
   const [state, setState] = useState(initialState);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState("");

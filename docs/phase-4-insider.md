@@ -1,5 +1,7 @@
 # Phase 4: Insider — The Evidence Wall
 
+This records the Phase 4 delivery. Containment is now implemented in [Phase 5](phase-5-containment.md); pending-content statements below describe the earlier phase.
+
 Chapter 3 is playable at `/play/insider` after Trail completion. Validator index 2 awards 25 raw points through the existing engine. Inbox, Trail, participant sessions, the shared 60-minute clock, ranking, audit history, hint deductions and the single global +5 Tamper Alert retain their existing rules. Containment becomes the current chapter after completion; its content is not implemented.
 
 ## Gameplay and evidence

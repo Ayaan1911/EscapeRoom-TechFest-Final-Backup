@@ -113,8 +113,9 @@ for (const [index, variant] of (["A", "B", "C"] as const).entries()) test(`Insid
   await page.reload(); await expect(page.getByRole("button", { name: "Submit Insider conclusion", exact: true })).toBeDisabled();
   await page.getByRole("button", { name: "Log out", exact: true }).click(); await expect(page).toHaveURL(/\/login$/); await insiderLogin(page, id);
   const state = await (await page.request.get("/api/game")).json(); expect(state.current).toBe(3); expect(state.insiderUnlocked).toBe(true); expect(state.score).toBe(score); expect(state.progress.chapters[2].score).toBe(25); expect(state.progress.bonus).toBe(variant === "A" ? 5 : 0);
-  await expect(page.getByRole("heading", { name: "Containment", exact: true })).toBeVisible();
+  await expect(page.locator(".briefing-panel").getByRole("heading", { name: "Containment", exact: true })).toBeVisible();
   for (const route of ["inbox", "trail"]) { await page.goto(`/play/${route}`); expect((await page.request.get("/api/game/insider")).status()).toBe(200); await expect(page.getByRole("heading", { name: route === "inbox" ? "The Inbox" : "Trail", exact: true })).toBeVisible(); }
+  await page.goto("/play/containment"); await expect(page.getByRole("heading", { name: "Containment", exact: true })).toBeVisible(); expect((await page.request.get("/api/game/containment")).status()).toBe(200);
 });
 
 test("closed rounds retain unlocked history and block sealed-team unlock, hints and conclusions", async ({ page, browser }) => {

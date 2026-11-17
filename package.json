@@ -19,7 +19,9 @@
     "demo:trail": "node scripts/inbox-demo.mjs --trail",
     "test:e2e:trail": "node scripts/inbox-demo.mjs --test --trail",
     "demo:insider": "node scripts/inbox-demo.mjs --insider",
-    "test:e2e:insider": "node scripts/inbox-demo.mjs --test --insider"
+    "test:e2e:insider": "node scripts/inbox-demo.mjs --test --insider",
+    "demo:containment": "node scripts/inbox-demo.mjs --containment",
+    "test:e2e:containment": "node scripts/inbox-demo.mjs --test --containment"
   },
   "dependencies": {
     "@prisma/client": "^6.19.0",
