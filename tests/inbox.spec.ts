@@ -62,7 +62,11 @@ for (const variant of ["A", "B", "C"] as const) test(`team ${variant} investigat
   expect(await page.content()).not.toMatch(/inboxSolution|inboxValidator|"answerKey"|"requiredEvidence"/);
   await expect(page.getByRole("complementary", { name: "Recovered emails" }).getByRole("button")).toHaveCount(6);
   await page.getByRole("button").filter({ hasText: `MAIL-${variant}-05` }).click();
+  await page.getByRole("tab", { name: /Attachments/ }).click(); // attachments live in their own tab
   await expect(page.getByRole("article", { name: "Selected email" })).toContainText("ATTACKER-CONTROLLED");
+  await page.getByRole("tab", { name: /Attachments/ }).press("ArrowRight"); // keyboard: arrows move between tabs
+  await expect(page.getByRole("tab", { name: "Headers" })).toHaveAttribute("aria-selected", "true");
+  await page.getByRole("tab", { name: "Message" }).click();
   await expect(page.getByRole("article", { name: "Selected email" }).locator('a[href^="https:"]')).toHaveCount(0);
   const [snapshot] = await Promise.all([page.waitForEvent("popup"), page.getByRole("link", { name: "Open QR forensic snapshot" }).click()]);
   await expect(snapshot.getByRole("heading", { name: "Captured authentication page" })).toBeVisible();
