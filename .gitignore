@@ -14,3 +14,7 @@ test-results/
 # organizer-only generated credentials and backups
 /private/
 /backups/
+
+# local-only helper scripts and database snapshots
+/scripts/.phase6-preservation.mjs
+/prisma/backups/

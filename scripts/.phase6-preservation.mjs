@@ -1,5 +1,0 @@
-﻿import {PrismaClient} from '@prisma/client';
-import {createHash} from 'node:crypto';
-import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
-import assert from 'node:assert/strict';
-const db=new PrismaClient();try{const snapshot={};for(const table of ['Team','TeamSession','GameSession','Submission','AuditLog','LoginAttempt','InsiderAccess','_prisma_migrations']){const rows=await db.$queryRawUnsafe(`SELECT * FROM "${table}" ORDER BY 1`);snapshot[table]={count:rows.length,hash:createHash('sha256').update(JSON.stringify(rows,(_,v)=>typeof v==='bigint'?String(v):v)).digest('hex')};}const path='prisma/backups/phase6-preservation.json';if(process.argv.includes('--after')){assert.deepEqual(snapshot,JSON.parse(readFileSync(path,'utf8')));console.log('PASS: all eight original development tables, including progress, sessions, fragments, grants and migration history, are unchanged.');}else{mkdirSync('prisma/backups',{recursive:true});writeFileSync(path,JSON.stringify(snapshot));console.log('Saved read-only fingerprints of all eight development tables.');}}finally{await db.$disconnect();}
