@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { randomBytes } from "node:crypto";
 import { db } from "./db";
-import { digest, verifyPassword } from "./password.mjs";
+import { digest, verifyPasswordAsync } from "./password.mjs";
 import { authorized } from "./auth-policy";
 
 export const cookieName = "ghost_session";
@@ -23,7 +23,7 @@ export async function login(role: "team" | "admin", id: string, code: string) {
   if (!allowed) return false;
   const team = role === "team" ? await db.team.findUnique({ where: { id } }) : null;
   const hash = role === "admin" ? process.env.ADMIN_ACCESS_HASH : team?.codeHash;
-  if (!hash || !verifyPassword(code, hash)) return false;
+  if (!hash || !await verifyPasswordAsync(code, hash)) return false;
   const raw = randomBytes(32).toString("hex");
   const jar = await cookies();
   const old = jar.get(cookieName)?.value;

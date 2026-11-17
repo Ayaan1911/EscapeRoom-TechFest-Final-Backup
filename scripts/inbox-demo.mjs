@@ -9,6 +9,7 @@ import { hashPassword } from "../src/lib/password.mjs";
 import { initialProgress, complete, bonus } from "../src/lib/game/engine.ts";
 
 const testing = process.argv.includes("--test");
+const rehearsal = process.argv.includes("--rehearsal");
 const verdict = process.argv.includes("--verdict");
 const containment = process.argv.includes("--containment") || verdict;
 const insider = process.argv.includes("--insider") || containment;
@@ -100,6 +101,16 @@ try {
   await db.$disconnect();
   if (testing) console.log("Browser verification uses a fresh temporary database and generated test-only credentials.");
   else console.log(`Temporary ${verdict ? "Final Verdict" : containment ? "Containment" : insider ? "Insider" : trail ? "Trail" : "Chapter 1"} demo: ${origin.origin}\nTeams: ${verdict ? "VERDICT-A, VERDICT-B, VERDICT-C (all four prior chapters completed; round active)" : containment ? "CONTAIN-A, CONTAIN-B, CONTAIN-C (Inbox + Trail + Insider completed; round active)" : insider ? "INSIDER-01, INSIDER-02, INSIDER-03 (Inbox + Trail completed; round active)" : trail ? "TRAIL-A, TRAIL-B, TRAIL-C (Inbox completed; round already started)" : "DEMO-A, DEMO-B, DEMO-C"}\nOrganizer: ${origin.origin}/login?role=admin\nGenerated demo-only access code for teams and organizer: ${code}\n${verdict ? "As a team open /play/verdict, link evidence and close the case. As organizer review provisional results, stop the demo round and inspect final qualification review. No automatic Round 2 advancement occurs." : containment ? "As organizer print /admin/containment-kit and authorize an accessible copy if needed. As a team open /play/containment. All response decisions are inert simulations." : insider ? "As organizer open /admin/insider-kit, prepare PRIVATE A and PUBLIC B separately, then unlock /play/insider as the matching team." : trail ? "Open Chapter 2 as a Trail team. TRAIL-A already has the global bonus; B/C can earn it in Trail." : "Start Round 1 as organizer, then investigate as a team."} Ctrl+C removes this temporary database. Existing .env and development data are untouched.`);
+  if (rehearsal) console.log(`
+=== ROUND 1 FULL REHEARSAL (real five-chapter app, disposable database) ===
+Teams DEMO-A / DEMO-B / DEMO-C start with ZERO progress (variants A/B/C), same code as organizer (printed above).
+ 1. Organizer window: ${origin.origin}/login?role=admin  -> Start Round 1.
+ 2. Organizer: open /admin/inbox-kit (print/scan QR), /admin/insider-kit (prepare PRIVATE A + PUBLIC B), /admin/containment-kit.
+ 3. Participant in a SEPARATE browser profile: ${origin.origin}/login?role=team, Team ID DEMO-A.
+ 4. Play Inbox -> Trail -> Insider (enter both physical fragments) -> Containment (organizer may authorize accessible CCTV copy) -> Final Verdict.
+ 5. See CASE CLOSED; refresh and log in again to confirm the saved score (max 105 with Tamper Alert).
+ 6. Organizer: review the leaderboard, Stop the round, inspect qualification (Top 10 + 2 standby) and CSV export.
+Ctrl+C removes the temporary database. If the window is force-closed, delete only the folder named ghost-inbox-demo-* in %TEMP%.`);
   process.on("SIGINT", interrupt);
   process.on("SIGTERM", interrupt);
   // Own Ctrl+C input on Windows so npm cannot terminate the process tree before cleanup.

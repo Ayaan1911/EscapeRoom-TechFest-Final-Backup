@@ -12,10 +12,14 @@
     "test:e2e": "playwright test",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
+    "teams:provision": "node --env-file=.env scripts/provision-teams.mjs",
+    "load:round1": "node scripts/load-test.mjs",
+    "db:backup": "node scripts/db-backup.mjs backup prisma/dev.db backups",
     "db:seed": "node --env-file=.env scripts/seed.mjs",
     "auth:hash": "powershell -NoProfile -File scripts/hash.ps1",
     "demo:inbox": "node scripts/inbox-demo.mjs",
     "test:e2e:inbox": "node scripts/inbox-demo.mjs --test",
+    "rehearsal:round1": "node scripts/inbox-demo.mjs --rehearsal",
     "demo:trail": "node scripts/inbox-demo.mjs --trail",
     "test:e2e:trail": "node scripts/inbox-demo.mjs --test --trail",
     "demo:insider": "node scripts/inbox-demo.mjs --insider",
@@ -49,5 +53,8 @@
     "tailwindcss": "^4.0.0",
     "typescript": "^5.9.0",
     "vitest": "^4.0.0"
+  },
+  "overrides": {
+    "deepmerge-ts": "8.0.2"
   }
 }

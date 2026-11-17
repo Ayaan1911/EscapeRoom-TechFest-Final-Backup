@@ -10,3 +10,7 @@ test-results/
 *.db
 *.db-*
 *.sqlite*
+
+# organizer-only generated credentials and backups
+/private/
+/backups/
