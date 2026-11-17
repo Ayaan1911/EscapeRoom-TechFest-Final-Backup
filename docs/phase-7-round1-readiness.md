@@ -1,5 +1,7 @@
 # Phase 7 — Round 1 readiness
 
+> **Superseded in Phase 8:** persistence moved from SQLite to PostgreSQL (Neon). Sections below that describe SQLite files, WAL, `connection_limit=1`, `VACUUM INTO` backups and `prisma\dev.db` are historical. Current procedures: `docs/phase-8-render-neon-deployment.md`. The 50-team load test was re-run on PostgreSQL in Phase 8 (0 errors, 50/50 teams).
+
 Branch `feat/phase-7-round1-readiness` (from Phase 6 commit `b7cd422`). Scope: provisioning, load/reliability, security, operations. No Round 2 work, no deployment.
 
 ## Status (three separate levels)

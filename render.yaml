@@ -1,0 +1,33 @@
+# Render Blueprint for the FICTIONAL Round 1 preview. Free plan only; no paid resources are declared here.
+# Secrets are never stored in this file: the four `sync: false` variables are entered by the owner in the Render dashboard.
+# Deploys are MANUAL (autoDeploy: false) and pinned to one reviewed branch; use "Manual Deploy > Deploy a specific commit" and record the SHA.
+# If the Blueprint editor rejects `autoDeploy`, set Settings > Build & Deploy > Auto-Deploy = Off in the dashboard instead.
+services:
+  - type: web
+    name: ghost404-round1-preview
+    runtime: node
+    plan: free
+    region: singapore # keep the same region family as the Neon project (AWS ap-southeast-1)
+    branch: feat/phase-8-ui-security-deployment
+    autoDeploy: false
+    buildCommand: npm ci --include=dev && npm run build
+    # Migrations run BEFORE the server accepts traffic (preDeployCommand is not relied on for the free plan). Idempotent on every cold start.
+    startCommand: npm run start:render
+    healthCheckPath: /api/health # liveness only; does not touch the database
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
+      - key: DB_POOL_SIZE
+        value: "5"
+      - key: DATABASE_URL # Neon POOLED connection string (host contains -pooler), with ?sslmode=require&pgbouncer=true&connect_timeout=30
+        sync: false
+      - key: DIRECT_URL # Neon DIRECT connection string, used only by prisma migrate / backup scripts
+        sync: false
+      - key: ADMIN_ACCESS_HASH # hash only: GHOST_BOOTSTRAP_SECRET=... node scripts/bootstrap.mjs, copy the hash from .env
+        sync: false
+      - key: APP_ORIGIN # exact public origin, e.g. https://ghost404-round1-preview.onrender.com (no trailing slash)
+        sync: false

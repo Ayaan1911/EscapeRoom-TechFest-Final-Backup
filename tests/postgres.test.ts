@@ -3,13 +3,14 @@ import { createTempDatabase } from "../scripts/pg-temp.mjs";
 import { initialProgress, score } from "../src/lib/game/engine";
 import { hashPassword } from "../src/lib/password.mjs";
 import { inboxAnswers } from "./fixtures/inbox";
+import { NextRequest } from "next/server";
 
 // PostgreSQL-specific proofs: transactional correctness under real concurrency, restart/recovery.
 // Needs the local disposable server (npm run db:test:up). Runs with the other DB tests: GHOST_DB_TEST=1 npm test.
 const jar = vi.hoisted(() => new Map<string, string>());
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: (key: string) => jar.has(key) ? { value: jar.get(key) } : undefined, set: (key: string, value: string) => jar.set(key, value), delete: (key: string) => jar.delete(key) }) }));
 
-describe.skipIf(!process.env.GHOST_DB_TEST)("PostgreSQL concurrency and recovery", () => {
+describe.skipIf(!process.env.GHOST_DB_TEST)("PostgreSQL concurrency and recovery", { timeout: 90_000 }, () => {
   let temp: Awaited<ReturnType<typeof createTempDatabase>>;
   let db: typeof import("../src/lib/db").db;
   let auth: typeof import("../src/lib/auth");
@@ -70,6 +71,13 @@ describe.skipIf(!process.env.GHOST_DB_TEST)("PostgreSQL concurrency and recovery
     expect(round.startsAt).not.toBeNull(); expect(round.deadline!.getTime() - round.startsAt!.getTime()).toBe(3_600_000);
     expect(await db.auditLog.count({ where: { action: "start" } })).toBeGreaterThanOrEqual(1);
     jar.clear();
+  });
+
+  it("health: liveness never touches the database; readiness (?db=1) does and exposes no data", async () => {
+    const health = await import("../src/app/api/health/route");
+    const live = await health.GET(new NextRequest("http://127.0.0.1:3000/api/health")); expect(await live.json()).toEqual({ ok: true });
+    const ready = await health.GET(new NextRequest("http://127.0.0.1:3000/api/health?db=1")); const body = await ready.json();
+    expect(body).toEqual({ ok: true, database: "up", round: "active" }); expect(JSON.stringify(body)).not.toMatch(/team|hash|code/i);
   });
 
   it("keeps scores, sessions and the deadline across a full client restart", async () => {

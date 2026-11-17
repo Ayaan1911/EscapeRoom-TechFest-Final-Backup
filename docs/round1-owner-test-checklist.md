@@ -1,6 +1,6 @@
 # Round 1 owner test checklist (Windows 11 / PowerShell)
 
-Run from `D:\Projects\EscapeRoom TechFest`. Everything below uses a **temporary database**; your real data is never touched.
+Run from `D:\Projects\EscapeRoom TechFest`. Everything below uses a **temporary local PostgreSQL database** (start the disposable server once with `npm run db:test:up`); your real data is never touched.
 
 ## A. Full playthrough rehearsal (~30 min)
 
@@ -32,7 +32,7 @@ npm run test:e2e:verdict      # all chapters in Chromium, ~8 min
 npm run build
 ```
 
-Expected: no lint errors; 125 tests passing (95 without the DB flag, 30 skipped); 32 browser tests passing; build succeeds.
+Expected: no lint errors; 133 tests passing (95 without the DB flag); browser suites passing (`npm run test:e2e:verdict`, `npm run test:e2e:journey`); build succeeds.
 
 ## C. 50-team load test (~3 min)
 
@@ -52,14 +52,13 @@ npm run teams:provision -- --list                                               
 
 Only add `--apply` for the real event database, then hand out each code privately.
 
-## E. Backup / restore drill
+## E. Backup / restore drill (PostgreSQL)
 
 ```powershell
-node scripts/db-backup.mjs backup prisma\dev.db backups
-node scripts/db-backup.mjs verify backups\<the new file>.db
+npm run db:backup                                  # JSON snapshot of DIRECT_URL into backupsnode scripts/db-backup.mjs verify backups\<the new file>.json
 ```
 
-Expected: `Backup OK` with team counts. Practise a restore only on a copy of the database.
+Expected: `Backup OK` with table counts. Practise `restore <file> --yes` only into an EMPTY scratch database (a populated one is refused).
 
 ## F. Things only you can verify (not done by automated tests)
 
