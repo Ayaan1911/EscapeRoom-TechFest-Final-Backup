@@ -163,3 +163,44 @@
 }
 @media (max-width: 520px) { .k-step-name { display: none; } .k-stepper li:not(.is-here) { flex: 0 0 auto; } .k-stepper .is-here .k-step-name { display: inline; } }
 @media (prefers-reduced-motion: reduce) { .k-mission, .k-banner, .k-viewer, .k-artifact .k-facts, .k-hints li, .k-notebook li.is-filled, .k-feedback-ok { animation: none; } .k-btn { transition: none; } }
+
+/* Shared console pieces (Trail and later chapters) */
+.k-actions { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; }
+.k-stack { flex-direction: column; align-items: stretch; }
+.k-btn-sm { min-height: 36px; padding: 0 12px; font-size: 14px; }
+.k-muted { color: var(--muted); }
+.k-pad { padding: var(--s5); }
+.k-spacer { flex: 1; }
+.k-console { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+.k-filterbar { display: grid; grid-template-columns: minmax(220px, 2fr) repeat(5, minmax(120px, 1fr)); gap: var(--s3); padding: var(--s4); }
+.k-filter { font-size: 13px !important; color: var(--muted) !important; font-weight: 600; }
+.k-toolbar { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; padding: var(--s3) var(--s4); border-top: 1px solid var(--line); }
+.k-trail-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); gap: var(--s4); align-items: start; }
+.k-tablecard { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.k-tablescroll { overflow: auto; max-height: 640px; }
+.k-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.k-table th { position: sticky; top: 0; background: var(--surface-2); color: var(--muted); font: 700 11px var(--font-mono); letter-spacing: .1em; text-transform: uppercase; padding: 10px 12px; text-align: left; white-space: nowrap; z-index: 1; }
+.k-table td { padding: 9px 12px; border-top: 1px solid var(--line); vertical-align: middle; }
+.k-table td small { display: block; color: var(--muted); margin-top: 2px; }
+.k-table td time { display: block; color: var(--muted); font: 12px var(--font-mono); }
+.k-table tbody tr { cursor: pointer; transition: background .12s; }
+.k-table tbody tr:hover { background: rgba(255,255,255,.03); }
+.k-table tbody tr.is-selected { background: rgba(227,169,59,.1); box-shadow: inset 3px 0 0 var(--amber); }
+.k-table tbody tr.is-pinned { box-shadow: inset 3px 0 0 var(--ok); }
+.k-pager { justify-content: space-between; background: var(--surface); }
+.k-inspector { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: var(--s5); display: grid; gap: var(--s3); align-content: start; position: sticky; top: var(--s4); max-height: calc(100vh - 32px); overflow-y: auto; }
+.k-inspector h2 { margin: 0; font-size: 20px; overflow-wrap: anywhere; }
+.k-inspector .k-facts dd { font-size: 13px; }
+.k-artifact-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s3); }
+.k-artifact-grid .k-artifact { padding: var(--s4); display: grid; gap: var(--s3); align-content: space-between; }
+.k-artifact-body { display: grid; gap: 4px; }
+.k-artifact-body strong { font-size: 16px; line-height: 1.35; }
+.k-artifact-body summary { cursor: pointer; color: var(--amber); font-weight: 600; margin-top: var(--s2); min-height: 32px; }
+.k-tray { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; padding: var(--s3); border: 1px dashed #3b475c; border-radius: 8px; min-height: 52px; }
+.k-tray small { color: var(--muted); }
+.k-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 6px 4px 12px; border: 1px solid rgba(227,169,59,.5); border-radius: 999px; background: rgba(227,169,59,.08); color: var(--amber); animation: ghost-pop .25s ease-out both; }
+.k-chip button { background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 18px; min-width: 28px; min-height: 28px; }
+@media (max-width: 1199px) { .k-trail-grid { grid-template-columns: minmax(0, 1fr); } .k-inspector { position: static; max-height: none; } .k-filterbar { grid-template-columns: repeat(3, minmax(0, 1fr)); } .k-filterbar > :first-child { grid-column: 1 / -1; } }
+@media (max-width: 899px) { .k-filterbar { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .k-artifact-grid { grid-template-columns: minmax(0, 1fr); } .k-inspector { padding: var(--s4); } }
+@media (max-width: 520px) { .k-filterbar { grid-template-columns: minmax(0, 1fr); } }
+@media (prefers-reduced-motion: reduce) { .k-chip { animation: none; } }
