@@ -5,7 +5,7 @@ import { session } from "@/lib/auth";
 import { authorizeContainmentCopy } from "@/lib/game/containment-access.server";
 
 export async function grantCopy(form: FormData) {
-  if (!await session("admin")) redirect("/login?role=admin");
+  if (!await session("admin")) redirect("/organizer/login");
   const fields = Object.fromEntries([...form].filter(([key]) => !key.startsWith("$ACTION_")));
   const parsed = z.object({ teamId: z.string().trim().min(1).max(80), reason: z.string().trim().min(5).max(500) }).strict().safeParse(fields);
   let error = "";

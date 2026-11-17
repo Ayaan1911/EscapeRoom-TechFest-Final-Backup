@@ -2,7 +2,7 @@
 //   node --env-file=.env scripts/provision-teams.mjs --list
 //   node --env-file=.env scripts/provision-teams.mjs --input teams.csv --out private\credentials.csv            (dry run)
 //   node --env-file=.env scripts/provision-teams.mjs --input teams.csv --out private\credentials.csv --apply
-//   node --env-file=.env scripts/provision-teams.mjs --generate 50 --out private\credentials.csv --apply        (fictional)
+//   node --env-file=.env scripts/provision-teams.mjs --generate 50 --out private\credentials.csv --apply --expect-database <name>   (fictional; the name must match the connected database)
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { PrismaClient } from "@prisma/client";
@@ -15,6 +15,11 @@ const value = n => { const i = args.indexOf(`--${n}`); return i >= 0 ? args[i + 
 if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is not set (use --env-file=.env)");
 const db = new PrismaClient();
 try {
+  // Target identity (names only, never the URL): writes require the operator to type the exact database name they intend to change.
+  const [{ name: connected }] = await db.$queryRaw`select current_database() as name`;
+  const round = await db.gameSession.findUnique({ where: { id: 1 } });
+  console.log(`Target database: ${connected}; round: ${!round?.startsAt ? "not started" : round.endedAt ? "ended" : "started"}`);
+  if (flag("apply") && value("expect-database") !== connected) throw new Error(`Refusing to write: pass --expect-database <name> equal to the connected database (connected: ${connected})`);
   const existing = await db.team.findMany({ select: { id: true, name: true, variant: true, progress: true }, orderBy: { id: "asc" } });
   if (flag("list")) {
     console.log("id,name,variant");

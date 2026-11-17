@@ -5,16 +5,17 @@ import { status } from "@/lib/game/engine";
 import { Brand } from "@/components/ui/brand";
 import { Badge, Card } from "@/components/ui/kit";
 import { ConfirmForm } from "@/components/ui/confirm";
-import { signOutAdmin } from "../login/actions";
+import { signOutAdmin } from "../organizer/login/actions";
 import { administer } from "./actions";
 import { qualificationReport } from "@/lib/game/qualification.server";
 import { QualificationBoard } from "@/components/game/qualification-board";
 
+const utc = (d: Date) => `${d.toISOString().slice(0, 16).replace("T", " ")} UTC`;
 const TONE = { waiting: "amber", active: "ok", finished: "neutral" } as const;
 export default async function AdminPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  if (!await session("admin")) redirect("/login?role=admin");
+  if (!await session("admin")) redirect("/organizer/login");
   const report = await qualificationReport();
-  if (!report) redirect("/login?role=admin");
+  if (!report) redirect("/organizer/login");
   const round = report.round, state = status(round);
   const logs = await recentAudit();
   const params = await searchParams;
@@ -24,7 +25,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     <main className="dashboard-main"><div className="k-desk">
       <header className="k-mission">
         <div className="k-mission-main"><div><span className="k-eyebrow">ROUND 1 / {state}</span><h1>Event operations</h1>
-          <p className="k-objective">{round.startsAt?.toISOString() || "Waiting for organizer start"} — {round.deadline?.toISOString() || "60 minutes"}</p></div>
+          <p className="k-objective">{round.startsAt ? `Started ${utc(round.startsAt)} · deadline ${utc(round.deadline!)}` : "Waiting for organizer start · fixed 60-minute clock"}</p></div>
           <dl className="k-stats"><div><dt>Round</dt><dd><Badge tone={TONE[state as keyof typeof TONE] ?? "neutral"}>{state.toUpperCase()}</Badge></dd></div><div><dt>Teams</dt><dd>{report.rows.length} registered</dd></div><div><dt>Finished</dt><dd>{complete} complete · {report.rows.length - complete} in progress</dd></div></dl></div>
       </header>
       {params.error && <p role="alert" className="k-banner k-banner-warn">{params.error}</p>}

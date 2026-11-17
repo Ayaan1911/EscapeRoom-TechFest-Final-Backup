@@ -5,7 +5,7 @@ import { inboxQr } from "@/lib/game/inbox-qr.server";
 import { PrintButton } from "@/components/game/print-button";
 
 export default async function InboxKitPage({ searchParams }: { searchParams: Promise<{ origin?: string }> }) {
-  if (!await session("admin")) redirect("/login?role=admin");
+  if (!await session("admin")) redirect("/organizer/login");
   const params = await searchParams;
   const origin = params.origin ?? process.env.APP_ORIGIN ?? "";
   let qr: Awaited<ReturnType<typeof inboxQr>> | undefined;

@@ -5,7 +5,7 @@ import { inboxAnswers } from "./fixtures/inbox";
 
 test.skip(!process.env.GHOST_E2E_INBOX, "Run npm run test:e2e:inbox to use isolated temporary fixtures");
 async function login(page: Page, variant: string | "admin") {
-  await page.goto(variant === "admin" ? "/login?role=admin" : "/login");
+  await page.goto(variant === "admin" ? "/organizer/login" : "/login");
   if (variant !== "admin") await page.getByLabel("Team ID").fill(`DEMO-${variant}`);
   await page.getByLabel("Access code").fill(variant === "admin" ? process.env.GHOST_E2E_ADMIN_CODE! : process.env.GHOST_E2E_TEAM_CODE!);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();

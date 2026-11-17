@@ -89,4 +89,11 @@ describe.skipIf(!process.env.GHOST_DB_TEST)("PostgreSQL concurrency and recovery
     expect((await db.gameSession.findUniqueOrThrow({ where: { id: 1 } })).deadline!.getTime()).toBe(deadline);
     expect(await db.teamSession.count()).toBeGreaterThan(0);
   });
+
+  it("creates the round row exactly once when many first requests arrive at the same moment (no unique-constraint errors)", async () => {
+    await db.gameSession.deleteMany({ where: { id: 1 } });
+    const rounds = await Promise.all(Array.from({ length: 30 }, () => service.roundState()));
+    expect(rounds.every(r => r.id === 1 && r.startsAt === null)).toBe(true);
+    expect(await db.gameSession.count()).toBe(1);
+  });
 });

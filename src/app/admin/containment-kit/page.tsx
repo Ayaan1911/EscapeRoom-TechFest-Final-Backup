@@ -6,7 +6,7 @@ import { PrintButton } from "@/components/game/print-button";
 import { grantCopy } from "./actions";
 
 export default async function ContainmentKitPage({ searchParams }: { searchParams: Promise<{ variant?: string; error?: string; authorized?: string }> }) {
-  if (!await session("admin")) redirect("/login?role=admin");
+  if (!await session("admin")) redirect("/organizer/login");
   const params = await searchParams;
   const variants = params.variant === undefined || params.variant === "all" ? ["A", "B", "C"] : ["A", "B", "C"].includes(params.variant) ? [params.variant] : [];
   const snapshots = await containmentPrintData(variants) ?? [];

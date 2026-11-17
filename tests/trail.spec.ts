@@ -5,7 +5,7 @@ import { trailAnswers, trailTamper } from "./fixtures/trail";
 
 test.skip(!process.env.GHOST_E2E_TRAIL, "Run npm run test:e2e:trail for isolated Inbox and Trail regression fixtures");
 async function login(page: Page, id: string) {
-  await page.goto(id === "admin" ? "/login?role=admin" : "/login");
+  await page.goto(id === "admin" ? "/organizer/login" : "/login");
   if (id !== "admin") await page.getByLabel("Team ID").fill(id);
   await page.getByLabel("Access code").fill(id === "admin" ? process.env.GHOST_E2E_ADMIN_CODE! : process.env.GHOST_E2E_TEAM_CODE!);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();

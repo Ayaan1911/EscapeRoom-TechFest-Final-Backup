@@ -13,7 +13,7 @@ const V = "A" as const, TEAM = "DEMO-A";
 const origin = "http://127.0.0.1:3000";
 
 async function signIn(page: Page, role: "team" | "admin") {
-  await page.goto(role === "admin" ? "/login?role=admin" : "/login");
+  await page.goto(role === "admin" ? "/organizer/login" : "/login");
   if (role === "team") await page.getByLabel("Team ID", { exact: true }).fill(TEAM);
   await page.getByLabel("Access code", { exact: true }).fill(role === "admin" ? process.env.GHOST_E2E_ADMIN_CODE! : process.env.GHOST_E2E_TEAM_CODE!);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();

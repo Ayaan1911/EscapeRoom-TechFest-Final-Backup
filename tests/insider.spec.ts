@@ -40,7 +40,7 @@ test("organizer prepares separate A/B A4 sheets for 50 teams, stable reprints an
 test("anonymous, organizer and premature participant requests cannot reveal a dossier or print private slips", async ({ page }) => {
   expect((await page.request.get("/api/game/insider")).status()).toBe(401);
   await page.goto("/play/insider"); await expect(page).toHaveURL(/\/login\?next=/);
-  await page.goto("/admin/insider-kit?part=A&scope=all"); await expect(page).toHaveURL(/\/login\?role=admin/);
+  await page.goto("/admin/insider-kit?part=A&scope=all"); await expect(page).toHaveURL(/\/organizer\/login/);
   await insiderLogin(page, "admin"); expect((await page.request.get("/api/game/insider")).status()).toBe(401);
   await page.getByRole("button", { name: "Log out", exact: true }).click(); await expect(page).toHaveURL(/\/login$/);
   await insiderLogin(page, "INSIDER-LOCKED");
@@ -48,7 +48,7 @@ test("anonymous, organizer and premature participant requests cannot reveal a do
   await page.goto("/play/insider"); await expect(page).toHaveURL(/\/play$/);
   const premature = await page.request.post("/api/game", { headers: { Origin: "http://127.0.0.1:3000" }, data: { action: "unlock", chapter: 2, answer: { fragmentA: printedPairs().A[0].fragment, fragmentB: printedPairs().B[0].fragment } } });
   expect(premature.status()).toBe(409); expect((await premature.json()).error).toContain("locked");
-  await page.goto("/admin/insider-kit?part=A&scope=all"); await expect(page).toHaveURL(/\/login\?role=admin/); await expect(page.locator(".fragment-card")).toHaveCount(0);
+  await page.goto("/admin/insider-kit?part=A&scope=all"); await expect(page).toHaveURL(/\/organizer\/login/); await expect(page.locator(".fragment-card")).toHaveCount(0);
 });
 
 for (const [index, variant] of (["A", "B", "C"] as const).entries()) test(`Insider ${variant}: physical unlock, investigation, hints, conclusion and saved recovery`, async ({ page }, info) => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -55,11 +55,14 @@ describe("provisioning CLI and backup/restore against disposable databases", () 
     const dir = mkdtempSync(join(tmpdir(), "ghost-prov-")), temp = await createTempDatabase("prov");
     try {
       const env = { ...process.env, DATABASE_URL: temp.url, DIRECT_URL: temp.url };
-      const run = (...args: string[]) => spawnSync(process.execPath, ["scripts/provision-teams.mjs", ...args], { env, encoding: "utf8" });
+      const run = (...args: string[]) => spawnSync(process.execPath, ["scripts/provision-teams.mjs", ...args, ...(args.includes("--apply") ? ["--expect-database", temp.name] : [])], { env, encoding: "utf8" });
+      const bare = (...args: string[]) => spawnSync(process.execPath, ["scripts/provision-teams.mjs", ...args], { env, encoding: "utf8" });
       const backupCli = (...args: string[]) => spawnSync(process.execPath, ["scripts/db-backup.mjs", ...args], { env, encoding: "utf8" });
       const out = join(dir, "private", "creds.csv");
       const dry = run("--generate", "50", "--out", out); expect(dry.stdout, dry.stderr).toContain("DRY RUN");
       expect(run("--list").stdout).toContain("0 registered");
+      const noGuard = bare("--generate", "1", "--out", join(dir, "x.csv"), "--apply"); expect(noGuard.status).not.toBe(0); expect(noGuard.stderr).toContain("--expect-database"); expect(existsSync(join(dir, "x.csv"))).toBe(false);
+      const wrong = spawnSync(process.execPath, ["scripts/provision-teams.mjs", "--generate", "1", "--out", join(dir, "y.csv"), "--apply", "--expect-database", "ghost404_preview"], { env, encoding: "utf8" }); expect(wrong.status).not.toBe(0); expect(existsSync(join(dir, "y.csv"))).toBe(false);
       const applied = run("--generate", "50", "--out", out, "--apply");
       expect(applied.status, applied.stderr).toBe(0);
       const creds = readFileSync(out, "utf8").trim().split(/\r?\n/);

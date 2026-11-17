@@ -21,7 +21,7 @@ async function arrange(page: Page, kind: "event" | "recovery", target: readonly 
 test("Containment enforces sessions, waiting round, exact team isolation and an audited Insider override", async ({ page, browser }) => {
   expect((await page.request.get("/api/game/containment")).status()).toBe(401);
   await page.goto("/play/containment"); await expect(page).toHaveURL(/\/login\?next=/);
-  await page.goto("/admin/containment-kit"); await expect(page).toHaveURL(/\/login\?role=admin/);
+  await page.goto("/admin/containment-kit"); await expect(page).toHaveURL(/\/organizer\/login/);
   await login(page, "CONTAIN-A"); expect((await page.request.get("/api/game/containment")).status()).toBe(403);
   const post = await page.request.post("/api/game", { headers: { Origin: "http://127.0.0.1:3000" }, data: { action: "submit", chapter: 3, answer: containmentAnswers.A } }); expect(post.status()).toBe(409); expect((await post.json()).error).toContain("not active");
   await page.goto("/play/containment"); await expect(page).toHaveURL(/\/play$/); await expect(page.getByRole("timer", { name: "Round time remaining" })).toHaveText("WAITING");
@@ -32,7 +32,7 @@ test("Containment enforces sessions, waiting round, exact team isolation and an 
   const override = admin.locator("section").filter({ has: admin.getByRole("heading", { name: "Unlock next chapter", exact: true }) }); await override.getByLabel("Team ID", { exact: true }).fill("CONTAIN-LOCKED"); await override.getByLabel("Reason", { exact: true }).fill("Containment browser regression: approved Insider progression override"); await override.getByRole("button", { name: "Record override", exact: true }).click(); await confirmDialog(admin);
   await expect(admin.locator("section").filter({ has: admin.getByRole("heading", { name: "Recent audit events", exact: true }) }).getByText(/Containment browser regression: approved Insider progression override/)).toBeVisible(); await page.goto("/play/containment"); await expect(page.getByRole("heading", { name: "Containment", exact: true })).toBeVisible(); await expect(page.getByText("Saved score: 40 / 105", { exact: true })).toBeVisible();
   const own = await (await page.request.get("/api/game/containment")).json(); expect(own.evidence.caseId).toBe("NEXUS-CONTAINMENT-C"); expect(own.fallbackCctv).toBeNull(); expect(JSON.stringify(own)).not.toMatch(/fragmentA|fragmentB/);
-  await page.goto("/admin/containment-kit"); await expect(page).toHaveURL(/\/login\?role=admin/); organizerCookies = await context.cookies(); await context.close();
+  await page.goto("/admin/containment-kit"); await expect(page).toHaveURL(/\/organizer\/login/); organizerCookies = await context.cookies(); await context.close();
 });
 
 test("organizer prints fictional A4 CCTV sheets without solutions and authorizes one audited accessible copy", async ({ page }, info) => {

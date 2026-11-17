@@ -7,7 +7,7 @@ import { insiderPrintPages, insiderWallStation } from "@/lib/game/insider-fragme
 import { PrintButton } from "@/components/game/print-button";
 
 export default async function InsiderKitPage({ searchParams }: { searchParams: Promise<{ part?: string; scope?: string; teamIds?: string | string[] }> }) {
-  if (!await session("admin")) redirect("/login?role=admin");
+  if (!await session("admin")) redirect("/organizer/login");
   const params = await searchParams;
   const selected = typeof params.teamIds === "string" ? [params.teamIds] : params.teamIds ?? [];
   const request = z.object({ part: z.enum(["A", "B"]), scope: z.enum(["all", "selected"]), teamIds: z.array(z.string().max(80)).max(200) }).safeParse({ part: params.part, scope: params.scope, teamIds: selected });

@@ -5,7 +5,7 @@ import { session } from "@/lib/auth";
 import { control } from "@/lib/game/service";
 
 export async function administer(form: FormData) {
-  if (!await session("admin")) redirect("/login?role=admin");
+  if (!await session("admin")) redirect("/organizer/login");
   const parsed = z.object({ action: z.enum(["start", "stop", "unlock"]), teamId: z.string().max(80).optional(), reason: z.string().trim().min(5).max(500).optional() }).safeParse(Object.fromEntries(form));
   if (!parsed.success) redirect("/admin?error=Invalid+request");
   let error = "";

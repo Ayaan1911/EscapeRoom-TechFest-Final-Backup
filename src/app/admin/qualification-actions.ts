@@ -5,7 +5,7 @@ import { session } from "@/lib/auth";
 import { confirmQualification } from "@/lib/game/qualification.server";
 
 export async function confirmReview(form: FormData) {
-  if (!await session("admin")) redirect("/login?role=admin");
+  if (!await session("admin")) redirect("/organizer/login");
   const fields = Object.fromEntries([...form].filter(([key]) => !key.startsWith("$ACTION_")));
   const parsed = z.object({ reason: z.string().trim().min(5).max(500), reviewed: z.literal("on") }).strict().safeParse(fields);
   let error = "";

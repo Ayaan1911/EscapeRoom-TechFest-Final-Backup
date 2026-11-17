@@ -66,7 +66,7 @@ It reports error rate, login/submission/poll latency, PostgreSQL connections, pa
 
 ```powershell
 npm run preview:teams -- --generate 3 --out private\preview-credentials.csv            # dry run
-npm run preview:teams -- --generate 3 --out private\preview-credentials.csv --apply
+npm run preview:teams -- --generate 3 --out private\preview-credentials.csv --apply --expect-database ghost404_preview
 ```
 
 The credentials file stays local and git-ignored. Share a team's code only with the person demoing.

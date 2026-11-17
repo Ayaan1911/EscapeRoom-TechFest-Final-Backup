@@ -50,7 +50,7 @@ export default function Home() {
       <section className="lp-section lp-cta" aria-labelledby="cta-heading">
         <h2 id="cta-heading">Ready when your organizer is.</h2>
         <p>Sign in with the team ID and access code your organizer gave you. Use the HTTPS address you were given and keep your code private.</p>
-        <div className="k-actions"><Link className="k-btn k-btn-primary k-btn-lg" href="/login">Team login</Link><Link className="k-btn k-btn-lg" href="/login?role=admin">Organizer login</Link></div>
+        <div className="k-actions"><Link className="k-btn k-btn-primary k-btn-lg" href="/login">Team login</Link></div>
       </section>
     </main>
     <footer className="site-footer"><span>OPERATION GHOST_404</span><span>FICTIONAL INCIDENT SIMULATION · TECHFEST 2026</span></footer>

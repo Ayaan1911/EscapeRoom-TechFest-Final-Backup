@@ -6,7 +6,7 @@ export const manifestPath = join(process.cwd(), "test-results/insider-main/fragm
 export type PrintCard = { teamId: string; station: string; fragment: string };
 export function printedPairs(): { A: PrintCard[]; B: PrintCard[] } { return JSON.parse(readFileSync(manifestPath, "utf8")); }
 export async function insiderLogin(page: Page, id: string) {
-  await page.goto(id === "admin" ? "/login?role=admin" : "/login");
+  await page.goto(id === "admin" ? "/organizer/login" : "/login");
   if (id !== "admin") await page.getByLabel("Team ID", { exact: true }).fill(id);
   await page.getByLabel("Access code", { exact: true }).fill(id === "admin" ? process.env.GHOST_E2E_ADMIN_CODE! : process.env.GHOST_E2E_TEAM_CODE!);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();

@@ -4,7 +4,11 @@ import { validators } from "./validators";
 import { matchesInsiderFragments } from "./insider-fragments.server";
 
 export async function roundState() {
-  return db.gameSession.upsert({ where: { id: 1 }, create: { id: 1 }, update: {} });
+  // Read first (no write on the hot polling path). The row is created once; concurrent first requests must not fail on the unique id, so use skipDuplicates instead of upsert.
+  const found = await db.gameSession.findUnique({ where: { id: 1 } });
+  if (found) return found;
+  await db.gameSession.createMany({ data: [{ id: 1 }], skipDuplicates: true });
+  return db.gameSession.findUniqueOrThrow({ where: { id: 1 } });
 }
 export async function teamState(id: string) {
   const team = await db.team.findUniqueOrThrow({ where: { id }, include: { insiderAccess: { select: { unlockedAt: true } } } });
