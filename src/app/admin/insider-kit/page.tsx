@@ -1,0 +1,19 @@
+import { redirect } from "next/navigation";
+import { z } from "zod";
+import { session } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { insiderPrintData } from "@/lib/game/insider-kit.server";
+import { insiderPrintPages, insiderWallStation } from "@/lib/game/insider-fragments.server";
+import { PrintButton } from "@/components/game/print-button";
+
+export default async function InsiderKitPage({ searchParams }: { searchParams: Promise<{ part?: string; scope?: string; teamIds?: string | string[] }> }) {
+  if (!await session("admin")) redirect("/login?role=admin");
+  const params = await searchParams;
+  const selected = typeof params.teamIds === "string" ? [params.teamIds] : params.teamIds ?? [];
+  const request = z.object({ part: z.enum(["A", "B"]), scope: z.enum(["all", "selected"]), teamIds: z.array(z.string().max(80)).max(200) }).safeParse({ part: params.part, scope: params.scope, teamIds: selected });
+  const teams = await db.team.findMany({ select: { id: true, name: true }, orderBy: { id: "asc" } });
+  const part = request.success ? request.data.part : "A";
+  const cards = request.success ? await insiderPrintData(part, request.data.scope === "all" ? undefined : request.data.teamIds) ?? [] : [];
+  const pages = insiderPrintPages(cards, part);
+  return <main className="dashboard-main insider-kit-main"><div className="print-controls"><a className="back-link" href="/admin">← Event operations</a><h1>Insider Evidence Wall kit</h1><p>Print the two parts separately. Fragment A goes inside the matching team&apos;s private registration envelope. Only Fragment B goes on the public wall. Never post an A sheet or a complete pair.</p><p>Five stable wall sections, A–E, spread demand across stations. Sort cards by team ID within each section. Duplicate the same B sheets at additional stations when needed; no new fragments are generated on reprint.</p><form><label>Sheet type<select name="part" defaultValue={part}><option value="A">Fragment A - PRIVATE envelope slips</option><option value="B">Fragment B - PUBLIC Evidence Wall cards</option></select></label><fieldset className="kit-team-selector"><legend>Registered teams ({teams.length})</legend>{teams.map(team => <label key={team.id}><input type="checkbox" name="teamIds" value={team.id} defaultChecked={selected.includes(team.id)} /><span>{team.id} · {team.name}<small>Wall section {insiderWallStation(team.id)}</small></span></label>)}</fieldset><div className="trail-links"><button className="button-primary" name="scope" value="all">Prepare all teams</button><button className="button-secondary" name="scope" value="selected">Prepare selected teams</button></div></form>{params.scope && !request.success && <p role="alert">Invalid print selection.</p>}{request.success && <p role="status">{cards.length} cards prepared on {pages.length} A4 sheets. Only Fragment {part} is present in this print view.</p>}{cards.length > 0 && <PrintButton />}</div>{pages.map((page, index) => <section className="print-kit-page" key={`${page.station}-${index}`}><header><strong>{part === "A" ? "PRIVATE ENVELOPES - DO NOT POST" : `PUBLIC EVIDENCE WALL - SECTION ${page.station}`}</strong><span>NEXUS / INSIDER · Sheet {index + 1} of {pages.length}</span></header><div className="fragment-grid">{page.cards.map(card => <article className="fragment-card" data-team-id={card.teamId} data-station={card.station} key={card.teamId}><div><strong>FRAGMENT {part}</strong><span>WALL SECTION {card.station}</span></div><h2>Team {card.teamId}</h2><code aria-label={`Fragment ${part} for ${card.teamId}`}>{card.fragment}</code><p>{part === "A" ? "Seal in this team's registration envelope. Keep private." : "Post only this B card. Match your team ID and envelope slip."}</p><small>Open /play/insider in the event app. Both pieces and your team login are required.</small></article>)}</div></section>)}</main>;
+}

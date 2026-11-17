@@ -1,5 +1,7 @@
 # Phase 3: Trail
 
+This records the Phase 3 delivery. Chapter 3 is now implemented in [Phase 4: Insider](phase-4-insider.md); statements below about pending Insider content describe the earlier phase.
+
 Trail is playable at `/play/trail` on the verified Phase 2 branch base `471cb669e641962dd8c4e34ea80a3d964551efc0`. It uses validator index 1 and the existing shared round, serializable transaction, score engine, three-second submission cooldown and global Tamper Alert. No schema change or new dependency is required. Inbox fixtures and its answer keys are unchanged. Insider, Containment, Final Verdict and Round 2 remain unimplemented.
 
 ## Investigation and continuity

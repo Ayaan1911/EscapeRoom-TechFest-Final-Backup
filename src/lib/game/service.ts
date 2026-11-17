@@ -1,15 +1,16 @@
 import { db } from "../db";
 import { bonus, complete, current, hints, permit, progressSchema, ranking, score, start, status, useHint } from "./engine";
 import { validators } from "./validators";
+import { matchesInsiderFragments } from "./insider-fragments.server";
 
 export async function roundState() {
   return db.gameSession.upsert({ where: { id: 1 }, create: { id: 1 }, update: {} });
 }
 export async function teamState(id: string) {
-  const team = await db.team.findUniqueOrThrow({ where: { id } });
+  const team = await db.team.findUniqueOrThrow({ where: { id }, include: { insiderAccess: { select: { unlockedAt: true } } } });
   const progress = progressSchema.parse(JSON.parse(team.progress));
   const round = await roundState();
-  return { id: team.id, name: team.name, participants: JSON.parse(team.participants) as string[], variant: team.variant, progress, score: score(progress), hints: hints(progress), current: current(progress), round, status: status(round), serverNow: Date.now(), chapterHints: progress.chapters.map((chapter, i) => validators[i]?.hints.slice(0, chapter.hints) ?? []) };
+  return { id: team.id, name: team.name, participants: JSON.parse(team.participants) as string[], variant: team.variant, progress, score: score(progress), hints: hints(progress), current: current(progress), round, status: status(round), serverNow: Date.now(), chapterHints: progress.chapters.map((chapter, i) => validators[i]?.hints.slice(0, chapter.hints) ?? []), insiderUnlocked: !!team.insiderAccess?.unlockedAt };
 }
 export async function leaderboard() {
   const teams = await db.team.findMany({ select: { id: true, name: true, progress: true, variant: true, participants: true } });
@@ -18,9 +19,9 @@ export async function leaderboard() {
 export async function recentAudit() {
   return db.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: 100 });
 }
-export async function mutateTeam(id: string, chapter: number, action: "submit" | "hint", answer: unknown) {
+export async function mutateTeam(id: string, chapter: number, action: "submit" | "hint" | "unlock", answer: unknown) {
   return db.$transaction(async tx => {
-    const team = await tx.team.findUniqueOrThrow({ where: { id } });
+    const team = await tx.team.findUniqueOrThrow({ where: { id }, include: { insiderAccess: { select: { unlockedAt: true } } } });
     const round = await tx.gameSession.findUniqueOrThrow({ where: { id: 1 } });
     const p = progressSchema.parse(JSON.parse(team.progress));
     const now = Date.now();
@@ -28,6 +29,8 @@ export async function mutateTeam(id: string, chapter: number, action: "submit" |
     try { permit(p, round, chapter, now); } catch (e) { reason = (e as Error).message; }
     const validator = validators[chapter];
     if (!reason && !validator) reason = "Chapter content is not implemented yet";
+    if (!reason && action === "unlock" && chapter !== 2) reason = "Invalid unlock request";
+    if (!reason && chapter === 2 && action === "submit" && !team.insiderAccess?.unlockedAt) reason = "Unlock the dossier using both physical fragments first";
     if (reason) {
       await tx.submission.create({ data: { teamId: id, chapter, accepted: false, reason, answer: action === "submit" ? JSON.stringify(answer ?? null) : null } });
       return { error: reason };
@@ -39,8 +42,19 @@ export async function mutateTeam(id: string, chapter: number, action: "submit" |
       await tx.auditLog.create({ data: { actor: id, action: "hint", detail: JSON.stringify({ chapter, number: p.chapters[chapter].hints }) } });
       return { hint: validator!.hints[p.chapters[chapter].hints - 1] };
     }
+    if (action === "unlock" && team.insiderAccess?.unlockedAt) return { unlocked: true };
     const previous = await tx.submission.findFirst({ where: { teamId: id, chapter }, orderBy: { createdAt: "desc" } });
     if (previous && now - previous.createdAt.getTime() < 3000) return { error: "Please wait between evidence submissions.", retryAfter: Math.max(1, Math.ceil((3000 - (now - previous.createdAt.getTime())) / 1000)) };
+    if (action === "unlock") {
+      const access = await tx.insiderAccess.findUnique({ where: { teamId: id } });
+      const unlocked = !!access && matchesInsiderFragments(access, answer);
+      await tx.submission.create({ data: { teamId: id, chapter, accepted: false, reason: unlocked ? "dossier-unlocked" : "fragment-rejected", answer: null } });
+      if (unlocked) {
+        await tx.insiderAccess.update({ where: { teamId: id }, data: { unlockedAt: new Date(now) } });
+        await tx.auditLog.create({ data: { actor: id, action: "dossier-unlock", detail: JSON.stringify({ chapter }) } });
+      }
+      return { unlocked };
+    }
     const result = validator!.validate(answer, team.variant);
     const tamperAwarded = !!result.tamperDetected && !p.bonus;
     if (tamperAwarded) {

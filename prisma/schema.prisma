@@ -13,6 +13,14 @@ model Team {
   variant String
   progress String
   sessions TeamSession[]
+  insiderAccess InsiderAccess?
+}
+model InsiderAccess {
+  teamId String @id
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  fragmentA String @unique
+  fragmentB String @unique
+  unlockedAt DateTime?
 }
 model TeamSession {
   tokenHash String @id

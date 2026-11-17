@@ -2,9 +2,9 @@
 import { useEffect, useState } from "react";
 import type { Progress } from "@/lib/game/engine";
 
-export type ChapterState = { progress: Progress; score: number; current: number; status: string; chapterHints: string[][]; serverNow: number; round: { deadline: string | null } };
+export type ChapterState = { progress: Progress; score: number; current: number; status: string; chapterHints: string[][]; serverNow: number; round: { deadline: string | null }; insiderUnlocked?: boolean };
 
-export function useChapter(chapter: 0 | 1, initialState: ChapterState) {
+export function useChapter(chapter: 0 | 1 | 2, initialState: ChapterState) {
   const [state, setState] = useState(initialState);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState("");
@@ -33,17 +33,17 @@ export function useChapter(chapter: 0 | 1, initialState: ChapterState) {
     const timer = setInterval(() => setClock({ now: Date.now(), remaining: state.status === "active" && state.round.deadline ? Math.max(0, Math.ceil((Date.parse(state.round.deadline) - state.serverNow - (performance.now() - received)) / 1000)) : 0 }), 1000);
     return () => clearInterval(timer);
   }, [state.serverNow, state.round.deadline, state.status]);
-  async function send(action: "hint" | "submit", answer?: unknown) {
+  async function send(action: "hint" | "submit" | "unlock", answer?: unknown) {
     if (busy) return;
     setBusy(true); setFeedback("");
     try {
       const response = await fetch("/api/game", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, chapter, ...(answer ? { answer } : {}) }) });
       const result = await response.json();
-      if (action === "submit") setRetryAt(Date.now() + (result.retryAfter ?? 3) * 1000);
+      if (action !== "hint") setRetryAt(Date.now() + (result.retryAfter ?? 3) * 1000);
       if (!response.ok) throw new Error(result.error ?? "Unable to save. Retry when the connection returns.");
-      setFeedback(result.hint ? "Hint released and saved." : result.accepted ? `Conclusion accepted. Chapter ${chapter + 2} unlocked.` : result.tamperAwarded ? "Tamper Alert recorded. One-time +5 bonus awarded; the chapter is still open." : "Evidence does not support this submission. Recheck the complete chain.");
+      setFeedback(action === "unlock" ? result.unlocked ? "Dossier unlocked and saved." : "These fragments do not unlock this dossier. Check both printed pieces." : result.hint ? "Hint released and saved." : result.accepted ? `Conclusion accepted. Chapter ${chapter + 2} unlocked.` : result.tamperAwarded ? "Tamper Alert recorded. One-time +5 bonus awarded; the chapter is still open." : "Evidence does not support this submission. Recheck the complete chain.");
       await refresh();
-    } catch (error) { setFeedback(error instanceof TypeError ? "Unable to confirm save. Your form remains here; saved progress will refresh when connected." : (error as Error).message); }
+    } catch (error) { setFeedback(error instanceof TypeError ? action === "unlock" ? "Unable to confirm unlock. Saved progress will refresh when connected; re-enter the printed pieces if still sealed." : "Unable to confirm save. Your form remains here; saved progress will refresh when connected." : (error as Error).message); }
     finally { setBusy(false); }
   }
   return { state, busy, feedback, connection, send, remaining: clock.remaining, retrySeconds: Math.max(0, Math.ceil((retryAt - clock.now) / 1000)) };

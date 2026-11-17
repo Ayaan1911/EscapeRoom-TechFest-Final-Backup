@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
   if (raw.length > 16_384) return new NextResponse(null, { status: 413 });
   let value: unknown;
   try { value = JSON.parse(raw); } catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
-  const parsed = z.object({ action: z.enum(["submit", "hint"]), chapter: z.number().int().min(0).max(4), answer: z.unknown().optional() }).strict().safeParse(value);
+  const parsed = z.object({ action: z.enum(["submit", "hint", "unlock"]), chapter: z.number().int().min(0).max(4), answer: z.unknown().optional() }).strict().refine(value => value.action !== "unlock" || value.chapter === 2).safeParse(value);
   if (!parsed.success) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   try {
     const result = await mutateTeam(auth.teamId, parsed.data.chapter, parsed.data.action, parsed.data.answer);
