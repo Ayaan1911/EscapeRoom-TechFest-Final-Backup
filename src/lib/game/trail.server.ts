@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { inboxEvidence, inboxSolution } from "./inbox.server";
 import type { ChapterValidator } from "./engine";
+import { earnedIds } from "./scoring";
 import type { TrailArtifact, TrailEvidence, TrailEvent } from "@/types/trail";
 
 const slots = {
@@ -84,6 +85,16 @@ export const trailValidator: ChapterValidator = {
     "Separate failed attempts and pending MFA from sessions that actually gained access. Source-IP frequency is not evidence of a successful compromise; eliminate denied, revoked and authorized activity using the supporting records.",
     "Start at the unauthorized database export and trace its exact session backwards. Compare the original issuance device and source with the later validation event, then correlate the redirect with the retained Inbox capture. A matching account alone is insufficient.",
   ],
+  grade(answer, variant) {
+    const parsed = answerSchema.safeParse(answer);
+    if (!parsed.success || !Object.hasOwn(slots, variant) || parsed.data.kind !== "conclusion") return [];
+    const value = parsed.data, expected = trailSolution(variant), [mint, capture, audit] = expected.supportingEvidenceIds, has = (evidence: string) => value.supportingEvidenceIds.includes(evidence);
+    return [
+      ...earnedIds("trail.source", { account: value.account === expected.account, sourceIp: value.sourceIp === expected.sourceIp }),
+      ...earnedIds("trail.session", { sessionId: value.sessionId === expected.sessionId, eventId: value.eventId === expected.eventId }),
+      ...earnedIds("trail.corroboration", { mintEvent: has(mint), capture: has(capture), databaseAudit: has(audit) }),
+    ];
+  },
   validate(answer, variant) {
     const parsed = answerSchema.safeParse(answer);
     if (!parsed.success || !Object.hasOwn(slots, variant)) return { correct: false, points: 0 };

@@ -4,6 +4,7 @@ import { inboxEvidence, inboxSolution } from "./inbox.server";
 import { trailEvidence, trailSolution } from "./trail.server";
 import { insiderDossier, insiderSolution } from "./insider.server";
 import type { ChapterValidator } from "./engine";
+import { earnedIds } from "./scoring";
 import type { ContainmentCctv, ContainmentEvidence, ContainmentRecord } from "@/types/containment";
 
 // IDs carry no chronology or dependency rank; only the retained evidence supports the order.
@@ -92,6 +93,24 @@ const distinct = (min: number, max: number) => z.array(id).min(min).max(max).ref
 const schema = z.object({ kind: z.literal("plan"), eventOrder: distinct(7, 7), account: z.string().trim().toLowerCase().max(120).pipe(z.email()), sessionId: id, immediateActions: distinct(1, 10), recoveryOrder: distinct(1, 9), supportingEvidenceIds: distinct(5, 10), explanation: z.string().trim().max(1000).optional() }).strict();
 export const containmentValidator: ChapterValidator = {
   hints: ["Reconstruct the seven events from trusted source timestamps, not card order or IDs. Separate delivered-lure navigation, the retained capture and later token validation; approved archive/maintenance observations belong outside the incident chain.", "Separate the parallel urgent response from ordered recovery. Preserve evidence alongside containment; verify identity and authority before replacing material, close the exploited weakness before the barrier check, and verify the barrier before restoring access."],
+  grade(answer, variant) {
+    const parsed = schema.safeParse(answer);
+    if (!parsed.success || !Object.hasOwn(cases, variant)) return [];
+    const value = parsed.data, expected = containmentSolution(variant), recovery = expected.recoveryOrder;
+    const sameSet = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every(id => b.includes(id));
+    const edges = [[0, 3], [1, 2], [2, 3], [3, 4], [4, 5]], orderSet = sameSet(value.recoveryOrder, recovery);
+    const allowedEvidence = new Set([...expected.supportingEvidenceIds, `CAP-${variant}-17`, `CUST-${variant}-01`, `CHG-${variant}-219`, `DB-${variant}-MAINT`]);
+    const cleanEvidence = value.supportingEvidenceIds.every(id => allowedEvidence.has(id)), has = (ids: string[]) => cleanEvidence && ids.every(id => value.supportingEvidenceIds.includes(id));
+    const placed = (from: number, to: number) => expected.eventOrder.slice(from, to).every((id, i) => value.eventOrder[from + i] === id);
+    const noWrong = value.immediateActions.every(id => expected.immediateActions.includes(id));
+    return [
+      ...earnedIds("containment.timeline", { early: placed(0, 3), middle: placed(3, 5), late: placed(5, 7) }),
+      ...earnedIds("containment.identity", { account: value.account === expected.account, sessionId: value.sessionId === expected.sessionId }),
+      ...earnedIds("containment.immediate", Object.fromEntries(expected.immediateActions.map((id, i) => [`a${i + 1}`, noWrong && value.immediateActions.includes(id)]))),
+      ...earnedIds("containment.recovery", { set: orderSet, ...Object.fromEntries(edges.map(([before, after], i) => [`e${i + 1}`, orderSet && value.recoveryOrder.indexOf(recovery[before]) < value.recoveryOrder.indexOf(recovery[after])])) }),
+      ...earnedIds("containment.evidence", { forensic: has(expected.supportingEvidenceIds.slice(0, 3)), response: has(expected.supportingEvidenceIds.slice(3)) }),
+    ];
+  },
   validate(answer, variant) {
     const parsed = schema.safeParse(answer);
     if (!parsed.success || !Object.hasOwn(cases, variant)) return { correct: false, points: 0 };

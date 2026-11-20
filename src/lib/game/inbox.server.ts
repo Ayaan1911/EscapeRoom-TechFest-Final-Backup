@@ -1,6 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import type { ChapterValidator } from "./engine";
+import { earnedIds } from "./scoring";
 import type { InboxArtifact, InboxEmail, InboxEvidence } from "@/types/inbox";
 
 const variants = {
@@ -84,6 +85,16 @@ export const inboxValidator: ChapterValidator = {
     "Suspicious language and failed mail authentication are leads, not a verdict. Build a chronological chain from a delivered message through a recorded navigation to the first unauthorized database export.",
     "Use the printed QR or /clue/inbox to inspect the captured redirect. Match its campaign and capture ID to a sign-in event, then match that event's session identifier to a database audit record. Check the quarantine and timestamp evidence for alternative suspects.",
   ],
+  grade(answer, variant) {
+    const parsed = answerSchema.safeParse(answer);
+    if (!parsed.success || !Object.hasOwn(variants, variant) || parsed.data.kind !== "conclusion") return [];
+    const value = parsed.data, expected = inboxSolution(variant), hit = (key: keyof typeof expected) => value[key as keyof typeof value] === expected[key];
+    return [
+      ...earnedIds("inbox.entry", { emailId: hit("emailId"), deliveryId: hit("deliveryId"), snapshotId: hit("snapshotId") }),
+      ...earnedIds("inbox.identity", { authenticationId: hit("authenticationId"), sessionId: hit("sessionId") }),
+      ...earnedIds("inbox.impact", { databaseId: hit("databaseId") }),
+    ];
+  },
   validate(answer, variant) {
     const parsed = answerSchema.safeParse(answer);
     if (!parsed.success || !Object.hasOwn(variants, variant)) return { correct: false, points: 0 };

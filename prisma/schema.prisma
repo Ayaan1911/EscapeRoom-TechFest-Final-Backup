@@ -15,6 +15,8 @@ model Team {
   progress String
   sessions TeamSession[]
   insiderAccess InsiderAccess?
+  taskScores TaskScore[]
+  drafts ChapterDraft[]
 }
 model InsiderAccess {
   teamId String @id
@@ -43,6 +45,11 @@ model Submission {
   accepted Boolean
   reason String
   answer String?
+  // Task-scoring audit (NULL on every pre-v2 row): version, points newly awarded by this submission, chapter raw after it, criterion ids first earned by it.
+  scoringVersion Int?
+  awarded Int?
+  chapterRaw Int?
+  criteria String?
   createdAt DateTime @default(now())
   @@index([teamId, createdAt])
 }
@@ -57,4 +64,30 @@ model LoginAttempt {
   key String @id
   failures Int
   windowStart DateTime
+}
+
+// Best-ever earned criteria per task. Monotonic: criteria are only ever added, never removed.
+model TaskScore {
+  teamId String
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  chapter Int
+  taskId String
+  earned Int
+  max Int
+  criteria String // JSON array of earned criterion ids
+  firstScoredAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@id([teamId, taskId])
+  @@index([teamId, chapter])
+}
+// Unscored work-in-progress answers, optimistic-locked by version.
+model ChapterDraft {
+  teamId String
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  chapter Int
+  taskId String
+  data String
+  version Int @default(1)
+  updatedAt DateTime @updatedAt
+  @@id([teamId, chapter, taskId])
 }

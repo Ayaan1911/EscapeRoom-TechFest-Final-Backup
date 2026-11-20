@@ -1,5 +1,6 @@
 import { db, serializable } from "../db";
-import { bonus, complete, current, hints, permit, progressSchema, ranking, score, start, status, useHint } from "./engine";
+import { applyRaw, bonus, current, hints, overrideChapter, permit, points, progressSchema, ranking, score, start, status, unlockThresholds, unlocked, useHint } from "./engine";
+import { catalog, criterionPoints, MAX_SCORED_ATTEMPTS, taskMax } from "./scoring";
 import { validators } from "./validators";
 import { matchesInsiderFragments } from "./insider-fragments.server";
 
@@ -14,7 +15,9 @@ export async function teamState(id: string) {
   const team = await db.team.findUniqueOrThrow({ where: { id }, include: { insiderAccess: { select: { unlockedAt: true } } } });
   const progress = progressSchema.parse(JSON.parse(team.progress));
   const round = await roundState();
-  return { id: team.id, name: team.name, participants: JSON.parse(team.participants) as string[], variant: team.variant, progress, score: score(progress), hints: hints(progress), current: current(progress), round, status: status(round), serverNow: Date.now(), chapterHints: progress.chapters.map((chapter, i) => validators[i]?.hints.slice(0, chapter.hints) ?? []), insiderUnlocked: !!team.insiderAccess?.unlockedAt };
+  const taskRows = await db.taskScore.findMany({ where: { teamId: id }, select: { taskId: true, earned: true } });
+  const earned = new Map(taskRows.map(row => [row.taskId, row.earned]));
+  return { id: team.id, name: team.name, participants: JSON.parse(team.participants) as string[], variant: team.variant, progress, score: score(progress), hints: hints(progress), current: current(progress), round, status: status(round), serverNow: Date.now(), chapterHints: progress.chapters.map((chapter, i) => validators[i]?.hints.slice(0, chapter.hints) ?? []), insiderUnlocked: !!team.insiderAccess?.unlockedAt, unlocked: points.map((_, i) => unlocked(progress, i)), unlockThresholds, tasks: catalog.map(list => list.map(task => ({ id: task.id, title: task.title, earned: earned.get(task.id) ?? 0, max: taskMax(task) }))) };
 }
 export async function leaderboard() {
   const teams = await db.team.findMany({ select: { id: true, name: true, progress: true, variant: true, participants: true } });
@@ -59,7 +62,16 @@ export async function mutateTeam(id: string, chapter: number, action: "submit" |
       }
       return { unlocked };
     }
+    if (action === "submit") {
+      const attempts = await tx.submission.count({ where: { teamId: id, chapter, scoringVersion: { not: null } } });
+      if (attempts >= MAX_SCORED_ATTEMPTS) {
+        const error = "Submission limit reached for this chapter. Ask an organizer if you need it reviewed.";
+        await tx.submission.create({ data: { teamId: id, chapter, accepted: false, reason: error, answer: JSON.stringify(answer ?? null) } });
+        return { error };
+      }
+    }
     const result = validator!.validate(answer, team.variant);
+    const graded = validator!.grade(answer, team.variant).filter(criterion => criterionPoints.has(criterion));
     const decidedAt = Date.now();
     if (status(round, decidedAt) !== "active") {
       const error = "Round is not active";
@@ -71,18 +83,37 @@ export async function mutateTeam(id: string, chapter: number, action: "submit" |
       bonus(p);
       await tx.auditLog.create({ data: { actor: id, action: "tamper-alert", detail: JSON.stringify({ chapter }) } });
     }
-    if (result.correct) {
-      complete(p, chapter, result.points, decidedAt);
+    // Task scoring: every criterion is earned at most once (union with what is stored) and points are derived only from the server catalog.
+    const stored = await tx.taskScore.findMany({ where: { teamId: id, chapter } });
+    const before = p.chapters[chapter].score;
+    let taskSum = 0, newlyEarned: string[] = [];
+    const tasks: { id: string; earned: number; max: number }[] = [];
+    for (const task of catalog[chapter]) {
+      const row = stored.find(r => r.taskId === task.id);
+      const had = new Set<string>(row ? JSON.parse(row.criteria) : []);
+      const fresh = graded.filter(criterion => criterion.startsWith(`${task.id}:`) && !had.has(criterion));
+      const all = [...had, ...fresh];
+      const earned = all.reduce((n, criterion) => n + (criterionPoints.get(criterion) ?? 0), 0);
+      taskSum += earned;
+      tasks.push({ id: task.id, earned, max: taskMax(task) });
+      if (fresh.length) {
+        newlyEarned = [...newlyEarned, ...fresh];
+        const data = { earned, max: taskMax(task), criteria: JSON.stringify(all) };
+        await tx.taskScore.upsert({ where: { teamId_taskId: { teamId: id, taskId: task.id } }, create: { teamId: id, chapter, taskId: task.id, ...data }, update: data });
+      }
     }
-    if (result.correct || tamperAwarded) {
-      await tx.team.update({ where: { id }, data: { progress: JSON.stringify(p) } });
-    }
-    await tx.submission.create({ data: { teamId: id, chapter, accepted: result.correct, reason: result.correct ? "completed" : "incorrect", answer: JSON.stringify(answer ?? null) } });
-    return { accepted: result.correct, tamperAwarded };
+    const unlockedNow = applyRaw(p, chapter, taskSum, decidedAt);
+    const awarded = p.chapters[chapter].score - before;
+    const full = taskSum === points[chapter];
+    if (awarded > 0 || unlockedNow.length || tamperAwarded) await tx.team.update({ where: { id }, data: { progress: JSON.stringify(p) } });
+    for (const next of unlockedNow) await tx.auditLog.create({ data: { actor: id, action: "chapter-unlock", detail: JSON.stringify({ chapter: next, rawAfter: p.chapters[chapter].score, threshold: unlockThresholds[chapter] }) } });
+    await tx.submission.create({ data: { teamId: id, chapter, accepted: full, reason: full ? "completed" : graded.length ? "partial" : "incorrect", answer: JSON.stringify(answer ?? null), scoringVersion: 2, awarded, chapterRaw: p.chapters[chapter].score, criteria: JSON.stringify(newlyEarned) } });
+    return { accepted: full, partial: !full && graded.length > 0, awarded, chapterRaw: p.chapters[chapter].score, chapterMax: points[chapter], tasks, unlocked: unlockedNow, tamperAwarded };
   });
 }
 export async function control(action: "start" | "stop" | "unlock", teamId?: string, reason?: string) {
   return serializable(async tx => {
+    let chapter: number | undefined;
     const round = await tx.gameSession.upsert({ where: { id: 1 }, create: { id: 1 }, update: {} });
     if (action === "start") await tx.gameSession.update({ where: { id: 1 }, data: start(round) });
     if (action === "stop") {
@@ -93,11 +124,11 @@ export async function control(action: "start" | "stop" | "unlock", teamId?: stri
       if (!teamId || !reason?.trim()) throw new Error("Team and override reason are required");
       const t = await tx.team.findUniqueOrThrow({ where: { id: teamId } });
       const p = progressSchema.parse(JSON.parse(t.progress));
-      permit(p, round, current(p));
-      // Overrides advance without awarding unearned chapter points.
-      complete(p, current(p), 0, Date.now(), true);
+      if (status(round) !== "active") throw new Error("Round is not active");
+      // Overrides advance without awarding unearned chapter points and never remove earned ones.
+      chapter = overrideChapter(p, Date.now());
       await tx.team.update({ where: { id: teamId }, data: { progress: JSON.stringify(p) } });
     }
-    await tx.auditLog.create({ data: { actor: "organizer", action, detail: JSON.stringify({ teamId, reason }) } });
+    await tx.auditLog.create({ data: { actor: "organizer", action, detail: JSON.stringify({ teamId, reason, ...(chapter === undefined ? {} : { chapter }) }) } });
   });
 }

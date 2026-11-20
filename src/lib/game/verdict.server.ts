@@ -5,6 +5,7 @@ import { trailEvidence, trailSolution } from "./trail.server";
 import { insiderDossier, insiderSolution } from "./insider.server";
 import { containmentEvidence } from "./containment.server";
 import type { ChapterValidator } from "./engine";
+import { earnedIds } from "./scoring";
 import type { VerdictEvidence, VerdictRecord } from "@/types/verdict";
 
 const hypotheses = { A: { replay: "27", employee: "64", maintenance: "91" }, B: { replay: "83", employee: "16", maintenance: "42" }, C: { replay: "38", employee: "72", maintenance: "15" } } as const;
@@ -67,6 +68,25 @@ const schema = z.object({
 }).strict();
 export const verdictValidator: ChapterValidator = {
   hints: ["Map the entry, session, impact, internal-assistance and response claims to independent retained sources from all four chapters. A mailbox display name or one database principal cannot establish the whole causal chain.", "Keep account ownership separate from intent. Match the captured campaign to the exact replayed session and customer export, correlate the signed policy action with intent/access/custody, and use actual records to contradict an alternative. An attacker alias is not a proven real-world identity, and a prepared plan is not an executed recovery."],
+  grade(answer, variant) {
+    const parsed = schema.safeParse(answer);
+    if (!parsed.success || !Object.hasOwn(hypotheses, variant)) return [];
+    const value = parsed.data, expected = verdictSolution(variant), alternative = verdictSolution(variant, "maintenance");
+    const sameSet = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every(id => b.includes(id));
+    const mapped = Object.values(value.evidenceMap).flat(), disjoint = new Set(mapped).size === mapped.length;
+    const chain = (key: keyof typeof expected.chain) => value.chain[key] === expected.chain[key];
+    const role = (name: keyof typeof expected.evidenceMap) => {
+      const required = expected.evidenceMap[name], actual = value.evidenceMap[name], extras = name === "entry" ? [`GW-${variant}-01`] : name === "assistance" ? [`CHG-${variant}-219`] : [];
+      return disjoint && required.every(id => actual.includes(id)) && actual.every(id => required.includes(id) || extras.includes(id));
+    };
+    return [
+      ...earnedIds("verdict.entry", { emailId: chain("emailId"), captureId: chain("captureId"), campaign: chain("campaign") }),
+      ...earnedIds("verdict.session", { victimAccount: chain("victimAccount"), sessionId: chain("sessionId"), exportId: chain("exportId") }),
+      ...earnedIds("verdict.insider", { insiderId: chain("insiderId"), policyId: chain("policyId") }),
+      ...earnedIds("verdict.evidence", { entry: role("entry"), session: role("session"), impact: role("impact"), assistance: role("assistance"), response: role("response") }),
+      ...earnedIds("verdict.reasoning", { hypothesis: value.hypothesisId === expected.hypothesisId, rejection: [expected.rejected, alternative.rejected].some(rejected => value.rejected.hypothesisId === rejected.hypothesisId && value.rejected.contradiction === rejected.contradiction && sameSet(value.rejected.evidenceIds, rejected.evidenceIds)) }),
+    ];
+  },
   validate(answer, variant) {
     const parsed = schema.safeParse(answer);
     if (!parsed.success || !Object.hasOwn(hypotheses, variant)) return { correct: false, points: 0 };
