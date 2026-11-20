@@ -49,7 +49,7 @@ for (const variant of ["A", "B", "C"] as const) test(`Trail ${variant}: filters,
   let externalSubmissionAt = 0;
   if (variant === "A") {
     await expect(page.getByText("Global Tamper Alert bonus already recorded: +5.")).toBeVisible();
-    expect(await (await post({ kind: "tamper", tamper: trailTamper(variant) })).json()).toEqual({ accepted: false, tamperAwarded: false });
+    expect(await (await post({ kind: "tamper", tamper: trailTamper(variant) })).json()).toMatchObject({ accepted: false, tamperAwarded: false, awarded: 0 });
     externalSubmissionAt = Date.now();
   }
   const table = page.getByRole("region", { name: "Authentication events" });

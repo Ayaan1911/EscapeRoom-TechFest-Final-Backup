@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createTempDatabase } from "../scripts/pg-temp.mjs";
 import { initialProgress } from "../src/lib/game/engine";
+import { catalog } from "../src/lib/game/scoring";
 import { hashPassword } from "../src/lib/password.mjs";
 import { inboxAnswers, tamperAnswer } from "./fixtures/inbox";
 import { NextRequest } from "next/server";
@@ -93,7 +94,7 @@ describe.runIf(process.env.GHOST_DB_TEST === "1")("Prisma persistence and sessio
     const { validators } = await import("../src/lib/game/validators");
     const registeredTrail = validators[1];
     // Test-only fixture, never a real chapter answer key.
-    validators[1] = { validate: () => ({ correct:true, points:25, tamperDetected:true }), hints:["Test hint one","Test hint two"] };
+    validators[1] = { validate: () => ({ correct:true, points:25, tamperDetected:true }), grade: () => catalog[1].flatMap(task => Object.keys(task.criteria).map(key => `${task.id}:${key}`)), hints:["Test hint one","Test hint two"] };
     expect((await service.mutateTeam("A",1,"hint",null)).hint).toBe("Test hint one");
     expect((await service.mutateTeam("A",1,"hint",null)).hint).toBe("Test hint two");
     expect((await service.mutateTeam("A",1,"hint",null)).error).toBeDefined();
@@ -126,8 +127,9 @@ describe.runIf(process.env.GHOST_DB_TEST === "1")("Prisma persistence and sessio
     expect((await service.mutateTeam(id, 0, "hint", null)).hint).toBeDefined();
     expect((await service.mutateTeam(id, 0, "hint", null)).error).toMatch(/Maximum two/);
     expect((await service.teamState(id)).chapterHints[0]).toHaveLength(2);
-    const wrong = { ...solution, emailId: "unrelated-email", tamper: tamperAnswer(variant) };
-    expect(await service.mutateTeam(id, 0, "submit", wrong)).toEqual({ accepted: false, tamperAwarded: true });
+    // Every scored field wrong: zero task points, but the independent Tamper Alert bonus still applies. (A partly wrong answer now earns partial credit; see tests/scoring.test.ts.)
+    const wrong = { ...solution, emailId: "unrelated-email", deliveryId: "unrelated-click", snapshotId: "unrelated-capture", authenticationId: "unrelated-auth", databaseId: "unrelated-db", sessionId: "unrelated-session", tamper: tamperAnswer(variant) };
+    expect(await service.mutateTeam(id, 0, "submit", wrong)).toMatchObject({ accepted: false, tamperAwarded: true, awarded: 0 });
     expect((await service.teamState(id)).progress.bonus).toBe(5);
     expect((await service.teamState(id)).current).toBe(0);
     expect((await service.teamState(id)).score).toBe(0);
@@ -144,10 +146,10 @@ describe.runIf(process.env.GHOST_DB_TEST === "1")("Prisma persistence and sessio
     expect(throttled.status).toBe(429);
     expect(Number(throttled.headers.get("Retry-After"))).toBeGreaterThan(0);
     await db.submission.updateMany({ where: { teamId: id }, data: { createdAt: new Date(0) } });
-    expect(await service.mutateTeam(id, 0, "submit", { kind: "tamper", tamper: tamperAnswer(variant) })).toEqual({ accepted: false, tamperAwarded: false });
+    expect(await service.mutateTeam(id, 0, "submit", { kind: "tamper", tamper: tamperAnswer(variant) })).toMatchObject({ accepted: false, tamperAwarded: false });
     expect(await db.auditLog.count({ where: { actor: id, action: "tamper-alert" } })).toBe(1);
     await db.submission.updateMany({ where: { teamId: id }, data: { createdAt: new Date(0) } });
-    expect(await service.mutateTeam(id, 0, "submit", solution)).toEqual({ accepted: true, tamperAwarded: false });
+    expect(await service.mutateTeam(id, 0, "submit", solution)).toMatchObject({ accepted: true, tamperAwarded: false });
     const saved = await service.teamState(id);
     expect(saved.score).toBe(11); // 15 - 3 - 6 + 5, independently capped.
     expect(saved.current).toBe(1);
@@ -192,7 +194,7 @@ describe.runIf(process.env.GHOST_DB_TEST === "1")("Prisma persistence and sessio
     await service.control("start");
     expect((await service.mutateTeam(id, 1, "hint", null)).error).toMatch(/locked/);
     expect((await service.mutateTeam(id, 1, "submit", answer)).error).toMatch(/locked/);
-    expect(await service.mutateTeam(id, 0, "submit", { ...inboxAnswers[variant], ...(variant === "A" ? { tamper: tamperAnswer(variant) } : {}) })).toEqual({ accepted: true, tamperAwarded: variant === "A" });
+    expect(await service.mutateTeam(id, 0, "submit", { ...inboxAnswers[variant], ...(variant === "A" ? { tamper: tamperAnswer(variant) } : {}) })).toMatchObject({ accepted: true, tamperAwarded: variant === "A", awarded: 15, chapterRaw: 15 });
     expect((await service.teamState(id)).current).toBe(1);
     const response = await trail.GET();
     expect(response.status).toBe(200); expect(response.headers.get("Cache-Control")).toBe("no-store");
@@ -212,8 +214,8 @@ describe.runIf(process.env.GHOST_DB_TEST === "1")("Prisma persistence and sessio
     expect((await service.mutateTeam(id, 1, "hint", null)).hint).toBeDefined();
     expect((await service.mutateTeam(id, 1, "hint", null)).error).toMatch(/Maximum two/);
     expect((await service.teamState(id)).chapterHints[1]).toHaveLength(2);
-    const wrong = { ...answer, account: "unrelated@nexus.example", tamper: trailTamper(variant) };
-    expect(await service.mutateTeam(id, 1, "submit", wrong)).toEqual({ accepted: false, tamperAwarded: variant !== "A" });
+    const wrong = { ...answer, account: "unrelated@nexus.example", sourceIp: "192.0.2.250", sessionId: "unrelated-session", eventId: "EV-unrelated", supportingEvidenceIds: ["unrelated-1", "unrelated-2", "unrelated-3"], tamper: trailTamper(variant) }; // zero criteria; partial credit is covered in tests/scoring.test.ts
+    expect(await service.mutateTeam(id, 1, "submit", wrong)).toMatchObject({ accepted: false, tamperAwarded: variant !== "A" });
     expect((await service.teamState(id)).current).toBe(1);
     expect((await service.teamState(id)).score).toBe(11);
     expect((await service.teamState("B")).score).toBe(0);
@@ -222,10 +224,10 @@ describe.runIf(process.env.GHOST_DB_TEST === "1")("Prisma persistence and sessio
     expect((await service.mutateTeam(id, 1, "submit", answer)).retryAfter).toBeGreaterThan(0);
     expect(await db.submission.count({ where: { teamId: id, chapter: 1 } })).toBe(attempts);
     await db.submission.updateMany({ where: { teamId: id, chapter: 1 }, data: { createdAt: new Date(0) } });
-    expect(await service.mutateTeam(id, 1, "submit", { kind: "tamper", tamper: trailTamper(variant) })).toEqual({ accepted: false, tamperAwarded: false });
+    expect(await service.mutateTeam(id, 1, "submit", { kind: "tamper", tamper: trailTamper(variant) })).toMatchObject({ accepted: false, tamperAwarded: false });
     expect(await db.auditLog.count({ where: { actor: id, action: "tamper-alert" } })).toBe(1);
     await db.submission.updateMany({ where: { teamId: id, chapter: 1 }, data: { createdAt: new Date(0) } });
-    expect(await service.mutateTeam(id, 1, "submit", answer)).toEqual({ accepted: true, tamperAwarded: false });
+    expect(await service.mutateTeam(id, 1, "submit", answer)).toMatchObject({ accepted: true, tamperAwarded: false });
     const saved = await service.teamState(id);
     expect(saved.progress.chapters[1].score).toBe(25); expect(saved.score).toBe(36); expect(saved.current).toBe(2);
     expect((await service.mutateTeam(id, 1, "submit", answer)).error).toMatch(/locked/);
