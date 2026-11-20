@@ -1,6 +1,7 @@
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import { confirmDialog } from "./fixtures/admin-confirm";
 import { insiderLogin as login } from "./fixtures/insider-browser";
+import { arrange, solveContainment, submitTask } from "./fixtures/ui";
 import { containmentAnswers } from "./fixtures/containment";
 
 test.skip(!process.env.GHOST_E2E_CONTAINMENT, "Run npm run test:e2e:containment for isolated full-chapter fixtures");
@@ -9,13 +10,6 @@ let organizerCookies: Awaited<ReturnType<BrowserContext["cookies"]>> = [];
 async function organizer(page: Page) {
   await page.context().addCookies(organizerCookies); await page.goto("/admin");
   await expect(page.getByRole("heading", { name: "Event operations", exact: true })).toBeVisible();
-}
-async function arrange(page: Page, kind: "event" | "recovery", target: readonly string[]) {
-  const attribute = kind === "event" ? "data-event-id" : "data-recovery-id";
-  for (const [position, id] of target.entries()) {
-    while ((await page.locator(`[${attribute}]`).evaluateAll(cards => cards.map(card => card.getAttribute(cards[0].hasAttribute("data-event-id") ? "data-event-id" : "data-recovery-id")))).indexOf(id) > position) await page.getByRole("button", { name: `Move ${kind} ${id} up`, exact: true }).click();
-  }
-  await expect(page.locator(`input[name=${kind === "event" ? "eventOrder" : "recoveryOrder"}]`)).toHaveValue(JSON.stringify(target));
 }
 
 test("Containment enforces sessions, waiting round, exact team isolation and an audited Insider override", async ({ page, browser }) => {
@@ -56,7 +50,7 @@ for (const variant of ["A", "B", "C"] as const) test(`Containment ${variant}: ke
   const response = await page.request.get("/api/game/containment"); expect(response.headers()["cache-control"]).toBe("no-store"); const data = await response.json(); expect(data.evidence.caseId).toBe(`NEXUS-CONTAINMENT-${variant}`); expect(data.evidence.events).toHaveLength(7);
   expect((await page.request.get("/api/game/containment?variant=A&teamId=CONTAIN-A")).status()).toBe(403);
   if (variant === "A") await expect(page.getByRole("article", { name: "Fictional snapshot CCTV-A-08", exact: true })).toBeVisible();
-  else { expect(data.fallbackCctv).toBeNull(); await page.getByRole("button", { name: "Check authorized CCTV copy", exact: true }).click(); await expect(page.getByText(/No accessible-copy grant is recorded/)).toBeVisible(); }
+  else { expect(data.fallbackCctv).toBeNull(); await page.getByRole("button", { name: "Check authorized CCTV copy", exact: true }).click(); await expect(page.getByText(/No accessible copy granted/)).toBeVisible(); }
   if (variant === "B") {
     const context = await browser.newContext(), admin = await context.newPage(); await organizer(admin); await admin.goto("/admin/containment-kit"); await admin.getByLabel("Team ID", { exact: true }).fill(id); await admin.getByLabel("Copy authorization reason", { exact: true }).fill("Browser regression: damaged B clue needs accessible copy"); await admin.getByRole("button", { name: "Authorize evidence copy", exact: true }).click(); await expect(admin.getByText(/Accessible copy authorized and audited/)).toBeVisible(); await context.close();
     await page.getByRole("button", { name: "Check authorized CCTV copy", exact: true }).click(); await expect(page.getByRole("article", { name: "Fictional snapshot CCTV-B-08", exact: true })).toBeVisible(); await expect(page.getByRole("article", { name: "Fictional snapshot CCTV-A-08", exact: true })).toHaveCount(0);
@@ -64,32 +58,30 @@ for (const variant of ["A", "B", "C"] as const) test(`Containment ${variant}: ke
   const first = data.evidence.events[0].id;
   await page.getByRole("button", { name: `Move event ${first} down`, exact: true }).focus(); await page.keyboard.press("Space"); await expect(page.getByText(`${first} moved to position 2 of 7.`, { exact: true })).toBeVisible();
   await arrange(page, "event", answer.eventOrder);
-  const drawer = page.locator("details").filter({ has: page.getByText(`${answer.supportingEvidenceIds[3]} · Response authority and business constraints`, { exact: true }) }); await drawer.locator("summary").click(); await expect(drawer).toContainText("Support read-only service"); await expect(drawer).toContainText("parallel");
-  await expect(page.getByText(/Supporting observation$/, { exact: false }).filter({ hasText: `OBS-${variant}-` })).toHaveCount(2);
-  for (const evidenceId of answer.supportingEvidenceIds) await page.getByRole("checkbox", { name: `Pin evidence ${evidenceId}`, exact: true }).check();
-  for (const action of [...answer.immediateActions].reverse()) await page.getByRole("checkbox", { name: `Select immediate ${action}`, exact: true }).check();
+  await page.locator("summary", { hasText: "Read the records" }).click(); const drawer = page.locator("details").filter({ has: page.getByText(`${answer.supportingEvidenceIds[3]} · Response authority and business constraints`, { exact: true }) }); await drawer.locator("summary").click(); await expect(drawer).toContainText("Support read-only service"); await expect(drawer).toContainText("parallel");
+  await expect(page.getByText(/· observation$/, { exact: false }).filter({ hasText: `OBS-${variant}-` })).toHaveCount(2);
   const r = answer.recoveryOrder, safe = variant === "A" ? r : variant === "B" ? [r[1], r[0], r[2], ...r.slice(3)] : [r[1], r[2], r[0], ...r.slice(3)];
-  for (const action of [...r].reverse()) await page.getByRole("checkbox", { name: `Select recovery ${action}`, exact: true }).check(); await arrange(page, "recovery", safe);
-  await page.getByLabel("Affected account", { exact: true }).fill(answer.account); await page.getByLabel("Affected session", { exact: true }).fill(answer.sessionId); await page.getByLabel("Response explanation (optional)", { exact: true }).fill("The exact incident session is contained while evidence and approved services remain available. Verified authority, scoped replacement and policy closure precede restoration.");
-  await page.getByRole("button", { name: "Request Containment hint 1", exact: true }).click(); await expect(page.locator(".released-hints li")).toHaveCount(1);
-  if (variant === "C") { await page.getByRole("button", { name: "Request Containment hint 2", exact: true }).click(); await expect(page.locator(".released-hints li")).toHaveCount(2); await expect(page.getByRole("button", { name: "Request Containment hint 2", exact: true })).toBeDisabled(); }
-  if (variant === "A") await page.getByRole("button", { name: `Move event ${answer.eventOrder[0]} down`, exact: true }).click();
-  if (variant === "B") await arrange(page, "recovery", [r[4], ...safe.filter(id => id !== r[4])]);
-  if (variant === "C") await page.getByLabel("Affected session", { exact: true }).fill("nx-c-managed");
-  await page.getByRole("button", { name: "Submit containment plan", exact: true }).click(); await expect(page.getByText(/Evidence does not support this submission/)).toBeVisible();
+  await page.locator("summary", { hasText: "Hints" }).click(); await page.getByRole("button", { name: /Reveal hint 1/ }).click(); await expect(page.locator(".pg-hints ol li")).toHaveCount(1);
+  if (variant === "C") { await page.getByRole("button", { name: /Reveal hint 2/ }).click(); await expect(page.locator(".pg-hints ol li")).toHaveCount(2); await expect(page.getByRole("button", { name: "No hints left" })).toBeDisabled(); }
+  // One wrong task per variant: partial credit only, never a completed chapter; rapid direct submissions stay throttled.
+  if (variant === "A") { await page.getByRole("button", { name: `Move event ${answer.eventOrder[0]} down`, exact: true }).click(); await submitTask(page, "Incident timeline"); }
+  if (variant === "B") { await page.getByLabel("Affected account", { exact: true }).fill(answer.account); await page.getByLabel("Affected session", { exact: true }).fill(answer.sessionId); await submitTask(page, "Affected account and session", /\+2 points\. Task 2\/2/);
+    for (const action of r) await page.getByRole("checkbox", { name: `Select recovery ${action}`, exact: true }).setChecked(true); await arrange(page, "recovery", [r[4], ...safe.filter(id => id !== r[4])]); await submitTask(page, "Ordered recovery"); }
+  if (variant === "C") { await page.getByLabel("Affected account", { exact: true }).fill(answer.account); await page.getByLabel("Affected session", { exact: true }).fill("nx-c-managed"); await submitTask(page, "Affected account and session", /\+1 points\. Task 1\/2/); }
   const probe = await page.request.post("/api/game", { headers: { Origin: "http://127.0.0.1:3000" }, data: { action: "submit", chapter: 3, answer } }); expect(probe.status()).toBe(429); expect(Number(probe.headers()["retry-after"])).toBeGreaterThan(0);
+  await expect(page.getByText("Chapter 4 completed. Chapter 5 unlocked.", { exact: true })).toHaveCount(0);
   expect((await (await page.request.get("/api/game")).json()).current).toBe(3);
-  await arrange(page, "event", answer.eventOrder); await arrange(page, "recovery", safe); await page.getByLabel("Affected session", { exact: true }).fill(answer.sessionId);
+  await solveContainment(page, variant, safe);
   if (variant === "A") {
     await page.setViewportSize({ width: 1440, height: 1000 }); await page.screenshot({ path: info.outputPath("containment-desktop.png"), fullPage: true }); await page.setViewportSize({ width: 390, height: 844 }); expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true); await page.screenshot({ path: info.outputPath("containment-mobile.png"), fullPage: true }); await page.setViewportSize({ width: 1440, height: 1000 });
-    await page.route("**/api/game", route => route.request().method() === "GET" ? route.abort() : route.continue()); await expect(page.getByRole("alert").filter({ hasText: "Connection interrupted" })).toBeVisible({ timeout: 10000 }); await page.unroute("**/api/game"); await expect(page.getByRole("alert").filter({ hasText: "Connection interrupted" })).toHaveCount(0, { timeout: 10000 }); await expect(page.locator("input[name=eventOrder]")).toHaveValue(JSON.stringify(answer.eventOrder));
+    await page.route("**/api/game", route => route.request().method() === "GET" ? route.abort() : route.continue()); await expect(page.getByRole("alert").filter({ hasText: "Connection interrupted" })).toBeVisible({ timeout: 10000 }); await page.unroute("**/api/game"); await expect(page.getByRole("alert").filter({ hasText: "Connection interrupted" })).toHaveCount(0, { timeout: 10000 });
   }
-  await expect(page.getByRole("button", { name: "Submit containment plan", exact: true })).toBeEnabled({ timeout: 6000 }); await page.getByRole("button", { name: "Submit containment plan", exact: true }).click(); await expect(page.getByText("Chapter 4 completed. Final Verdict unlocked.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Chapter 4 completed. Chapter 5 unlocked.", { exact: true })).toBeVisible();
   const score = variant === "A" ? 87 : variant === "B" ? 82 : 76; await expect(page.getByText(`Saved score: ${score} / 105`, { exact: true })).toBeVisible();
-  await page.reload(); await expect(page.locator(".released-hints li")).toHaveCount(variant === "C" ? 2 : 1); await expect(page.getByRole("button", { name: "Submit containment plan", exact: true })).toBeDisabled();
+  await page.reload(); await expect(page.locator(".pg-hints ol li")).toHaveCount(variant === "C" ? 2 : 1); await expect(page.getByLabel("Affected account", { exact: true })).toBeDisabled();
   await page.getByRole("button", { name: "Log out", exact: true }).click(); await expect(page).toHaveURL(/\/login$/); await login(page, id); await expect(page.locator(".k-map-card[aria-current=step]").getByRole("heading", { name: "Final Verdict", exact: true })).toBeVisible();
   const saved = await (await page.request.get("/api/game")).json(); expect(saved.current).toBe(4); expect(saved.score).toBe(score); expect(saved.progress.chapters[3].score).toBe(20); expect(saved.progress.bonus).toBe(variant === "A" ? 5 : 0);
-  await page.goto("/play/containment"); await expect(page.getByText("Chapter 4 completed. Final Verdict unlocked.", { exact: true })).toBeVisible(); expect(external).toEqual([]);
+  await page.goto("/play/containment"); await expect(page.getByText("Chapter 4 completed. Chapter 5 unlocked.", { exact: true })).toBeVisible(); expect(external).toEqual([]);
   await page.getByRole("link", { name: "Open Chapter 5", exact: true }).click(); await expect(page.getByRole("heading", { name: "Final Verdict", exact: true })).toBeVisible(); expect((await page.request.get("/api/game/verdict")).status()).toBe(200);
 });
 

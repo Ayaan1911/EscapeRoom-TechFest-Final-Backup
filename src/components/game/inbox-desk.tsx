@@ -72,7 +72,7 @@ export function InboxDesk({ evidence, initialState, initialDrafts }: { evidence:
       </article>
 
       <aside className="k-rail pg-rail" aria-label="Case file">
-        <div className="pg-qr"><strong>QR forensic snapshot</strong><span>Printed card → capture ID.</span><a className="k-btn k-btn-primary k-btn-sm" href="/clue/inbox" target="_blank" rel="noopener">Open snapshot ↗</a></div>
+        <div className="pg-qr"><strong>QR forensic snapshot</strong><span>Printed card → capture ID.</span><a className="k-btn k-btn-primary k-btn-sm" href="/clue/inbox" target="_blank" rel="noopener">Open QR forensic snapshot ↗</a></div>
         <h2 className="pg-rail-h">Records <span className="pg-chip">{evidence.artifacts.length}</span></h2>
         <div className="k-artifacts">{evidence.artifacts.map(a => { const [task, key] = KIND_TASK[a.kind], pinned = f.str(task, key) === a.id, expanded = open === a.id;
           return <article key={a.id} className={`k-artifact ${pinned ? "is-pinned" : ""}`}>
@@ -103,11 +103,11 @@ export function InboxDesk({ evidence, initialState, initialDrafts }: { evidence:
 
     <div className="pg-aux">
       <details className="pg-hints pg-tamper"><summary>Tamper Alert <span className="pg-chip">{tamperDone ? "+5 recorded" : "optional +5"}</span></summary>
-        {tamperDone ? <p className="k-banner k-banner-ok">Bonus recorded.</p> : <form onSubmit={e => { e.preventDefault(); void send("submit", { kind: "tamper", tamper }); }}><fieldset disabled={!editable || busy || retrySeconds > 0}>
+        {tamperDone ? <p className="k-banner k-banner-ok">Tamper Alert bonus already recorded: +5.</p> : <form onSubmit={e => { e.preventDefault(); void send("submit", { kind: "tamper", tamper }); }}><fieldset disabled={!editable || busy || retrySeconds > 0}>
           <p>Find the planted instructions aimed at an AI investigator.</p>
-          <div className="pg-fields"><label>Email<select required value={tamper.emailId} onChange={e => setTamper({ ...tamper, emailId: e.target.value })}><option value="" disabled>Select…</option>{evidence.emails.map(item => <option key={item.id}>{item.id}</option>)}</select></label>
-            <label>Artifact<select required value={tamper.artifactId} onChange={e => setTamper({ ...tamper, artifactId: e.target.value })}><option value="" disabled>Select…</option>{evidence.emails.flatMap(item => item.attachments).map(item => <option value={item.id} key={item.id}>{item.id} · {item.name}</option>)}</select></label>
-            <label>Technique<select required value={tamper.technique} onChange={e => setTamper({ ...tamper, technique: e.target.value })}><option value="" disabled>Select…</option><option value="instruction-override">Overrides an investigator’s task</option><option value="sender-spoofing">Display-name impersonation only</option></select></label></div>
+          <div className="pg-fields"><label>Manipulation email<select required value={tamper.emailId} onChange={e => setTamper({ ...tamper, emailId: e.target.value })}><option value="" disabled>Select…</option>{evidence.emails.map(item => <option key={item.id}>{item.id}</option>)}</select></label>
+            <label>Manipulation artifact<select required value={tamper.artifactId} onChange={e => setTamper({ ...tamper, artifactId: e.target.value })}><option value="" disabled>Select…</option>{evidence.emails.flatMap(item => item.attachments).map(item => <option value={item.id} key={item.id}>{item.id} · {item.name}</option>)}</select></label>
+            <label>Manipulation technique<select required value={tamper.technique} onChange={e => setTamper({ ...tamper, technique: e.target.value })}><option value="" disabled>Select…</option><option value="instruction-override">Overrides an investigator’s task</option><option value="sender-spoofing">Display-name impersonation only</option></select></label></div>
           <button className="k-btn k-btn-sm">Record Tamper Alert</button></fieldset></form>}
       </details>
       <HintBox chapter={0} state={state} editable={editable} busy={busy} onHint={() => void send("hint")} />

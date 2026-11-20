@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/kit";
 import { emptyTrailFilters, filterTrailRows } from "@/lib/game/trail-view";
 import type { TrailEvidence, TrailEvent } from "@/types/trail";
 
-const PAGE = 20;
+const PAGE = 25;
 // Outcome only: allowed / denied / challenged. Never a verdict about intent; correlation is the player's job.
 const OUTCOME = { success: { tone: "ok", mark: "✓", text: "Allowed" }, failure: { tone: "alert", mark: "✕", text: "Denied" }, challenge: { tone: "amber", mark: "◔", text: "Challenged" } } as const;
 
@@ -53,24 +53,24 @@ export function TrailDesk({ evidence, initialState, initialDrafts }: { evidence:
         <a className="k-btn k-btn-sm" href="/api/game/trail/csv">Download CSV</a>
       </div>
       <div className="k-filterbar">
-        {filterField("Search", <input value={filters.search} onChange={e => updateFilters({ search: e.target.value })} placeholder="ID, session, device, text" />)}
-        {filterField("User", <select value={filters.account} onChange={e => updateFilters({ account: e.target.value })}><option value="">All</option>{choices("account").map(v => <option key={v}>{v}</option>)}</select>)}
-        {filterField("Source IP", <select value={filters.sourceIp} onChange={e => updateFilters({ sourceIp: e.target.value })}><option value="">All</option>{choices("sourceIp").map(v => <option key={v}>{v}</option>)}</select>)}
-        {filterField("Outcome", <select value={filters.result} onChange={e => updateFilters({ result: e.target.value })}><option value="">All</option>{["success", "failure", "challenge"].map(v => <option key={v} value={v}>{OUTCOME[v as keyof typeof OUTCOME].text}</option>)}</select>)}
-        {filterField("Event type", <select value={filters.eventType} onChange={e => updateFilters({ eventType: e.target.value })}><option value="">All</option>{choices("eventType").map(v => <option key={v}>{v}</option>)}</select>)}
-        {filterField("Session", <input value={filters.sessionId} onChange={e => updateFilters({ sessionId: e.target.value })} placeholder="Exact session ID" />)}
+        {filterField("Search", <input aria-label="Search records" value={filters.search} onChange={e => updateFilters({ search: e.target.value })} placeholder="ID, session, device, text" />)}
+        {filterField("User", <select aria-label="Filter by user" value={filters.account} onChange={e => updateFilters({ account: e.target.value })}><option value="">All</option>{choices("account").map(v => <option key={v}>{v}</option>)}</select>)}
+        {filterField("Source IP", <select aria-label="Filter by source IP" value={filters.sourceIp} onChange={e => updateFilters({ sourceIp: e.target.value })}><option value="">All</option>{choices("sourceIp").map(v => <option key={v}>{v}</option>)}</select>)}
+        {filterField("Outcome", <select aria-label="Filter by result" value={filters.result} onChange={e => updateFilters({ result: e.target.value })}><option value="">All</option>{["success", "failure", "challenge"].map(v => <option key={v} value={v}>{OUTCOME[v as keyof typeof OUTCOME].text}</option>)}</select>)}
+        {filterField("Event type", <select aria-label="Filter by event type" value={filters.eventType} onChange={e => updateFilters({ eventType: e.target.value })}><option value="">All</option>{choices("eventType").map(v => <option key={v}>{v}</option>)}</select>)}
+        {filterField("Session", <input aria-label="Filter by session" value={filters.sessionId} onChange={e => updateFilters({ sessionId: e.target.value })} placeholder="Exact session ID" />)}
       </div>
       <div className="pg-console-grid">
-        <div className="k-tablecard"><div className="k-tablescroll"><table className="k-table pg-table"><caption className="k-sr">Authentication events. Select a row to inspect it.</caption>
+        <div className="k-tablecard" role="region" aria-label="Authentication events"><div className="k-tablescroll"><table className="k-table pg-table"><caption className="k-sr">Authentication events. Select a row to inspect it.</caption>
           <thead><tr><th scope="col">Event</th><th scope="col">Account</th><th scope="col">Source</th><th scope="col">Outcome</th><th scope="col">Session</th></tr></thead>
           <tbody>{visible.map(row => { const o = OUTCOME[row.result]; return <tr key={row.id} className={selectedId === row.id ? "is-selected" : pinned.includes(row.id) ? "is-pinned" : ""} aria-selected={selectedId === row.id}>
             <td><button type="button" className="pg-rowbtn k-mono" onClick={() => setSelectedId(row.id)} aria-label={`Inspect ${row.id}`}>{row.id}</button><time dateTime={row.timestamp}>{row.timestamp.slice(11, 19)}</time></td>
             <td>{row.account}</td><td className="k-mono">{row.sourceIp}</td><td><Badge tone={o.tone}>{o.mark} {o.text}</Badge><small>{row.eventType}</small></td><td className="k-mono">{row.sessionId}</td></tr>; })}</tbody></table>
           {visible.length === 0 && <p className="k-empty k-pad">No events match.</p>}</div>
-          <div className="k-toolbar k-pager"><button type="button" className="k-btn k-btn-sm" disabled={page === 0} onClick={() => setPage(p => p - 1)}>← Prev</button><span>Page {page + 1}/{pages}</span><button type="button" className="k-btn k-btn-sm" disabled={page + 1 >= pages} onClick={() => setPage(p => p + 1)}>Next →</button><span className="k-spacer" />
-            <button type="button" className="k-btn k-btn-sm" aria-pressed={filters.descending} onClick={() => updateFilters({ descending: !filters.descending })}>{filters.descending ? "Oldest first" : "Newest first"}</button><button type="button" className="k-btn k-btn-sm" onClick={() => { setFilters(emptyTrailFilters); setPage(0); }}>Reset</button></div></div>
+          <div className="k-toolbar k-pager"><button type="button" className="k-btn k-btn-sm" disabled={page === 0} aria-label="Previous page" onClick={() => setPage(p => p - 1)}>← Prev</button><span>Page {page + 1} of {pages}</span><button type="button" className="k-btn k-btn-sm" disabled={page + 1 >= pages} aria-label="Next page" onClick={() => setPage(p => p + 1)}>Next →</button><span className="k-spacer" />
+            <button type="button" className="k-btn k-btn-sm" aria-pressed={filters.descending} onClick={() => updateFilters({ descending: !filters.descending })}>{filters.descending ? "Sort oldest first" : "Sort newest first"}</button><button type="button" className="k-btn k-btn-sm" onClick={() => { setFilters(emptyTrailFilters); setPage(0); }}>Reset filters</button></div></div>
 
-        <aside className="k-inspector pg-inspector" aria-label="Selected event">
+        <aside className="k-inspector pg-inspector" aria-label="Selected event details">
           <span className="k-eyebrow">EVENT</span><h2 className="k-mono">{selected.id}</h2>
           <div className="k-badges"><Badge tone={OUTCOME[selected.result].tone}>{OUTCOME[selected.result].mark} {OUTCOME[selected.result].text}</Badge><Badge tone="info">{selected.eventType}</Badge></div>
           <dl className="k-facts">{(["timestamp", "account", "sourceIp", "method", "device", "sessionId", "conditionalAccess", "correlationId", "details"] as const).map(k => <div key={k}><dt>{k}</dt><dd className="k-mono">{selected[k]}</dd></div>)}</dl>
@@ -105,11 +105,11 @@ export function TrailDesk({ evidence, initialState, initialDrafts }: { evidence:
 
     <div className="pg-aux">
       <details className="pg-hints pg-tamper"><summary>Tamper Alert <span className="pg-chip">{state.progress.bonus === 5 ? "+5 recorded" : "optional +5, once per team"}</span></summary>
-        {state.progress.bonus === 5 ? <p className="k-banner k-banner-ok">Bonus recorded.</p> : <form onSubmit={e => { e.preventDefault(); void send("submit", { kind: "tamper", tamper: { ...tamper, field: tamper.field } }); }}><fieldset disabled={!editable || busy || retrySeconds > 0}>
+        {state.progress.bonus === 5 ? <p className="k-banner k-banner-ok">Global Tamper Alert bonus already recorded: +5.</p> : <form onSubmit={e => { e.preventDefault(); void send("submit", { kind: "tamper", tamper: { ...tamper, field: tamper.field } }); }}><fieldset disabled={!editable || busy || retrySeconds > 0}>
           <p>Find a log field that tells an AI investigator to drop evidence.</p>
-          <div className="pg-fields"><label>Event ID<input required value={tamper.eventId} maxLength={100} onChange={e => setTamper({ ...tamper, eventId: e.target.value })} /></label>
-            <label>Field<select required value={tamper.field} onChange={e => setTamper({ ...tamper, field: e.target.value })}><option value="" disabled>Select…</option><option value="details">details</option><option value="account">account</option></select></label>
-            <label>Technique<select required value={tamper.technique} onChange={e => setTamper({ ...tamper, technique: e.target.value })}><option value="" disabled>Select…</option><option value="instruction-override">Overrides the investigation task</option><option value="failed-password">Repeated failed passwords</option></select></label></div>
+          <div className="pg-fields"><label>Manipulation event ID<input required value={tamper.eventId} maxLength={100} onChange={e => setTamper({ ...tamper, eventId: e.target.value })} /></label>
+            <label>Manipulation field<select required value={tamper.field} onChange={e => setTamper({ ...tamper, field: e.target.value })}><option value="" disabled>Select…</option><option value="details">details</option><option value="account">account</option></select></label>
+            <label>Manipulation technique<select required value={tamper.technique} onChange={e => setTamper({ ...tamper, technique: e.target.value })}><option value="" disabled>Select…</option><option value="instruction-override">Overrides the investigation task</option><option value="failed-password">Repeated failed passwords</option></select></label></div>
           <button className="k-btn k-btn-sm">Record Tamper Alert</button></fieldset></form>}
       </details>
       <HintBox chapter={1} state={state} editable={editable} busy={busy} onHint={() => void send("hint")} />

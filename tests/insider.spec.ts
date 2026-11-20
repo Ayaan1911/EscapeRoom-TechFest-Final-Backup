@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { confirmDialog } from "./fixtures/admin-confirm";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
+import { solveInsider, submitTask } from "./fixtures/ui";
 import { insiderAnswers } from "./fixtures/insider";
 import { insiderLogin, manifestPath, printedPairs, readCards } from "./fixtures/insider-browser";
 
@@ -62,9 +63,10 @@ for (const [index, variant] of (["A", "B", "C"] as const).entries()) test(`Insid
   const sealed = await page.request.get("/api/game/insider?teamId=INSIDER-50&variant=Z"); expect(sealed.headers()["cache-control"]).toBe("no-store"); expect(await sealed.json()).toEqual({ unlocked: false, dossier: null });
   const post = (action: string, data: unknown) => page.request.post("/api/game", { headers: { Origin: "http://127.0.0.1:3000" }, data: { action, chapter: 2, answer: data } });
   const early = await post("submit", answer); expect(early.status()).toBe(409); expect((await early.json()).error).toContain("Unlock");
-  await page.getByRole("button", { name: "Request Insider hint 1" }).click();
-  await expect(page.locator(".released-hints li")).toHaveCount(1);
-  if (variant === "C") { await page.getByRole("button", { name: "Request Insider hint 2" }).click(); await expect(page.locator(".released-hints li")).toHaveCount(2); }
+  await page.locator("summary", { hasText: "Hints" }).click();
+  await page.getByRole("button", { name: /Reveal hint 1/ }).click();
+  await expect(page.locator(".pg-hints ol li")).toHaveCount(1);
+  if (variant === "C") { await page.getByRole("button", { name: /Reveal hint 2/ }).click(); await expect(page.locator(".pg-hints ol li")).toHaveCount(2); }
   // The direct premature request above bypasses the hook's client countdown.
   await expect.poll(async () => (await post("unlock", { fragmentA: a, fragmentB: "B-000000-000000-000000-000000" })).status(), { intervals: [1000], timeout: 6000 }).toBe(200);
   const rejectedAt = Date.now();
@@ -84,7 +86,7 @@ for (const [index, variant] of (["A", "B", "C"] as const).entries()) test(`Insid
   await page.reload(); await expect(page.getByLabel("Fragment A", { exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Log out", exact: true }).click(); await expect(page).toHaveURL(/\/login$/); await insiderLogin(page, id); await page.goto("/play/insider");
   await expect(page.getByRole("heading", { name: "The Evidence Wall", exact: true })).toBeVisible();
-  await expect(page.locator(".released-hints li")).toHaveCount(variant === "C" ? 2 : 1);
+  await expect(page.locator(".pg-hints ol li")).toHaveCount(variant === "C" ? 2 : 1);
   await page.getByRole("combobox", { name: "Suspect profile", exact: true }).selectOption(answer.employeeId); await expect(page.locator(".suspect-profile")).toContainText(answer.employeeId);
   await page.getByRole("combobox", { name: "Record type", exact: true }).selectOption("policy"); await expect(page.getByText("2 of 26 records", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Reset dossier filters", exact: true }).click();
@@ -92,26 +94,26 @@ for (const [index, variant] of (["A", "B", "C"] as const).entries()) test(`Insid
     await page.getByLabel("Search dossier", { exact: true }).fill(evidenceId);
     await page.getByRole("region", { name: "Dossier records", exact: true }).getByRole("button").first().click();
     await expect(page.getByRole("article", { name: "Evidence detail", exact: true })).toContainText(evidenceId);
-    await page.getByRole("button", { name: "Pin evidence ID", exact: true }).click();
+    await page.getByRole("button", { name: /^☆ Pin evidence ID/ }).click();
   }
   await page.bringToFront(); await page.context().grantPermissions(["clipboard-read", "clipboard-write"], { origin: "http://127.0.0.1:3000" });
-  await page.getByRole("button", { name: "Copy evidence ID", exact: true }).click();
-  await expect(page.getByText(`Evidence ID copied: ${answer.supportingEvidenceIds[2]}`, { exact: true })).toBeVisible(); expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(answer.supportingEvidenceIds[2]);
-  await expect(page.getByRole("button", { name: /^Remove pinned / })).toHaveCount(3);
-  await page.getByRole("combobox", { name: "Insider employee", exact: true }).selectOption(variant === "B" ? `EMP-${variant}-01` : answer.employeeId);
-  await page.getByRole("combobox", { name: "Unauthorized policy action", exact: true }).selectOption(answer.actionId);
-  await page.getByLabel("Short explanation (optional)", { exact: true }).fill("The device, individually signed change, journaled intent and independently retained approval agree.");
-  if (variant === "B") { await page.getByRole("button", { name: "Submit Insider conclusion", exact: true }).click(); await expect(page.getByText(/Evidence does not support this submission/)).toBeVisible(); expect((await post("submit", answer)).status()).toBe(429); await page.getByRole("combobox", { name: "Insider employee", exact: true }).selectOption(answer.employeeId); }
+  await page.getByRole("button", { name: "Copy ID", exact: true }).click();
+  await expect(page.getByText(`Copied ${answer.supportingEvidenceIds[2]}`, { exact: true })).toBeVisible(); expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(answer.supportingEvidenceIds[2]);
+  await expect(page.getByRole("button", { name: /^Unpin / })).toHaveCount(3);
+  if (variant === "B") { // wrong insider earns nothing for that task; direct rapid submissions are throttled
+    await page.getByRole("combobox", { name: "Insider employee", exact: true }).selectOption(`EMP-${variant}-01`);
+    await submitTask(page, "Insider identified", /No new points/);
+    expect((await post("submit", answer)).status()).toBe(429);
+  }
   if (variant === "A") {
     await page.setViewportSize({ width: 1440, height: 1000 }); await page.screenshot({ path: info.outputPath("insider-desktop.png"), fullPage: true });
     await page.setViewportSize({ width: 390, height: 844 }); expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true); await page.screenshot({ path: info.outputPath("insider-mobile.png"), fullPage: true }); await page.setViewportSize({ width: 1440, height: 1000 });
   }
-  await expect(page.getByRole("button", { name: "Submit Insider conclusion", exact: true })).toBeEnabled({ timeout: 6000 });
-  await page.getByRole("button", { name: "Submit Insider conclusion", exact: true }).click();
+  await solveInsider(page, variant);
   await expect(page.getByText("Chapter 3 completed. Chapter 4 unlocked.", { exact: true })).toBeVisible();
   const score = variant === "A" ? 67 : variant === "B" ? 62 : 56;
   await expect(page.getByText(`Saved score: ${score} / 105`, { exact: true })).toBeVisible();
-  await page.reload(); await expect(page.getByRole("button", { name: "Submit Insider conclusion", exact: true })).toBeDisabled();
+  await page.reload(); await expect(page.getByRole("combobox", { name: "Insider employee", exact: true })).toBeDisabled();
   await page.getByRole("button", { name: "Log out", exact: true }).click(); await expect(page).toHaveURL(/\/login$/); await insiderLogin(page, id);
   const state = await (await page.request.get("/api/game")).json(); expect(state.current).toBe(3); expect(state.insiderUnlocked).toBe(true); expect(state.score).toBe(score); expect(state.progress.chapters[2].score).toBe(25); expect(state.progress.bonus).toBe(variant === "A" ? 5 : 0);
   await expect(page.locator(".k-map-card[aria-current=step]").getByRole("heading", { name: "Containment", exact: true })).toBeVisible();

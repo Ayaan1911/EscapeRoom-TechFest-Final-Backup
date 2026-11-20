@@ -121,7 +121,7 @@ test("fresh team plays Login → Inbox → Trail → Insider → Containment →
   await arrange(team, "recovery", cont.recoveryOrder);
   await team.getByLabel("Affected account", { exact: true }).fill(cont.account); await team.getByLabel("Affected session", { exact: true }).fill(cont.sessionId);
   await expect(team.getByRole("button", { name: "Submit containment plan", exact: true })).toBeEnabled({ timeout: 8000 }); await team.getByRole("button", { name: "Submit containment plan", exact: true }).click();
-  await expect(team.getByText("Chapter 4 completed. Final Verdict unlocked.", { exact: true })).toBeVisible();
+  await expect(team.getByText("Chapter 4 completed. Chapter 5 unlocked.", { exact: true })).toBeVisible();
   await expectContinue(team, 5, "/play/containment");
 
   // 7. Final Verdict

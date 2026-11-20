@@ -11,7 +11,7 @@ const specs = process.argv.slice(2).filter(a => !a.startsWith("--"));
 const temp = await createTempDatabase("p2");
 const code = randomBytes(18).toString("hex");
 const origin = "http://127.0.0.1:3000";
-const env = { ...process.env, DATABASE_URL: temp.url, DIRECT_URL: temp.url, ADMIN_ACCESS_HASH: hashPassword(code), APP_ORIGIN: origin, GHOST_E2E_TEAM_CODE: code, GHOST_E2E_ADMIN_CODE: code };
+const env = { ...process.env, DATABASE_URL: temp.url, DIRECT_URL: temp.url, ADMIN_ACCESS_HASH: hashPassword(code), APP_ORIGIN: origin, GHOST_PHASE2: "1", GHOST_E2E_TEAM_CODE: code, GHOST_E2E_ADMIN_CODE: code };
 const db = new PrismaClient({ datasourceUrl: temp.url });
 const progress = (raw = [0, 0, 0, 0, 0], extra = {}) => { const p = initialProgress(); raw.forEach((score, i) => { p.chapters[i].score = score; }); return { ...p, ...extra }; };
 // Deterministic, well-formed fragments (A/B + 24 hex) so the spec can type the right ones.

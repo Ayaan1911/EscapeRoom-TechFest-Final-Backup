@@ -72,7 +72,7 @@ export function DeskFrame({ chapter, title, objective, caseId, state, remaining,
         <div className="pg-title"><span className="k-eyebrow">CHAPTER {String(chapter + 1).padStart(2, "0")}{caseId ? ` · ${caseId}` : ""}</span><h1>{title}</h1><p>{objective}</p></div>
         <dl className="pg-stats">
           <div><dt>Time left</dt><dd role="timer" aria-label="Round time remaining" className={urgent ? "is-urgent" : ""}>{state.status === "active" ? formatClock(remaining) : state.status.toUpperCase()}</dd></div>
-          <div><dt>Total</dt><dd><b>{state.score}</b> / 105</dd></div>
+          <div><dt>Total</dt><dd><b>{state.score}</b> / 105<span className="k-sr">Saved score: {state.score} / 105</span></dd></div>
           <div><dt>This chapter</dt><dd><b>{raw}</b> / {max} <small>({left} open)</small></dd></div>
           <div><dt>Hints</dt><dd>{mine.hints} / 2</dd></div>
         </dl>
@@ -87,7 +87,10 @@ export function DeskFrame({ chapter, title, objective, caseId, state, remaining,
 export function ConnectionBanner({ text, next }: { text: string; next: string }) { return text ? <p className="k-banner k-banner-warn" role="alert">{text} <a href={`/login?next=${next}`}>Sign in</a></p> : null; }
 
 export function StateBanner({ state, chapter }: { state: ChapterState; chapter: ChapterIndex }) {
-  if (state.progress.chapters[chapter].completedAt !== null) return <p className="k-banner k-banner-ok" role="status"><span><strong>Chapter complete.</strong> Everything below is read-only.</span></p>;
+  if (state.progress.chapters[chapter].completedAt !== null) {
+    const next = CHAPTER_META[chapter + 1], open = next && state.unlocked[chapter + 1];
+    return <div className="k-banner k-banner-ok" role="status"><div><strong>Chapter {chapter + 1} completed.{open ? ` Chapter ${chapter + 2} unlocked.` : ""}</strong><span>Saved. This chapter is now read-only.</span></div>{open && <a className="k-btn k-btn-primary" href={next.href}>Open Chapter {chapter + 2} →</a>}</div>;
+  }
   if (state.status !== "active") return <p className="k-banner k-banner-warn" role="status">Round {state.status}. Evidence stays readable; submissions and hints are closed.</p>;
   return null;
 }

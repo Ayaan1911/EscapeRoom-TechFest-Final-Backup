@@ -5,7 +5,7 @@ test.skip(!process.env.GHOST_E2E_INSIDER, "Run npm run test:e2e:insider for a se
 test("a new server process retains physical unlock, completion, hints and all 50 printable pairs", async ({ page }) => {
   await insiderLogin(page, "INSIDER-01"); await page.goto("/play/insider");
   await expect(page.getByRole("heading", { name: "The Evidence Wall", exact: true })).toBeVisible(); await expect(page.getByLabel("Fragment A", { exact: true })).toHaveCount(0);
-  await expect(page.getByText("Saved score: 67 / 105", { exact: true })).toBeVisible(); await expect(page.locator(".released-hints li")).toHaveCount(1);
+  await expect(page.getByText("Saved score: 67 / 105", { exact: true })).toBeVisible(); await expect(page.locator(".pg-hints ol li")).toHaveCount(1);
   await expect(page.getByText("Chapter 3 completed. Chapter 4 unlocked.", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Log out", exact: true }).click(); await expect(page).toHaveURL(/\/login$/); await insiderLogin(page, "admin");
   const pairs = printedPairs();

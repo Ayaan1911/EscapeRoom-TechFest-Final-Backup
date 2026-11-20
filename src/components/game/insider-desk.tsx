@@ -59,29 +59,29 @@ export function InsiderDesk({ initialDossier, initialState, initialDrafts }: { i
         { id: "act", label: "Policy action", value: f.str("insider.action", "actionId") }, { id: "ev", label: "Evidence pinned", value: pinned.length ? `${pinned.length}` : "", note: "need 3+" }]} />
 
       <section className="pg-board" aria-label="Staff profiles">
-        <h2 className="pg-h">Staff <small>Select to filter records. Selection is not a verdict.</small></h2>
+        <h2 className="pg-h">The Evidence Wall</h2><p className="pg-hint-line">Staff profiles. Selecting one only filters records; it is not a verdict.</p>
         <ul className="k-suspects">{dossier.suspects.map(item => <li key={item.id}><button type="button" className="k-suspect" aria-pressed={suspect === item.id} aria-label={`Filter to ${item.name}`} onClick={() => setSuspect(suspect === item.id ? "" : item.id)}>
           <span className="k-avatar" aria-hidden="true">{initials(item.name)}</span><strong>{item.name}</strong><span className="k-muted">{item.role}</span><Badge>{countFor(item.id)} records</Badge></button></li>)}</ul>
-        {person && <dl className="pg-profile"><div><dt>ID</dt><dd className="k-mono">{person.id}</dd></div><div><dt>Role</dt><dd>{person.role}</dd></div><div><dt>Privileges</dt><dd>{person.privileges}</dd></div><div><dt>Responsibilities</dt><dd>{person.responsibilities}</dd></div><div><dt>Device</dt><dd className="k-mono">{person.device}</dd></div></dl>}
+        {person && <dl className="pg-profile suspect-profile"><div><dt>ID</dt><dd className="k-mono">{person.id}</dd></div><div><dt>Role</dt><dd>{person.role}</dd></div><div><dt>Privileges</dt><dd>{person.privileges}</dd></div><div><dt>Responsibilities</dt><dd>{person.responsibilities}</dd></div><div><dt>Device</dt><dd className="k-mono">{person.device}</dd></div></dl>}
       </section>
 
-      <section className="pg-console" aria-label="Dossier records">
+      <section className="pg-console" aria-label="Dossier explorer">
         <div className="k-filterbar k-filterbar-3">
-          <label className="k-filter">Search<input value={search} onChange={e => setSearch(e.target.value)} placeholder="ID, device, phrase" /></label>
-          <label className="k-filter">Staff<select value={suspect} onChange={e => setSuspect(e.target.value)}><option value="">All</option>{dossier.suspects.map(item => <option value={item.id} key={item.id}>{item.id} · {item.name}</option>)}</select></label>
-          <label className="k-filter">Type<select value={kind} onChange={e => setKind(e.target.value)}><option value="">All</option>{Object.keys(KIND).map(value => <option key={value}>{value}</option>)}</select></label></div>
-        <div className="k-toolbar"><strong role="status">{records.length} of {dossier.records.length} records</strong><span className="k-spacer" /><button type="button" className="k-btn k-btn-sm" onClick={() => { setSearch(""); setKind(""); setSuspect(""); }}>Reset</button></div>
+          <label className="k-filter">Search dossier<input value={search} onChange={e => setSearch(e.target.value)} placeholder="ID, device, phrase" /></label>
+          <label className="k-filter">Suspect profile<select value={suspect} onChange={e => setSuspect(e.target.value)}><option value="">All</option>{dossier.suspects.map(item => <option value={item.id} key={item.id}>{item.id} · {item.name}</option>)}</select></label>
+          <label className="k-filter">Record type<select value={kind} onChange={e => setKind(e.target.value)}><option value="">All</option>{Object.keys(KIND).map(value => <option key={value}>{value}</option>)}</select></label></div>
+        <div className="k-toolbar"><strong role="status">{records.length} of {dossier.records.length} records</strong><span className="k-spacer" /><button type="button" className="k-btn k-btn-sm" onClick={() => { setSearch(""); setKind(""); setSuspect(""); }}>Reset dossier filters</button></div>
         <div className="k-insider-grid">
-          <div className="k-reclist" aria-label="Records">{records.map(item => <button type="button" className={`k-rec k-rec-${item.kind}`} key={item.id} aria-pressed={record?.id === item.id} onClick={() => setSelected(item.id)}>
+          <div className="k-reclist" role="region" aria-label="Dossier records">{records.map(item => <button type="button" className={`k-rec k-rec-${item.kind}`} key={item.id} aria-pressed={record?.id === item.id} onClick={() => setSelected(item.id)}>
             <span className="k-rec-icon" aria-hidden="true">{KIND[item.kind].icon}</span>
             <span className="k-rec-main"><span className="k-mono k-muted">{item.id}</span><strong>{item.title}</strong><span className="k-rec-meta"><Badge tone={KIND[item.kind].tone}>{KIND[item.kind].label}</Badge><time dateTime={item.timestamp}>{item.timestamp.slice(11, 19)}</time>{pinned.includes(item.id) && <Badge tone="amber">★ pinned</Badge>}</span></span></button>)}
             {records.length === 0 && <p className="k-empty k-pad">No matching records.</p>}</div>
-          {record && <article className={`k-recview k-rec-${record.kind}`} aria-label="Record detail" key={record.id}>
+          {record && <article className={`k-recview k-rec-${record.kind}`} aria-label="Evidence detail" key={record.id}>
             <header><span className="k-eyebrow">{record.id} · {KIND[record.kind].label}</span><h3>{record.title}</h3><p className="k-mono k-muted">{record.timestamp}</p>
               <div className="k-badges">{record.employees.map(id => <button type="button" key={id} className="k-chip-btn" onClick={() => setSuspect(id)} aria-label={`Show records for ${nameOf(id)}`}>{initials(nameOf(id))} · {nameOf(id)}</button>)}</div></header>
             <p className="k-provenance">Source: {record.provenance}</p>
             <dl className="k-facts">{Object.entries(record.facts).map(([label, value]) => <div key={label}><dt>{label}</dt><dd className={record.kind === "policy" || record.kind === "access" ? "k-mono" : ""}>{value}</dd></div>)}</dl>
-            <footer className="pg-actions"><button type="button" className="k-btn k-btn-sm k-btn-primary" disabled={!editable || pinned.length >= 8 && !pinned.includes(record.id)} onClick={() => f.toggle("insider.corroboration", "supportingEvidenceIds", record.id, 8)}>{pinned.includes(record.id) ? "★ Unpin evidence" : "☆ Pin evidence"}</button><button type="button" className="k-btn k-btn-sm" onClick={() => void copy(record.id)}>Copy ID</button>
+            <footer className="pg-actions"><button type="button" className="k-btn k-btn-sm k-btn-primary" disabled={!editable || pinned.length >= 8 && !pinned.includes(record.id)} onClick={() => f.toggle("insider.corroboration", "supportingEvidenceIds", record.id, 8)}>{pinned.includes(record.id) ? "★ Unpin evidence" : "☆ Pin evidence ID"}</button><button type="button" className="k-btn k-btn-sm" onClick={() => void copy(record.id)}>Copy ID</button>
               {record.kind === "policy" && <button type="button" className="k-btn k-btn-sm" disabled={!editable} onClick={() => f.set("insider.action", "actionId", record.id)}>Use as policy action</button>}</footer>
             <p role="status" className="pg-live">{copyStatus}</p>
           </article>}

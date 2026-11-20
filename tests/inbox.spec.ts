@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { confirmDialog } from "./fixtures/admin-confirm";
 import jsQR from "jsqr";
+import { solveInbox } from "./fixtures/ui";
 import { inboxAnswers } from "./fixtures/inbox";
 
 test.skip(!process.env.GHOST_E2E_INBOX, "Run npm run test:e2e:inbox to use isolated temporary fixtures");
@@ -86,24 +87,18 @@ for (const variant of ["A", "B", "C"] as const) test(`team ${variant} investigat
   await snapshot.goto(`/clue/inbox?variant=${variant === "A" ? "B" : "A"}`);
   await expect(snapshot.locator("body")).toContainText(`CAP-${variant}-17`);
   await snapshot.close();
-  await page.getByRole("button", { name: "Request hint 1" }).click();
-  await expect(page.locator(".released-hints li")).toHaveCount(1);
+  await page.locator("summary", { hasText: "Hints" }).click();
+  await page.getByRole("button", { name: /Reveal hint 1/ }).click();
+  await expect(page.locator(".pg-hints ol li")).toHaveCount(1);
   await page.reload();
-  await expect(page.locator(".released-hints li")).toHaveCount(1);
+  await expect(page.locator(".pg-hints ol li")).toHaveCount(1);
+  await page.locator("summary", { hasText: "Tamper Alert" }).click();
   await page.getByLabel("Manipulation email").selectOption(`MAIL-${variant}-05`);
   await page.getByLabel("Manipulation artifact").selectOption(`ATT-${variant}-05`);
   await page.getByLabel("Manipulation technique").selectOption("instruction-override");
   await page.getByRole("button", { name: "Record Tamper Alert" }).click();
   await expect(page.getByText("Tamper Alert bonus already recorded: +5.")).toBeVisible();
-  const answer = inboxAnswers[variant];
-  await page.getByLabel("Initial compromise email").selectOption(answer.emailId);
-  await page.getByLabel("Delivery / navigation evidence").selectOption(answer.deliveryId);
-  await page.getByLabel("Snapshot evidence ID").fill(answer.snapshotId);
-  await page.getByLabel("Authentication evidence").selectOption(answer.authenticationId);
-  await page.getByLabel("Database export evidence").selectOption(answer.databaseId);
-  await page.getByLabel("Correlated session ID").fill(answer.sessionId);
-  await page.getByLabel("Short explanation").fill("Recorded redirect, capture, sign-in session and unauthorized export agree.");
-  await expect(page.getByRole("button", { name: "Submit conclusion" })).toBeEnabled({ timeout: 6000 });
+  await solveInbox(page, variant);
   if (variant === "A") {
     await page.setViewportSize({ width: 390, height: 844 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
@@ -111,12 +106,11 @@ for (const variant of ["A", "B", "C"] as const) test(`team ${variant} investigat
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.screenshot({ path: testInfo.outputPath("inbox-desktop.png"), fullPage: true });
   }
-  await page.getByRole("button", { name: "Submit conclusion" }).click();
   await expect(page.getByText("Chapter 1 completed. Chapter 2 unlocked.", { exact: true })).toBeVisible();
   await expect(page.getByText("Saved score: 17 / 105", { exact: true })).toBeVisible();
   await page.reload();
   await expect(page.getByText("Saved score: 17 / 105", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Submit conclusion" })).toBeDisabled();
+  await expect(page.getByLabel("Capture ID")).toBeDisabled();
   if (variant === "A") {
     await page.route("**/api/game", route => route.request().method() === "GET" ? route.abort() : route.continue());
     await expect(page.getByRole("alert").filter({ hasText: "Connection interrupted" })).toBeVisible({ timeout: 10000 });

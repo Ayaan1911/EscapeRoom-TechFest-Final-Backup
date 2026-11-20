@@ -34,7 +34,7 @@ test("one task alone earns points; partial progress is not 'complete'; threshold
   await page.getByRole("button", { name: "Submit task" }).first().click();
   await expect(page.getByText(/\+6 points\. Task 6\/6/).first()).toBeVisible();
   await expect(total(page)).toHaveText("6");
-  await expect(page.getByText("Chapter complete")).toHaveCount(0);
+  await expect(page.getByText(/Chapter \d completed/)).toHaveCount(0);
   await expect(page.getByRole("link", { name: /Trail unlocked/ })).toHaveCount(0); // 6 < 8: no false unlock claim
   const answer = taskAnswer("inbox.identity", "B") as Record<string, string>;
   await page.getByLabel("Session ID").fill(answer.sessionId); // wrong sign-in record on purpose: only the session is right
@@ -121,7 +121,7 @@ test("unlocked chapters stay editable while earlier ones are unfinished; navigat
   await expect(page.getByRole("button", { name: "Submit task" }).first()).toBeDisabled(); // disabled only because fields are empty
   await page.getByRole("button", { name: "Log out" }).click();
   await login(page, "P2-DONE"); await page.goto("/play/inbox");
-  await expect(page.getByText("Chapter complete")).toBeVisible();
+  await expect(page.getByText(/Chapter \d completed/)).toBeVisible();
   await expect(page.getByLabel("Capture ID")).toBeDisabled();
   await expect(page.getByRole("button", { name: /Task complete|Submit task/ }).first()).toBeDisabled();
   await page.goto("/play/verdict"); await expect(page.getByText(/CASE CLOSED/i).first()).toBeVisible();
@@ -137,7 +137,7 @@ test("Insider: reachable by points, but the physical fragments still gate the do
   await page.waitForTimeout(3200);
   await page.getByLabel("Fragment A").fill(frag("P2-SEALED", "A")); await page.getByLabel("Fragment B").fill(frag("P2-SEALED", "B"));
   await page.getByRole("button", { name: "Unlock dossier" }).click();
-  await expect(page.getByRole("heading", { name: "Staff" })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("heading", { name: "The Evidence Wall" })).toBeVisible({ timeout: 15_000 });
   await page.getByLabel("Insider employee").selectOption({ index: 1 });
   await page.getByRole("button", { name: "Submit task" }).first().click();
   await expect(page.getByText(/points|No new points/).first()).toBeVisible();

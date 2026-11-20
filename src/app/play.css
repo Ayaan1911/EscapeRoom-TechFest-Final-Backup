@@ -165,3 +165,4 @@ a.pg-map-link:hover { color: var(--accent); }
   .pg .k-timeline > li { grid-template-columns: 26px minmax(0, 1fr); gap: 8px; } .pg .k-tl-pos { width: 26px; height: 26px; font-size: 12px; } .pg .k-timeline::before { left: 12px; }
   .pg .k-tl-card { padding: 10px; } .pg .k-tl-card p { font-size: 14px; line-height: 1.5; }
 }
+.pg-map ol, .pg-chain, .pg-causal ol { position: relative; } /* contain absolutely positioned screen-reader text so it cannot widen the page */
