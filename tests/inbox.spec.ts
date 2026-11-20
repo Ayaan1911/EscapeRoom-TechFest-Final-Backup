@@ -2,7 +2,6 @@ import { expect, test, type Page } from "@playwright/test";
 import { confirmDialog } from "./fixtures/admin-confirm";
 import jsQR from "jsqr";
 import { solveInbox } from "./fixtures/ui";
-import { inboxAnswers } from "./fixtures/inbox";
 
 test.skip(!process.env.GHOST_E2E_INBOX, "Run npm run test:e2e:inbox to use isolated temporary fixtures");
 async function login(page: Page, variant: string | "admin") {
@@ -14,6 +13,7 @@ async function login(page: Page, variant: string | "admin") {
 }
 
 test("organizer starts a waiting round and prints a scannable phone QR", async ({ page, browser }) => {
+  test.setTimeout(75_000); // first request to each route compiles on the dev server
   await page.goto("/clue/inbox");
   await expect(page).toHaveURL(/\/login\?next=/);
   await login(page, "C");

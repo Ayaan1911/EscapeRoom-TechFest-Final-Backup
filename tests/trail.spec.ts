@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { confirmDialog } from "./fixtures/admin-confirm";
 import { readFileSync } from "node:fs";
-import { solveTrail, submitTask } from "./fixtures/ui";
+import { solveTrail, submitTask, logout } from "./fixtures/ui";
 import { trailAnswers, trailTamper } from "./fixtures/trail";
 
 test.skip(!process.env.GHOST_E2E_TRAIL, "Run npm run test:e2e:trail for isolated Inbox and Trail regression fixtures");
@@ -37,7 +37,7 @@ test("Trail page, JSON and CSV enforce sessions, progression and audited organiz
 });
 
 for (const variant of ["A", "B", "C"] as const) test(`Trail ${variant}: filters, evidence, CSV, hints, global bonus and saved completion`, async ({ page }, testInfo) => {
-  if (variant === "A") test.setTimeout(60000); // Connection recovery spans two five-second polling cycles.
+  test.setTimeout(90000); // task-by-task submissions wait out the 3 s evidence cooldown; connection recovery spans two polling cycles.
   const answer = trailAnswers[variant];
   await login(page, `TRAIL-${variant}`);
   await page.getByRole("link", { name: "Open Chapter 2", exact: true }).click();
@@ -128,7 +128,7 @@ for (const variant of ["A", "B", "C"] as const) test(`Trail ${variant}: filters,
     await expect(page.getByRole("alert").filter({ hasText: "Connection interrupted" })).toBeVisible({ timeout: 10000 });
     await page.unroute("**/api/game"); await expect(page.getByRole("alert").filter({ hasText: "Connection interrupted" })).toHaveCount(0, { timeout: 10000 });
   }
-  await page.getByRole("button", { name: "Log out", exact: true }).click(); await expect(page).toHaveURL(/\/login$/); await login(page, `TRAIL-${variant}`);
+  await logout(page); await login(page, `TRAIL-${variant}`);
   await page.goto("/play/trail"); await expect(page.getByText(`Saved score: ${score} / 105`, { exact: true })).toBeVisible();
   const saved = await (await page.request.get("/api/game")).json(); expect(saved.current).toBe(2); expect(saved.progress.chapters[1].score).toBe(25); expect(saved.progress.bonus).toBe(5);
   await page.getByRole("navigation", { name: "Investigation map" }).getByRole("link", { name: /Inbox/ }).click();

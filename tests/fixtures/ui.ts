@@ -19,7 +19,7 @@ export async function solveInbox(page: Page, variant: V, only?: "entry" | "ident
   const a = inboxAnswers[variant];
   if (!only || only === "entry") {
     await page.getByRole("complementary", { name: "Recovered emails" }).getByRole("button").filter({ hasText: a.emailId }).click();
-    await page.getByRole("button", { name: /Mark as breach email/ }).click();
+    const mark = page.getByRole("button", { name: /Mark as breach email/ }); if (await mark.count()) await mark.click(); // idempotent: already marked stays marked
     await page.getByLabel("Delivery / navigation record").selectOption(a.deliveryId);
     await page.getByLabel("Capture ID").fill(a.snapshotId);
     await submitTask(page, "Delivery and entry point");
@@ -71,7 +71,7 @@ export async function arrange(page: Page, kind: "event" | "recovery", target: re
 export async function solveContainment(page: Page, variant: V, recoveryOrder?: readonly string[]) {
   const a = containmentAnswers[variant];
   await arrange(page, "event", a.eventOrder); await submitTask(page, "Incident timeline");
-  await page.getByLabel("Affected account").fill(a.account); await page.getByLabel("Affected session").fill(a.sessionId); await submitTask(page, "Affected account and session");
+  await page.getByLabel("Affected account", { exact: true }).fill(a.account); await page.getByLabel("Affected session", { exact: true }).fill(a.sessionId); await submitTask(page, "Affected account and session");
   for (const id of a.immediateActions) await page.getByLabel(`Select immediate ${id}`, { exact: true }).setChecked(true);
   await submitTask(page, "Parallel urgent response");
   for (const id of a.recoveryOrder) await page.getByLabel(`Select recovery ${id}`, { exact: true }).setChecked(true);
@@ -83,14 +83,21 @@ export async function solveVerdict(page: Page, variant: V) {
   const a = verdictAnswers[variant];
   const step = (name: string) => page.getByRole("navigation", { name: /Causal chain/ }).getByRole("button", { name: new RegExp(name) }).click();
   await step("Entry"); await page.getByLabel("Initial compromise email").selectOption(a.chain.emailId); await page.getByLabel("Captured redirect").selectOption(a.chain.captureId); await submitTask(page, "Entry chain");
-  await step("Session"); await page.getByLabel("Victim account").selectOption(a.chain.victimAccount); await page.getByLabel("Replayed session").selectOption(a.chain.sessionId); await page.getByLabel("Unauthorized export", { exact: true }).selectOption(a.chain.exportId); await submitTask(page, "Session and impact chain");
+  await step("Session"); await page.getByLabel("Victim account").selectOption(a.chain.victimAccount); await page.getByLabel("Replayed session").selectOption(a.chain.sessionId); await page.getByRole("combobox", { name: "Unauthorized export", exact: true }).selectOption(a.chain.exportId); await submitTask(page, "Session and impact chain");
   await step("Insider"); await page.getByLabel("Internal accomplice").selectOption(a.chain.insiderId); await page.getByLabel("Policy modification").selectOption(a.chain.policyId); await submitTask(page, "Internal assistance chain");
   await step("Evidence map");
   for (const [role, ids] of Object.entries(a.evidenceMap)) for (const id of ids) await page.getByLabel(`Evidence role for ${id}`, { exact: true }).selectOption(role);
   await submitTask(page, "Evidence map");
   await step("Verdict");
-  await page.getByLabel("Best-supported").selectOption(a.hypothesisId); await page.getByLabel("Reject", { exact: true }).selectOption(a.rejected.hypothesisId); await page.getByLabel("Contradiction", { exact: true }).selectOption(a.rejected.contradiction);
+  await page.getByLabel("Best-supported").selectOption(a.hypothesisId); await page.getByRole("combobox", { name: "Reject", exact: true }).selectOption(a.rejected.hypothesisId); await page.getByRole("combobox", { name: "Contradiction", exact: true }).selectOption(a.rejected.contradiction);
   await page.getByLabel("Attacker attribution").selectOption(a.attackerAttribution); await page.getByLabel("Response status").selectOption(a.responseStatus);
   for (const id of a.rejected.evidenceIds) await page.getByLabel(`Counter-evidence ${id}`, { exact: true }).check();
   await submitTask(page, "Hypothesis and contradiction");
+}
+/** Logs out and waits for the login page. Retries the click because a click before React hydrates is a no-op (dev server). */
+export async function logout(page: Page) {
+  await expect(async () => {
+    await page.getByRole("button", { name: "Log out", exact: true }).click();
+    await expect(page).toHaveURL(/\/login$/, { timeout: 3000 });
+  }).toPass({ timeout: 25_000 });
 }

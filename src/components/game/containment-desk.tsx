@@ -97,7 +97,7 @@ export function ContainmentDesk({ evidence, initialCctv, initialState, initialDr
 
     <div className="pg-aux">
       <details className="pg-hints"><summary>Security-room clue <span className="pg-chip">{evidence.cctvReference.id}</span></summary><p>{evidence.cctvReference.placement}</p>
-        <button type="button" className="k-btn k-btn-sm" onClick={() => void checkCopy()}>Check authorized copy</button><p role="status" className="pg-live">{copyStatus}</p></details>
+        <button type="button" className="k-btn k-btn-sm" onClick={() => void checkCopy()}>Check authorized CCTV copy</button><p role="status" className="pg-live">{copyStatus}</p></details>
       <HintBox chapter={3} state={state} editable={editable} busy={busy} onHint={() => void send("hint")} />
       <details className="pg-hints"><summary>Notes <span className="pg-chip">private to your team</span></summary><label>Scratchpad<textarea rows={4} maxLength={900} disabled={!editable} value={f.str("notes", "text")} onChange={e => f.set("notes", "text", e.target.value)} /></label></details>
     </div>

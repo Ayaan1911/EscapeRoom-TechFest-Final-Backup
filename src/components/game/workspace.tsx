@@ -102,7 +102,10 @@ export function TaskPanel({ task, step, editable, busy, retrySeconds, result, re
   const id = useId(), done = task.earned >= task.max, partial = task.earned > 0 && !done;
   // Desktop: every task open. Phones: only the first task starts open, to keep the page short.
   const [open, setOpen] = useState(true);
-  useEffect(() => { if (step > 1 && window.matchMedia("(max-width: 700px)").matches) setOpen(false); }, [step]);
+  useEffect(() => { // follows the viewport: collapse extra tasks on a phone, reopen them when the window widens
+    const query = window.matchMedia("(max-width: 700px)"), sync = () => setOpen(!(step > 1 && query.matches));
+    sync(); query.addEventListener("change", sync); return () => query.removeEventListener("change", sync);
+  }, [step]);
   const mine = result?.task === task.id ? result : null;
   const state = done ? "Complete" : partial ? "Partial" : "Not scored";
   return <section className={`pg-task ${done ? "is-done" : partial ? "is-partial" : ""}`} aria-labelledby={`${id}-h`}>

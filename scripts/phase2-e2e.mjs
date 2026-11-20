@@ -7,7 +7,7 @@ import { PrismaClient } from "@prisma/client";
 import { hashPassword } from "../src/lib/password.mjs";
 import { initialProgress } from "../src/lib/game/engine.ts";
 
-const specs = process.argv.slice(2).filter(a => !a.startsWith("--"));
+const specs = process.argv.slice(2);
 const temp = await createTempDatabase("p2");
 const code = randomBytes(18).toString("hex");
 const origin = "http://127.0.0.1:3000";
@@ -27,6 +27,8 @@ try {
     await team(`P2-FRESH-${v}`, v, progress());
     await team(`P2-MID-${v}`, v, progress([8, 13, 13, 10, 0]));
   }
+  for (const v of ["A", "B", "C"]) await team(`P2-J-${v}`, v, progress(), true); // critical-journey teams
+  { const p = progress([15, 25, 25, 20, 0]); p.chapters.slice(0, 4).forEach((c, i) => { c.completedAt = 1000 + i; }); await team("P2-VERD-A", "A", p); }
   await team("P2-SEALED", "A", progress([8, 13]), true); // Insider open by points, physical dossier still sealed
   await team("P2-NEAR", "A", progress([7]));        // one point short of unlocking Trail
   await team("P2-SHARE", "B", progress());          // two-device draft tests

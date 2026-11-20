@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { confirmDialog } from "./fixtures/admin-confirm";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
-import { solveInsider, submitTask } from "./fixtures/ui";
+import { solveInsider, submitTask, logout } from "./fixtures/ui";
 import { insiderAnswers } from "./fixtures/insider";
 import { insiderLogin, manifestPath, printedPairs, readCards } from "./fixtures/insider-browser";
 
@@ -43,7 +43,7 @@ test("anonymous, organizer and premature participant requests cannot reveal a do
   await page.goto("/play/insider"); await expect(page).toHaveURL(/\/login\?next=/);
   await page.goto("/admin/insider-kit?part=A&scope=all"); await expect(page).toHaveURL(/\/organizer\/login/);
   await insiderLogin(page, "admin"); expect((await page.request.get("/api/game/insider")).status()).toBe(401);
-  await page.getByRole("button", { name: "Log out", exact: true }).click(); await expect(page).toHaveURL(/\/login$/);
+  await logout(page);
   await insiderLogin(page, "INSIDER-LOCKED");
   expect((await page.request.get("/api/game/insider?teamId=INSIDER-01&variant=A")).status()).toBe(403);
   await page.goto("/play/insider"); await expect(page).toHaveURL(/\/play$/);
@@ -84,7 +84,7 @@ for (const [index, variant] of (["A", "B", "C"] as const).entries()) test(`Insid
   await expect(page.getByRole("heading", { name: "The Evidence Wall", exact: true })).toBeVisible();
   const revealed = await (await page.request.get("/api/game/insider?variant=Z&teamId=another")).json(); expect(revealed.dossier.caseId).toBe(`NEXUS-INSIDER-${variant}`); expect(JSON.stringify(revealed)).not.toContain(a); expect(JSON.stringify(revealed)).not.toContain(b);
   await page.reload(); await expect(page.getByLabel("Fragment A", { exact: true })).toHaveCount(0);
-  await page.getByRole("button", { name: "Log out", exact: true }).click(); await expect(page).toHaveURL(/\/login$/); await insiderLogin(page, id); await page.goto("/play/insider");
+  await logout(page); await insiderLogin(page, id); await page.goto("/play/insider");
   await expect(page.getByRole("heading", { name: "The Evidence Wall", exact: true })).toBeVisible();
   await expect(page.locator(".pg-hints ol li")).toHaveCount(variant === "C" ? 2 : 1);
   await page.getByRole("combobox", { name: "Suspect profile", exact: true }).selectOption(answer.employeeId); await expect(page.locator(".suspect-profile")).toContainText(answer.employeeId);
@@ -114,7 +114,7 @@ for (const [index, variant] of (["A", "B", "C"] as const).entries()) test(`Insid
   const score = variant === "A" ? 67 : variant === "B" ? 62 : 56;
   await expect(page.getByText(`Saved score: ${score} / 105`, { exact: true })).toBeVisible();
   await page.reload(); await expect(page.getByRole("combobox", { name: "Insider employee", exact: true })).toBeDisabled();
-  await page.getByRole("button", { name: "Log out", exact: true }).click(); await expect(page).toHaveURL(/\/login$/); await insiderLogin(page, id);
+  await logout(page); await insiderLogin(page, id);
   const state = await (await page.request.get("/api/game")).json(); expect(state.current).toBe(3); expect(state.insiderUnlocked).toBe(true); expect(state.score).toBe(score); expect(state.progress.chapters[2].score).toBe(25); expect(state.progress.bonus).toBe(variant === "A" ? 5 : 0);
   await expect(page.locator(".k-map-card[aria-current=step]").getByRole("heading", { name: "Containment", exact: true })).toBeVisible();
   for (const route of ["inbox", "trail"]) { await page.goto(`/play/${route}`); expect((await page.request.get("/api/game/insider")).status()).toBe(200); await expect(page.getByRole("heading", { name: route === "inbox" ? "The Inbox" : "Trail", exact: true })).toBeVisible(); }
@@ -125,7 +125,7 @@ test("closed rounds retain unlocked history and block sealed-team unlock, hints 
   const context = await browser.newContext(), admin = await context.newPage(); await insiderLogin(admin, "admin");
   await admin.getByRole("button", { name: "Stop round", exact: true }).click(); await confirmDialog(admin, "STOP"); await expect(admin.getByRole("button", { name: "Stop round", exact: true })).toBeDisabled();
   await insiderLogin(page, "INSIDER-01"); await page.goto("/play/insider"); await expect(page.getByRole("heading", { name: "The Evidence Wall", exact: true })).toBeVisible(); await expect(page.getByRole("timer", { name: "Round time remaining" })).toHaveText("FINISHED");
-  await page.getByRole("button", { name: "Log out", exact: true }).click(); await expect(page).toHaveURL(/\/login$/); await insiderLogin(page, "INSIDER-04");
+  await logout(page); await insiderLogin(page, "INSIDER-04");
   await page.goto("/play/insider"); await expect(page.getByRole("button", { name: "Unlock dossier", exact: true })).toBeDisabled();
   const pairs = printedPairs(), fragments = { fragmentA: pairs.A.find(card => card.teamId === "INSIDER-04")!.fragment, fragmentB: pairs.B.find(card => card.teamId === "INSIDER-04")!.fragment };
   for (const action of ["unlock", "hint", "submit"]) { const response = await page.request.post("/api/game", { headers: { Origin: "http://127.0.0.1:3000" }, data: { action, chapter: 2, answer: action === "unlock" ? fragments : insiderAnswers.A } }); expect(response.status()).toBe(409); expect((await response.json()).error).toContain("not active"); }

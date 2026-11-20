@@ -167,3 +167,12 @@ test("after the deadline every chapter is read-only on the server and in the UI"
     expect(draft.status()).toBe(403);
   } finally { await db.gameSession.update({ where: { id: 1 }, data: { deadline: new Date(Date.now() + 3_600_000) } }); await db.$disconnect(); }
 });
+
+test("Final Verdict can be solved task by task end to end (variant A)", async ({ page }) => {
+  test.setTimeout(240_000);
+  await login(page, "P2-VERD-A"); await page.goto("/play/verdict");
+  await expect(page.getByRole("heading", { level: 1, name: "Final Verdict" })).toBeVisible();
+  const { solveVerdict } = await import("./fixtures/ui");
+  await solveVerdict(page, "A");
+  await expect(page.getByRole("heading", { name: "CASE CLOSED — INVESTIGATION COMPLETE" })).toBeVisible({ timeout: 20_000 });
+});

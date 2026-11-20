@@ -1,7 +1,7 @@
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import { confirmDialog } from "./fixtures/admin-confirm";
 import { insiderLogin as login } from "./fixtures/insider-browser";
-import { arrange, solveContainment, submitTask } from "./fixtures/ui";
+import { arrange, solveContainment, submitTask, logout } from "./fixtures/ui";
 import { containmentAnswers } from "./fixtures/containment";
 
 test.skip(!process.env.GHOST_E2E_CONTAINMENT, "Run npm run test:e2e:containment for isolated full-chapter fixtures");
@@ -21,7 +21,7 @@ test("Containment enforces sessions, waiting round, exact team isolation and an 
   await page.goto("/play/containment"); await expect(page).toHaveURL(/\/play$/); await expect(page.getByRole("timer", { name: "Round time remaining" })).toHaveText("WAITING");
   const context = await browser.newContext(), admin = await context.newPage(); await login(admin, "admin"); expect((await admin.request.get("/api/game/containment")).status()).toBe(401);
   await admin.getByRole("button", { name: "Start 60-minute round", exact: true }).click(); await confirmDialog(admin); await expect(admin.getByRole("button", { name: "Stop round", exact: true })).toBeEnabled();
-  await page.getByRole("button", { name: "Log out", exact: true }).click(); await expect(page).toHaveURL(/\/login$/); await login(page, "CONTAIN-LOCKED");
+  await logout(page); await login(page, "CONTAIN-LOCKED");
   expect((await page.request.get("/api/game/containment")).status()).toBe(403); expect((await page.request.get("/api/game/containment?teamId=CONTAIN-A")).status()).toBe(403);
   const override = admin.locator("section").filter({ has: admin.getByRole("heading", { name: "Unlock next chapter", exact: true }) }); await override.getByLabel("Team ID", { exact: true }).fill("CONTAIN-LOCKED"); await override.getByLabel("Reason", { exact: true }).fill("Containment browser regression: approved Insider progression override"); await override.getByRole("button", { name: "Record override", exact: true }).click(); await confirmDialog(admin);
   await expect(admin.locator("section").filter({ has: admin.getByRole("heading", { name: "Recent audit events", exact: true }) }).getByText(/Containment browser regression: approved Insider progression override/)).toBeVisible(); await page.goto("/play/containment"); await expect(page.getByRole("heading", { name: "Containment", exact: true })).toBeVisible(); await expect(page.getByText("Saved score: 40 / 105", { exact: true })).toBeVisible();
@@ -41,6 +41,7 @@ test("organizer prints fictional A4 CCTV sheets without solutions and authorizes
   await page.getByRole("link", { name: "Event operations", exact: false }).click(); await expect(page.getByText(/Browser regression: printed sheet inaccessible at the desk/)).toBeVisible();
 });
 
+async function openClue(page: Page) { const summary = page.locator("summary", { hasText: "Security-room clue" }); if (!(await summary.evaluate(el => (el.parentElement as HTMLDetailsElement).open))) await summary.click(); }
 for (const variant of ["A", "B", "C"] as const) test(`Containment ${variant}: keyboard timeline, evidence, safe equivalent recovery, hints, score and saved history`, async ({ page, browser }, info) => {
   test.setTimeout(90000);
   const answer = containmentAnswers[variant], id = `CONTAIN-${variant}`;
@@ -50,15 +51,15 @@ for (const variant of ["A", "B", "C"] as const) test(`Containment ${variant}: ke
   const response = await page.request.get("/api/game/containment"); expect(response.headers()["cache-control"]).toBe("no-store"); const data = await response.json(); expect(data.evidence.caseId).toBe(`NEXUS-CONTAINMENT-${variant}`); expect(data.evidence.events).toHaveLength(7);
   expect((await page.request.get("/api/game/containment?variant=A&teamId=CONTAIN-A")).status()).toBe(403);
   if (variant === "A") await expect(page.getByRole("article", { name: "Fictional snapshot CCTV-A-08", exact: true })).toBeVisible();
-  else { expect(data.fallbackCctv).toBeNull(); await page.getByRole("button", { name: "Check authorized CCTV copy", exact: true }).click(); await expect(page.getByText(/No accessible copy granted/)).toBeVisible(); }
+  else { expect(data.fallbackCctv).toBeNull(); await openClue(page); await page.getByRole("button", { name: "Check authorized CCTV copy", exact: true }).click(); await expect(page.getByText(/No accessible copy granted/)).toBeVisible(); }
   if (variant === "B") {
     const context = await browser.newContext(), admin = await context.newPage(); await organizer(admin); await admin.goto("/admin/containment-kit"); await admin.getByLabel("Team ID", { exact: true }).fill(id); await admin.getByLabel("Copy authorization reason", { exact: true }).fill("Browser regression: damaged B clue needs accessible copy"); await admin.getByRole("button", { name: "Authorize evidence copy", exact: true }).click(); await expect(admin.getByText(/Accessible copy authorized and audited/)).toBeVisible(); await context.close();
-    await page.getByRole("button", { name: "Check authorized CCTV copy", exact: true }).click(); await expect(page.getByRole("article", { name: "Fictional snapshot CCTV-B-08", exact: true })).toBeVisible(); await expect(page.getByRole("article", { name: "Fictional snapshot CCTV-A-08", exact: true })).toHaveCount(0);
+    await openClue(page); await page.getByRole("button", { name: "Check authorized CCTV copy", exact: true }).click(); await expect(page.getByRole("article", { name: "Fictional snapshot CCTV-B-08", exact: true })).toBeVisible(); await expect(page.getByRole("article", { name: "Fictional snapshot CCTV-A-08", exact: true })).toHaveCount(0);
   }
   const first = data.evidence.events[0].id;
   await page.getByRole("button", { name: `Move event ${first} down`, exact: true }).focus(); await page.keyboard.press("Space"); await expect(page.getByText(`${first} moved to position 2 of 7.`, { exact: true })).toBeVisible();
   await arrange(page, "event", answer.eventOrder);
-  await page.locator("summary", { hasText: "Read the records" }).click(); const drawer = page.locator("details").filter({ has: page.getByText(`${answer.supportingEvidenceIds[3]} · Response authority and business constraints`, { exact: true }) }); await drawer.locator("summary").click(); await expect(drawer).toContainText("Support read-only service"); await expect(drawer).toContainText("parallel");
+  await page.locator("summary", { hasText: "Read the records" }).click(); const drawer = page.locator("details").filter({ has: page.getByText(`${answer.supportingEvidenceIds[3]} · Response authority and business constraints`, { exact: true }) }).last(); await drawer.locator("summary").first().click(); await expect(drawer).toContainText("Support read-only service"); await expect(drawer).toContainText("parallel");
   await expect(page.getByText(/· observation$/, { exact: false }).filter({ hasText: `OBS-${variant}-` })).toHaveCount(2);
   const r = answer.recoveryOrder, safe = variant === "A" ? r : variant === "B" ? [r[1], r[0], r[2], ...r.slice(3)] : [r[1], r[2], r[0], ...r.slice(3)];
   await page.locator("summary", { hasText: "Hints" }).click(); await page.getByRole("button", { name: /Reveal hint 1/ }).click(); await expect(page.locator(".pg-hints ol li")).toHaveCount(1);
@@ -79,10 +80,10 @@ for (const variant of ["A", "B", "C"] as const) test(`Containment ${variant}: ke
   await expect(page.getByText("Chapter 4 completed. Chapter 5 unlocked.", { exact: true })).toBeVisible();
   const score = variant === "A" ? 87 : variant === "B" ? 82 : 76; await expect(page.getByText(`Saved score: ${score} / 105`, { exact: true })).toBeVisible();
   await page.reload(); await expect(page.locator(".pg-hints ol li")).toHaveCount(variant === "C" ? 2 : 1); await expect(page.getByLabel("Affected account", { exact: true })).toBeDisabled();
-  await page.getByRole("button", { name: "Log out", exact: true }).click(); await expect(page).toHaveURL(/\/login$/); await login(page, id); await expect(page.locator(".k-map-card[aria-current=step]").getByRole("heading", { name: "Final Verdict", exact: true })).toBeVisible();
+  await logout(page); await login(page, id); await expect(page.locator(".k-map-card[aria-current=step]").getByRole("heading", { name: "Final Verdict", exact: true })).toBeVisible();
   const saved = await (await page.request.get("/api/game")).json(); expect(saved.current).toBe(4); expect(saved.score).toBe(score); expect(saved.progress.chapters[3].score).toBe(20); expect(saved.progress.bonus).toBe(variant === "A" ? 5 : 0);
   await page.goto("/play/containment"); await expect(page.getByText("Chapter 4 completed. Chapter 5 unlocked.", { exact: true })).toBeVisible(); expect(external).toEqual([]);
-  await page.getByRole("link", { name: "Open Chapter 5", exact: true }).click(); await expect(page.getByRole("heading", { name: "Final Verdict", exact: true })).toBeVisible(); expect((await page.request.get("/api/game/verdict")).status()).toBe(200);
+  await page.getByRole("link", { name: /^Open Chapter 5/ }).first().click(); await expect(page.getByRole("heading", { name: "Final Verdict", exact: true })).toBeVisible(); expect((await page.request.get("/api/game/verdict")).status()).toBe(200);
 });
 
 test("closed rounds preserve authorized historical evidence and block new plans and hints", async ({ page, browser }) => {
