@@ -4,7 +4,7 @@ import { titles, type Progress } from "@/lib/game/engine";
 import { CaseClosed } from "./case-closed";
 import { Badge, CHAPTERS, formatClock } from "@/components/ui/kit";
 
-type Snapshot = { id: string; name: string; variant: string; participants: string[]; progress: Progress; score: number; hints: number; current: number; status: string; serverNow: number; round: { deadline: string | null } };
+type Snapshot = { id: string; name: string; variant: string; participants: string[]; progress: Progress; score: number; hints: number; current: number; unlocked: boolean[]; unlockThresholds: number[]; tasks: { id: string; earned: number; max: number }[][]; status: string; serverNow: number; round: { deadline: string | null } };
 const ROUTES = ["/play/inbox", "/play/trail", "/play/insider", "/play/containment", "/play/verdict"];
 const FOCUS = ["Find the breach email and prove it", "Reconstruct the stolen session", "Unlock the Evidence Wall, name the insider", "Order the incident and plan the response", "Link the evidence and close the case"];
 const BLURB = ["Six recovered messages. One initial compromise. Correlate the emails, QR capture and records.", "Follow the identity-provider events from session issuance to the unauthorized export.", "Collect your envelope and wall fragments, then find who deliberately weakened the controls.", "Reconstruct the incident, preserve evidence and build a scoped simulated response plan.", "Synthesize all four investigations, test competing explanations and close the case."];
@@ -36,9 +36,9 @@ export function LiveDashboard() {
   }, []);
   if (!data) return <div className="k-desk"><p role="status" className="k-banner k-banner-warn">{error || "Loading saved investigation…"}</p>{error && <a className="k-btn" href="/login">Sign in</a>}<div className="k-skeleton" aria-hidden="true" /></div>;
 
-  const waiting = data.status === "waiting", closed = data.current === -1;
+  const waiting = data.status === "waiting", closed = data.progress.completedAt !== null;
   const done = (i: number) => data.progress.chapters[i].completedAt !== null;
-  const open = (i: number) => !waiting && (i === 0 || done(i - 1));
+  const open = (i: number) => !waiting && data.unlocked[i];
   const urgent = data.status === "active" && remaining <= 300;
   return <div className="k-desk">
     <header className="k-mission">
@@ -56,17 +56,17 @@ export function LiveDashboard() {
     {waiting && <section className="k-banner k-banner-warn k-waiting" aria-labelledby="waiting-heading"><div><span className="k-eyebrow">ROUND 1</span><h2 id="waiting-heading">Awaiting organizer start</h2><p>The clock has not started. Keep this page open; chapters unlock the moment your organizer begins the round.</p></div><ul><li>All three teammates can sign in on separate devices.</li><li>Check you can see your team name and members above.</li><li>Have your printed envelope ready for Chapter 3.</li></ul></section>}
 
     <section aria-labelledby="map-heading">
-      <div className="k-section-head"><h2 id="map-heading">Case progression</h2><Badge tone={closed ? "ok" : "neutral"}>{closed ? 5 : data.current} / 5 chapters</Badge></div>
+      <div className="k-section-head"><h2 id="map-heading">Case progression</h2><Badge tone={closed ? "ok" : "neutral"}>{data.unlocked.filter(Boolean).length} / 5 open</Badge></div>
       <nav aria-label="Investigation chapters"><ol className="k-map">{titles.map((title, i) => {
-        const state = done(i) ? "done" : i === data.current && !waiting ? "current" : "locked", pts = data.progress.chapters[i].score;
+        const pts = data.progress.chapters[i].score, state = done(i) ? "done" : open(i) ? "current" : "locked", tasksDone = data.tasks[i].filter(t => t.earned >= t.max).length;
         return <li key={title} className={`k-map-card is-${state}`} aria-current={state === "current" ? "step" : undefined}>
-          <div className="k-map-top"><span className="k-map-n k-mono">0{i + 1}</span><Badge tone={state === "done" ? "ok" : state === "current" ? "amber" : "neutral"}>{state === "done" ? "Completed" : state === "current" ? "Current" : waiting ? "Waiting" : "Locked"}</Badge></div>
+          <div className="k-map-top"><span className="k-map-n k-mono">0{i + 1}</span><Badge tone={state === "done" ? "ok" : state === "current" ? "amber" : "neutral"}>{state === "done" ? "Completed" : state === "current" ? (pts > 0 ? "In progress" : "Available") : waiting ? "Waiting" : "Locked"}</Badge></div>
           <h3>{title}</h3><p className="k-map-focus">{FOCUS[i]}</p>
-          <p className="k-map-blurb">{state === "locked" ? (waiting ? "Opens when the round starts." : "Complete the previous chapter to unlock.") : BLURB[i]}</p>
-          <div className="k-map-foot"><span className="k-mono">{pts} / {CHAPTERS[i].max} pts</span>{open(i) && <a className={`k-btn ${state === "current" ? "k-btn-primary" : ""}`} href={ROUTES[i]}>Open Chapter {i + 1}</a>}</div>
+          <p className="k-map-blurb">{state === "locked" ? (waiting ? "Opens when the round starts." : `Earn ${data.unlockThresholds[i - 1]} points in ${titles[i - 1]} to unlock.`) : BLURB[i]}</p>
+          <div className="k-map-foot"><span className="k-mono">{pts} / {CHAPTERS[i].max} pts · {tasksDone}/{data.tasks[i].length} tasks</span>{open(i) && <a className={`k-btn ${state === "current" ? "k-btn-primary" : ""}`} href={ROUTES[i]}>Open Chapter {i + 1}</a>}</div>
         </li>;
       })}</ol></nav>
     </section>
-    <p className="k-note">All five Round 1 chapters are playable in sequence. Completion is saved; qualification requires organizer review after the round. Your session, timer and progress are saved on the server.</p>
+    <p className="k-note">Unlocked chapters stay open: improve any score until time runs out. Progress, drafts and the timer are saved on the server.</p>
   </div>;
 }

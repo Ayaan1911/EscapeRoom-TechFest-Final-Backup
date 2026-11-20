@@ -19,7 +19,7 @@ export function taskAnswer(taskId: string, variant: V): Record<string, unknown> 
   if (chapter === "verdict") {
     const full = verdictAnswers[variant] as unknown as Record<string, unknown> & { chain: Record<string, unknown> };
     if (taskId === "verdict.evidence") return { evidenceMap: full.evidenceMap };
-    if (taskId === "verdict.reasoning") return { hypothesisId: full.hypothesisId, rejected: full.rejected };
+    if (taskId === "verdict.reasoning") return { hypothesisId: full.hypothesisId, rejected: full.rejected, attackerAttribution: "alias-only", responseStatus: "plan-prepared" };
     return pick(full.chain, taskFields[taskId]);
   }
   const source = { inbox: inboxAnswers, trail: trailAnswers, insider: insiderAnswers, containment: containmentAnswers }[chapter]![variant] as unknown as Record<string, unknown>;

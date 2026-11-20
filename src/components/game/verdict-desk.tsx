@@ -1,125 +1,119 @@
 "use client";
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
 import { useChapter, type ChapterState } from "./use-chapter";
+import { useDrafts, type ServerDraft } from "./use-drafts";
 import { CaseClosed } from "./case-closed";
-import { Badge, Card, Feedback, MissionBar, ContinueBar } from "@/components/ui/kit";
+import { ConnectionBanner, DeskFrame, HintBox, ResultStrip, StateBanner, TaskPanel, fieldApi, isEditable, taskOf } from "./workspace";
+import { Badge } from "@/components/ui/kit";
 import { verdictRoles, type VerdictEvidence, type VerdictRole } from "@/types/verdict";
 
-const labels: Record<VerdictRole, string> = { entry: "Entry point", session: "Authentication / session abuse", impact: "Data impact", assistance: "Insider assistance", response: "Containment rationale" };
-const CHAIN = ["emailId", "victimAccount", "captureId", "sessionId", "exportId", "insiderId", "policyId"] as const;
-type Chain = Record<(typeof CHAIN)[number], string>;
-const EMPTY_CHAIN = Object.fromEntries(CHAIN.map(k => [k, ""])) as Chain;
-const NEED = 12;
+const ROLE_LABEL: Record<VerdictRole, string> = { entry: "Entry", session: "Session abuse", impact: "Data impact", assistance: "Insider help", response: "Response" };
+const TASKS = [
+  { id: "verdict.entry", short: "Entry" }, { id: "verdict.session", short: "Session & impact" }, { id: "verdict.insider", short: "Insider" },
+  { id: "verdict.evidence", short: "Evidence map" }, { id: "verdict.reasoning", short: "Verdict" },
+] as const;
+const ROLE_KEYS = verdictRoles as readonly string[];
 
-export function VerdictDesk({ evidence, initialState, team }: { evidence: VerdictEvidence; initialState: ChapterState; team: { id: string; name: string } }) {
-  const { state, busy, feedback, connection, send, remaining, retrySeconds } = useChapter(4, initialState);
-  const [assignments, setAssignments] = useState<Record<string, VerdictRole | "">>({});
-  const [counterEvidence, setCounterEvidence] = useState<string[]>([]);
-  const [search, setSearch] = useState("");
-  const [chapter, setChapter] = useState("");
-  const [chain, setChain] = useState<Chain>(EMPTY_CHAIN);
-  const [judgement, setJudgement] = useState({ hypothesisId: "", rejectedHypothesis: "", contradiction: "", attackerAttribution: "", responseStatus: "" });
-  const [chronological, setChronological] = useState(false);
-  const completed = state.current === -1 && state.progress.completedAt !== null;
-  const editable = state.status === "active" && state.current === 4 && !completed;
-  const disabled = !editable || busy;
-  const capture = evidence.captures.find(item => item.id === chain.captureId);
-  const pinned = evidence.records.filter(item => assignments[item.id]);
+export function VerdictDesk({ evidence, initialState, initialDrafts, team }: { evidence: VerdictEvidence; initialState: ChapterState; initialDrafts: ServerDraft[]; team: { id: string; name: string } }) {
+  const { state, busy, feedback, result, connection, send, submitTask, remaining, retrySeconds } = useChapter(4, initialState);
+  const editable = isEditable(state, 4);
+  const drafts = useDrafts(4, initialDrafts, editable), f = fieldApi(drafts);
+  const [active, setActive] = useState<(typeof TASKS)[number]["id"]>("verdict.entry");
+  const [search, setSearch] = useState(""), [chapter, setChapter] = useState("");
+  const closed = state.progress.completedAt !== null;
+  const role = (id: string) => ROLE_KEYS.find(r => f.arr("verdict.evidence", r).includes(id)) as VerdictRole | undefined;
+  const mapped = Object.fromEntries(verdictRoles.map(r => [r, f.arr("verdict.evidence", r)])) as Record<VerdictRole, string[]>;
+  const pinnedIds = verdictRoles.flatMap(r => mapped[r]);
   const records = evidence.records.filter(item => (!chapter || item.chapter === chapter) && (!search.trim() || JSON.stringify(item).toLowerCase().includes(search.trim().toLowerCase())));
-  const timeline = chronological ? [...evidence.timeline].sort((a, b) => a.timestamp.localeCompare(b.timestamp)) : evidence.timeline;
-  const chainDone = CHAIN.filter(k => chain[k]).length, judged = Object.values(judgement).filter(Boolean).length;
-  const checks = [
-    { label: "Causal chain", detail: `${chainDone} of ${CHAIN.length} links chosen`, done: chainDone === CHAIN.length },
-    { label: "Hypotheses weighed", detail: `${judged} of 5 judgements made`, done: judged === 5 },
-    { label: "Evidence linked", detail: `${pinned.length} of ${NEED} distinct records`, done: pinned.length >= NEED },
-    { label: "Counter-evidence", detail: `${counterEvidence.length} of 2 selected`, done: counterEvidence.length === 2 },
-  ];
-  const setChainKey = (key: keyof Chain) => (value: string) => setChain(old => ({ ...old, [key]: value }));
-  const setJ = (key: keyof typeof judgement) => (value: string) => setJudgement(old => ({ ...old, [key]: value }));
+  const capture = evidence.captures.find(item => item.id === f.str("verdict.entry", "captureId"));
+  const rejectedEvidence = f.arr("verdict.reasoning", "evidenceIds");
 
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); const data = new FormData(event.currentTarget);
-    const evidenceMap = Object.fromEntries(verdictRoles.map(role => [role, Object.entries(assignments).filter(([, value]) => value === role).map(([id]) => id)]));
-    void send("submit", { kind: "verdict", chain: { emailId: chain.emailId, victimAccount: chain.victimAccount, sessionId: chain.sessionId, exportId: chain.exportId, insiderId: chain.insiderId, policyId: chain.policyId, captureId: chain.captureId, campaign: capture?.campaign ?? "" }, evidenceMap, hypothesisId: judgement.hypothesisId, rejected: { hypothesisId: judgement.rejectedHypothesis, contradiction: judgement.contradiction, evidenceIds: counterEvidence }, attackerAttribution: judgement.attackerAttribution, responseStatus: judgement.responseStatus, explanation: data.get("explanation") });
+  function assign(id: string, next: VerdictRole | "") {
+    drafts.update("verdict.evidence", Object.fromEntries(verdictRoles.map(r => [r, mapped[r].filter(x => x !== id).concat(r === next ? [id] : [])])));
+    if (next === "" && rejectedEvidence.includes(id)) f.set("verdict.reasoning", "evidenceIds", rejectedEvidence.filter(x => x !== id));
   }
-  const node = (n: number, label: string, value: string, set: (v: string) => void, placeholder: string, options: { value: string; text: string }[], name?: string) =>
-    <div className="k-node" data-step={n}><label>{label}<select name={name} required value={value} onChange={e => set(e.target.value)}><option value="" disabled>{placeholder}</option>{options.map(o => <option key={o.value} value={o.value}>{o.text}</option>)}</select></label></div>;
-  const hypothesisOptions = evidence.hypotheses.map(item => ({ value: item.id, text: `${item.id} · ${item.title}` }));
+  async function submit(task: (typeof TASKS)[number]["id"]) {
+    await drafts.flush();
+    const s = (t: string, k: string) => f.str(t, k).trim();
+    const answer = task === "verdict.entry" ? { emailId: s(task, "emailId"), captureId: s(task, "captureId"), campaign: capture?.campaign ?? s(task, "campaign") }
+      : task === "verdict.session" ? { victimAccount: s(task, "victimAccount"), sessionId: s(task, "sessionId"), exportId: s(task, "exportId") }
+      : task === "verdict.insider" ? { insiderId: s(task, "insiderId"), policyId: s(task, "policyId") }
+      : task === "verdict.evidence" ? { evidenceMap: mapped }
+      : { hypothesisId: s(task, "hypothesisId"), attackerAttribution: s(task, "attackerAttribution"), responseStatus: s(task, "responseStatus"), rejected: { hypothesisId: s(task, "rejectedHypothesis"), contradiction: s(task, "contradiction"), evidenceIds: rejectedEvidence } };
+    await submitTask(task, answer);
+  }
+  const sel = (task: string, key: string, label: string, options: { value: string; text: string }[], onPick?: (v: string) => void) =>
+    <label>{label}<select disabled={!editable} value={f.str(task, key)} onChange={e => { f.set(task, key, e.target.value); onPick?.(e.target.value); }}><option value="">Select…</option>{options.map(o => <option key={o.value} value={o.value}>{o.text}</option>)}</select></label>;
+  const hyp = evidence.hypotheses.map(o => ({ value: o.id, text: `${o.id} · ${o.title}` }));
+  const filled = (id: string) => ({ "verdict.entry": ["emailId", "captureId"].every(k => f.str(id, k)), "verdict.session": ["victimAccount", "sessionId", "exportId"].every(k => f.str(id, k)), "verdict.insider": ["insiderId", "policyId"].every(k => f.str(id, k)), "verdict.evidence": verdictRoles.every(r => mapped[r].length > 0), "verdict.reasoning": ["hypothesisId", "rejectedHypothesis", "contradiction", "attackerAttribution", "responseStatus"].every(k => f.str(id, k)) && rejectedEvidence.length === 2 }[id] ?? false);
+  const panel = (id: (typeof TASKS)[number]["id"], ready: boolean, why: string, body: React.ReactNode, step: number) =>
+    <TaskPanel step={step} task={taskOf(state, 4, id)} editable={editable} busy={busy} retrySeconds={retrySeconds} result={result} ready={ready} why={why} onSubmit={() => void submit(id)}>{body}</TaskPanel>;
 
-  return <div className="k-desk">
-    <MissionBar chapter={4} title="Final Verdict" caseId={evidence.caseId} state={state} remaining={remaining} objective="One case. Independent sources. Build a defensible conclusion from at least twelve linked records." />
-    {completed && <CaseClosed teamId={team.id} teamName={team.name} progress={state.progress} />}
-    {!editable && !completed && <p className="k-banner k-banner-warn" role="status">The round is {state.status}. Permitted case evidence remains readable; new verdicts and hints are unavailable.</p>}
-    {connection && <p className="k-banner k-banner-warn" role="alert">{connection} <a href="/login?next=/play/verdict">Sign in</a></p>}
+  return <DeskFrame chapter={4} title="Final Verdict" caseId={evidence.caseId} state={state} remaining={remaining} drafts={drafts} objective="One causal chain, independent sources, one rejected alternative." banner={<><StateBanner state={state} chapter={4} /><ConnectionBanner text={connection} next="/play/verdict" /></>}>
+    {closed && <CaseClosed teamId={team.id} teamName={team.name} progress={state.progress} />}
 
-    <Card id="review" className="verdict-summary" eyebrow="CASE FILE" title="Incident review file" aside={<div className="k-actions"><a className="k-btn k-btn-sm" href="/play/inbox">Review Inbox</a><a className="k-btn k-btn-sm" href="/play/trail">Review Trail</a><a className="k-btn k-btn-sm" href="/play/insider">Review Insider</a><a className="k-btn k-btn-sm" href="/play/containment">Review Containment</a></div>}>
-      {evidence.summary.map(text => <p key={text}>{text}</p>)}
-    </Card>
+    <details className="pg-hints"><summary>Case file <span className="pg-chip">read first</span></summary>{evidence.summary.map(text => <p key={text}>{text}</p>)}
+      <div className="pg-actions">{["inbox", "trail", "insider", "containment"].map((c, i) => state.unlocked[i] ? <a key={c} className="k-btn k-btn-sm" href={`/play/${c}`}>Review {c}</a> : null)}</div></details>
 
-    <div className="k-contain-grid">
-      <div className="k-plan">
-        <Card id="board" className="" eyebrow="TIMELINE" title="Incident summary board" aside={<button type="button" className="k-btn k-btn-sm" onClick={() => setChronological(value => !value)}>{chronological ? "Show retained card arrangement" : "Compare source timestamps"}</button>}>
-          <div className="verdict-timeline k-vtl">{timeline.map(item => <article key={item.id}><span className="k-mono k-muted">{item.id}</span><h3>{item.title}</h3><time dateTime={item.timestamp} className="k-mono">{item.timestamp} UTC</time><p>Sources: {item.sourceIds.join(", ")}</p></article>)}</div>
-        </Card>
+    <nav className="pg-causal" aria-label="Causal chain: choose a step">
+      <ol>{TASKS.map((t, i) => { const row = taskOf(state, 4, t.id), done = row.earned >= row.max;
+        return <li key={t.id}><button type="button" aria-pressed={active === t.id} className={`${done ? "is-done" : row.earned > 0 ? "is-partial" : filled(t.id) ? "is-filled" : ""}`} onClick={() => setActive(t.id)}>
+          <span className="pg-causal-n" aria-hidden="true">{done ? "✓" : i + 1}</span><strong>{t.short}</strong><small>{row.earned}/{row.max} pts{filled(t.id) && !done ? " · filled" : ""}</small></button>{i < TASKS.length - 1 && <span className="pg-chain-link" aria-hidden="true">→</span>}</li>; })}</ol>
+    </nav>
 
-        <form onSubmit={submit} className="k-plan">
-          <Card id="chain" eyebrow="STEP 1" title="Causal chain and responsibilities" aside={<Badge tone={chainDone === CHAIN.length ? "ok" : "neutral"}>{chainDone}/{CHAIN.length} links</Badge>}>
-            <p>Link the initial lure, captured campaign, exact session, unauthorized impact and separately evidenced accomplice. Select source facts; do not infer intent from a victim account or geography from an IP.</p>
-            <fieldset disabled={disabled}><div className="k-chain">
-              {node(1, "Initial compromise email", chain.emailId, setChainKey("emailId"), "Select recovered message", evidence.emails.map(i => ({ value: i.id, text: `${i.id} · ${i.subject}` })), "emailId")}
-              {node(2, "Victim account", chain.victimAccount, setChainKey("victimAccount"), "Select affected account", evidence.accounts.map(v => ({ value: v, text: v })), "victimAccount")}
-              {node(3, "Captured redirect evidence", chain.captureId, setChainKey("captureId"), "Select retained capture", evidence.captures.map(i => ({ value: i.id, text: `${i.id} · ${i.campaign}` })))}
-              {node(4, "Replayed incident session", chain.sessionId, setChainKey("sessionId"), "Select exact session", evidence.sessions.map(v => ({ value: v, text: v })), "sessionId")}
-              {node(5, "Unauthorized export evidence", chain.exportId, setChainKey("exportId"), "Select database audit", evidence.exports.map(i => ({ value: i.id, text: `${i.id} · ${i.description}` })), "exportId")}
-              {node(6, "Internal accomplice", chain.insiderId, setChainKey("insiderId"), "Select evidenced employee", evidence.suspects.map(i => ({ value: i.id, text: `${i.id} · ${i.name} · ${i.role}` })), "insiderId")}
-              {node(7, "Unauthorized policy modification", chain.policyId, setChainKey("policyId"), "Select signed policy command", evidence.policies.map(i => ({ value: i.id, text: `${i.id} · ${i.description}` })), "policyId")}
-            </div></fieldset>
-            {capture && <p className="k-banner k-banner-warn">Selected capture: {capture.id} · Campaign {capture.campaign}<br />Retained redirect: {capture.url} (inert evidence text)</p>}
-          </Card>
+    <div className="pg-verdict-grid">
+      <div className="pg-tasks" aria-label="Active step">
+        {active === "verdict.entry" && panel("verdict.entry", !!(f.str("verdict.entry", "emailId") && f.str("verdict.entry", "captureId")), "Choose the lure email and the retained capture.", <div className="pg-fields">
+          {sel("verdict.entry", "emailId", "Initial compromise email", evidence.emails.map(i => ({ value: i.id, text: `${i.id} · ${i.subject}` })))}
+          {sel("verdict.entry", "captureId", "Captured redirect", evidence.captures.map(i => ({ value: i.id, text: `${i.id} · ${i.campaign}` })), v => f.set("verdict.entry", "campaign", evidence.captures.find(c => c.id === v)?.campaign ?? ""))}
+          {capture && <p className="pg-hint-line k-mono">Campaign {capture.campaign} · {capture.url} (inert text)</p>}</div>, 1)}
+        {active === "verdict.session" && panel("verdict.session", !!(f.str("verdict.session", "victimAccount") && f.str("verdict.session", "sessionId") && f.str("verdict.session", "exportId")), "Choose the victim account, replayed session and export.", <div className="pg-fields">
+          {sel("verdict.session", "victimAccount", "Victim account", evidence.accounts.map(v => ({ value: v, text: v })))}
+          {sel("verdict.session", "sessionId", "Replayed session", evidence.sessions.map(v => ({ value: v, text: v })))}
+          {sel("verdict.session", "exportId", "Unauthorized export", evidence.exports.map(i => ({ value: i.id, text: `${i.id} · ${i.description}` })))}</div>, 2)}
+        {active === "verdict.insider" && panel("verdict.insider", !!(f.str("verdict.insider", "insiderId") && f.str("verdict.insider", "policyId")), "Choose the evidenced employee and policy command.", <div className="pg-fields">
+          {sel("verdict.insider", "insiderId", "Internal accomplice", evidence.suspects.map(i => ({ value: i.id, text: `${i.id} · ${i.name} · ${i.role}` })))}
+          {sel("verdict.insider", "policyId", "Policy modification", evidence.policies.map(i => ({ value: i.id, text: `${i.id} · ${i.description}` })))}</div>, 3)}
 
-          <Card id="hypotheses" eyebrow="STEP 2" title="Competing incident explanations" aside={<Badge tone={judged === 5 ? "ok" : "neutral"}>{judged}/5 judgements</Badge>}>
-            <div className="k-hyp-grid verdict-hypotheses">{evidence.hypotheses.map(item => <article key={item.id} className={`k-hyp ${judgement.hypothesisId === item.id ? "is-best" : judgement.rejectedHypothesis === item.id ? "is-rejected" : ""}`}><header><span className="k-mono k-muted">{item.id}</span>{judgement.hypothesisId === item.id && <Badge tone="ok">Best supported</Badge>}{judgement.rejectedHypothesis === item.id && <Badge tone="alert">Rejected</Badge>}</header><h3>{item.title}</h3><p>{item.explanation}</p></article>)}</div>
-            <fieldset disabled={disabled}><div className="k-answer-grid">
-              <label>Best-supported hypothesis<select name="hypothesisId" required value={judgement.hypothesisId} onChange={e => setJ("hypothesisId")(e.target.value)}><option value="" disabled>Select supported interpretation</option>{hypothesisOptions.map(o => <option key={o.value} value={o.value}>{o.text}</option>)}</select></label>
-              <label>Rejected competing hypothesis<select name="rejectedHypothesis" required value={judgement.rejectedHypothesis} onChange={e => setJ("rejectedHypothesis")(e.target.value)}><option value="" disabled>Select a contradicted alternative</option>{hypothesisOptions.map(o => <option key={o.value} value={o.value}>{o.text}</option>)}</select></label>
-              <label>Contradiction established by records<select name="contradiction" required value={judgement.contradiction} onChange={e => setJ("contradiction")(e.target.value)}><option value="" disabled>Select an evidential contradiction</option><option value="device-and-policy">Changed-device validation and signed policy modification contradict the managed-workstation-only account</option><option value="outside-approved-scope">Customer export principal/session/object are outside the maintenance approval scope</option></select></label>
-              <label>External attacker attribution<select name="attackerAttribution" required value={judgement.attackerAttribution} onChange={e => setJ("attackerAttribution")(e.target.value)}><option value="" disabled>Assess the supported attribution limit</option><option value="alias-only">GHOST_404 is an external attacker alias; real identity/location unproven</option><option value="real-identity-proven">Real-world identity established</option><option value="location-proven">Real-world location established from the source IP</option></select></label>
-              <label>Response conclusion<select name="responseStatus" required value={judgement.responseStatus} onChange={e => setJ("responseStatus")(e.target.value)}><option value="" disabled>Assess what Chapter 4 established</option><option value="plan-prepared">Evidence-backed response plan prepared; execution/recovery not independently established</option><option value="recovery-executed">Containment executed and recovery independently verified</option></select></label>
-            </div></fieldset>
-          </Card>
+        {active === "verdict.evidence" && panel("verdict.evidence", filled("verdict.evidence"), "Give every role at least one record.", <>
+          <div className="pg-rolemap" role="group" aria-label="Evidence map">{verdictRoles.map(r => <div key={r} className={mapped[r].length ? "is-set" : ""}><b>{ROLE_LABEL[r]}</b><span>{mapped[r].length ? mapped[r].map(id => <code key={id} className="k-mono">{id}</code>) : <em>none yet</em>}</span></div>)}</div>
+          <div className="pg-fields"><label>Search records<input value={search} onChange={e => setSearch(e.target.value)} /></label><label>Chapter<select value={chapter} onChange={e => setChapter(e.target.value)}><option value="">All</option>{["Inbox", "Trail", "Insider", "Containment"].map(v => <option key={v}>{v}</option>)}</select></label></div>
+          <p role="status" className="pg-live">{records.length} records · {pinnedIds.length} linked</p>
+          <div className="pg-recgrid">{records.map(item => <article key={item.id} className={`pg-rec ${role(item.id) ? "is-linked" : ""}`}><span className="k-mono k-muted">{item.chapter} / {item.id}</span><h4>{item.title}</h4>
+            <details><summary>Inspect {item.id}</summary><p className="k-meta">Source: {item.source}</p><dl className="k-facts">{Object.entries(item.facts).map(([k, v]) => <div key={k}><dt>{k}</dt><dd className="k-mono">{v}</dd></div>)}</dl></details>
+            <label>Role<select aria-label={`Evidence role for ${item.id}`} disabled={!editable} value={role(item.id) ?? ""} onChange={e => assign(item.id, e.target.value as VerdictRole | "")}><option value="">Not linked</option>{verdictRoles.map(r => <option value={r} key={r}>{ROLE_LABEL[r]}</option>)}</select></label></article>)}</div></>, 4)}
 
-          <Card id="matrix" className="verdict-matrix" eyebrow="STEP 3" title="Evidence matrix and notebook" aside={<Badge tone={pinned.length >= NEED ? "ok" : "neutral"}>{pinned.length} / {NEED} records</Badge>}>
-            <p>Assign each supporting record to one causal role. Establish entry using mailbox/gateway/capture, session abuse using issuance/validation, impact using the correct database audit, assistance using policy/intent/access/approval/custody, and response using incident authority. A complete mapping needs at least twelve distinct records across all four chapters.</p>
-            <div className="k-meter" role="img" aria-label={`${Math.min(pinned.length, NEED)} of ${NEED} required records linked`}><span style={{ width: `${Math.min(100, (pinned.length / NEED) * 100)}%` }} /></div>
-            <div className="k-answer-grid"><label>Search review evidence<input value={search} onChange={e => setSearch(e.target.value)} /></label><label>Filter source chapter<select value={chapter} onChange={e => setChapter(e.target.value)}><option value="">All chapters</option>{["Inbox", "Trail", "Insider", "Containment"].map(value => <option key={value}>{value}</option>)}</select></label></div>
-            <p role="status" className="k-feedback">{records.length} review records shown · {pinned.length} evidence IDs pinned</p>
-            <div className="verdict-records k-vrecords">{records.map(item => <article className={`verdict-record k-vrec ${assignments[item.id] ? "is-linked" : ""}`} key={item.id}><span className="k-mono k-muted">{item.chapter} / {item.id}</span><h3>{item.title}</h3>
-              <details><summary>Inspect {item.id}</summary><p className="k-meta">Source: {item.source}</p><dl className="k-facts">{Object.entries(item.facts).map(([key, value]) => <div key={key}><dt>{key}</dt><dd className="k-mono">{value}</dd></div>)}</dl></details>
-              <label>Evidence role<select aria-label={`Evidence role for ${item.id}`} value={assignments[item.id] ?? ""} disabled={disabled} onChange={e => setAssignments(old => ({ ...old, [item.id]: e.target.value as VerdictRole | "" }))}><option value="">Not linked</option>{verdictRoles.map(role => <option value={role} key={role}>{labels[role]}</option>)}</select></label></article>)}</div>
-            <section aria-label="Verdict evidence notebook" className="k-relations"><h3>Pinned evidence relationships</h3>
-              {verdictRoles.map(role => { const ids = pinned.filter(item => assignments[item.id] === role).map(item => item.id); return <p key={role}><strong>{labels[role]}:</strong> {ids.join(", ") || "No evidence linked"}</p>; })}
-              <fieldset disabled={disabled}><legend>Select exactly two pinned records that contradict the rejected hypothesis</legend><div className="k-choices">{pinned.map(item => <label key={item.id} className={`k-choice k-choice-sm ${counterEvidence.includes(item.id) ? "is-picked" : ""}`}><input type="checkbox" aria-label={`Counter-evidence ${item.id}`} checked={counterEvidence.includes(item.id)} onChange={() => setCounterEvidence(old => old.includes(item.id) ? old.filter(id => id !== item.id) : [...old, item.id])} /><span><strong className="k-mono">{item.id}</strong><small>{item.title}</small></span></label>)}</div></fieldset>
-              <p>Counter-evidence selected: {counterEvidence.length} / 2</p></section>
-          </Card>
-
-          <Card id="verdict-submit" className="k-conclusion" eyebrow="STEP 4" title="Submit Final Verdict" aside={<Badge tone={checks.every(c => c.done) ? "ok" : "neutral"}>{checks.filter(c => c.done).length}/4 ready</Badge>}>
-            {completed && <p className="k-lock">🔒 Verdict accepted and locked.</p>}
-            <p>The server validates the structured claims, independent evidence roles and contradiction. Optional notes are ungraded observations, not verified claims or keyword-scored answers. Review source facts before submitting.</p>
-            <fieldset disabled={disabled}><label>Review explanation (optional)<textarea name="explanation" rows={4} maxLength={1000} /></label>
-              <div className="k-submit-row"><button className="k-btn k-btn-primary k-btn-lg" disabled={retrySeconds > 0 || pinned.length < NEED || counterEvidence.length !== 2}>Submit Final Verdict</button>{!completed && !checks.every(c => c.done) && <small>Complete the checklist to submit.</small>}</div></fieldset>
-            <Feedback busy={busy} text={feedback} extra={retrySeconds > 0 && editable ? `Next submission available in ${retrySeconds}s.` : ""} /><ContinueBar chapter={4} state={state} />
-          </Card>
-        </form>
+        {active === "verdict.reasoning" && panel("verdict.reasoning", filled("verdict.reasoning"), "Pick a best hypothesis, one to reject, the contradiction and two counter-records.", <>
+          <div className="pg-hyps">{evidence.hypotheses.map(h => { const best = f.str("verdict.reasoning", "hypothesisId") === h.id, rej = f.str("verdict.reasoning", "rejectedHypothesis") === h.id;
+            return <article key={h.id} className={best ? "is-best" : rej ? "is-rejected" : ""}><span className="k-mono k-muted">{h.id}</span>{best && <Badge tone="ok">✓ Best supported</Badge>}{rej && <Badge tone="alert">✕ Rejected</Badge>}<h4>{h.title}</h4><details><summary>Details</summary><p>{h.explanation}</p></details></article>; })}</div>
+          <div className="pg-fields">
+            {sel("verdict.reasoning", "hypothesisId", "Best-supported", hyp)}{sel("verdict.reasoning", "rejectedHypothesis", "Reject", hyp)}
+            {sel("verdict.reasoning", "contradiction", "Contradiction", [{ value: "device-and-policy", text: "Changed-device session + signed policy change" }, { value: "outside-approved-scope", text: "Export outside the maintenance approval" }])}
+            {sel("verdict.reasoning", "attackerAttribution", "Attacker attribution", [{ value: "alias-only", text: "GHOST_404 is an alias; identity/location unproven" }, { value: "real-identity-proven", text: "Real identity established" }, { value: "location-proven", text: "Location established from IP" }])}
+            {sel("verdict.reasoning", "responseStatus", "Response status", [{ value: "plan-prepared", text: "Plan prepared; execution not verified" }, { value: "recovery-executed", text: "Recovery executed and verified" }])}</div>
+          <fieldset disabled={!editable}><legend>Two linked records that contradict the rejected hypothesis ({rejectedEvidence.length}/2)</legend>
+            {pinnedIds.length === 0 ? <p className="k-empty">Link records in the Evidence map step first.</p> : <div className="k-choices">{pinnedIds.map(id => <label key={id} className={`k-choice k-choice-sm ${rejectedEvidence.includes(id) ? "is-picked" : ""}`}><input type="checkbox" aria-label={`Counter-evidence ${id}`} checked={rejectedEvidence.includes(id)} onChange={() => f.toggle("verdict.reasoning", "evidenceIds", id, 2)} /><span><strong className="k-mono">{id}</strong><small>{evidence.records.find(r => r.id === id)?.title}</small></span></label>)}</div>}</fieldset></>, 5)}
+        <ResultStrip result={result} /><p role="status" className="pg-live">{feedback}</p>
       </div>
 
-      <aside className="k-contain-rail" aria-label="Case progress and assistance">
-        <Card title="Case progress" eyebrow="LIVE CHECKLIST"><ol className="k-checklist">{checks.map(item => <li key={item.label} className={item.done ? "is-done" : ""}><span aria-hidden="true">{item.done ? "✓" : "○"}</span><div><strong>{item.label}</strong><small>{item.detail}</small></div></li>)}</ol></Card>
-        <Card id="verdict-hints" className="verdict-hints" eyebrow="ASSISTANCE" title="Final Verdict hints" aside={<Badge tone="amber">{state.progress.chapters[4].hints} / 2 used</Badge>}>
-          <p>Hint 1 costs 3 points; hint 2 costs 6 more. Maximum two. No new bonus is offered; your saved Tamper Alert remains +{state.progress.bonus}.</p>
-          <ol className="released-hints k-hints">{state.chapterHints[4].map((hint, i) => <li key={hint}><strong>Hint {i + 1}</strong><p>{hint}</p></li>)}</ol>
-          <button type="button" className="k-btn" disabled={disabled || state.progress.chapters[4].hints >= 2} onClick={() => void send("hint")}>Request Final Verdict hint {Math.min(2, state.progress.chapters[4].hints + 1)}</button>
-        </Card>
+      <aside className="pg-preview" aria-label="Final report preview">
+        <h2 className="pg-rail-h">Report preview</h2>
+        <dl>
+          <div><dt>Lure</dt><dd className="k-mono">{f.str("verdict.entry", "emailId") || "—"}</dd></div>
+          <div><dt>Capture</dt><dd className="k-mono">{f.str("verdict.entry", "captureId") || "—"}</dd></div>
+          <div><dt>Session</dt><dd className="k-mono">{f.str("verdict.session", "sessionId") || "—"}</dd></div>
+          <div><dt>Export</dt><dd className="k-mono">{f.str("verdict.session", "exportId") || "—"}</dd></div>
+          <div><dt>Insider</dt><dd className="k-mono">{f.str("verdict.insider", "insiderId") || "—"}</dd></div>
+          <div><dt>Evidence linked</dt><dd>{pinnedIds.length} records · {verdictRoles.filter(r => mapped[r].length).length}/5 roles</dd></div>
+          <div><dt>Best hypothesis</dt><dd className="k-mono">{f.str("verdict.reasoning", "hypothesisId") || "—"}</dd></div>
+        </dl>
+        <small>Preview shows your drafts. Only submitted tasks score.</small>
       </aside>
     </div>
-  </div>;
+
+    <div className="pg-aux">
+      <HintBox chapter={4} state={state} editable={editable} busy={busy} onHint={() => void send("hint")} />
+      <details className="pg-hints"><summary>Notes <span className="pg-chip">private to your team</span></summary><label>Scratchpad<textarea rows={4} maxLength={900} disabled={!editable} value={f.str("notes", "text")} onChange={e => f.set("notes", "text", e.target.value)} /></label></details>
+    </div>
+  </DeskFrame>;
 }

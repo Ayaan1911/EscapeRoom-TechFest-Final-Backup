@@ -1,134 +1,105 @@
 "use client";
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
 import { useChapter, type ChapterState } from "./use-chapter";
+import { useDrafts, type ServerDraft } from "./use-drafts";
 import { ContainmentCctv } from "./containment-cctv";
-import { Badge, Card, Feedback, MissionBar, ContinueBar } from "@/components/ui/kit";
+import { ChainDiagram, ConnectionBanner, DeskFrame, HintBox, ResultStrip, StateBanner, TaskPanel, fieldApi, isEditable, taskOf } from "./workspace";
+import { Badge } from "@/components/ui/kit";
 import type { ContainmentCctv as Snapshot, ContainmentEvidence } from "@/types/containment";
 
 type Option = { id: string; title: string; detail: string };
+const DRAFT = { timeline: "containment.timeline", identity: "containment.identity", immediate: "containment.immediate", recovery: "containment.recovery", evidence: "containment.evidence" } as const;
 
-export function ContainmentDesk({ evidence, initialCctv, initialState }: { evidence: ContainmentEvidence; initialCctv: Snapshot | null; initialState: ChapterState }) {
-  const { state, busy, feedback, connection, send, remaining, retrySeconds } = useChapter(3, initialState);
-  const [eventOrder, setEventOrder] = useState(evidence.events.map(event => event.id));
-  const [immediate, setImmediate] = useState<string[]>([]);
-  const [recovery, setRecovery] = useState<string[]>([]);
-  const [support, setSupport] = useState<string[]>([]);
-  const [movement, setMovement] = useState("");
-  const [dragging, setDragging] = useState<string | null>(null);
-  const [cctv, setCctv] = useState(initialCctv);
-  const [copyStatus, setCopyStatus] = useState("");
-  const completed = state.progress.chapters[3].completedAt !== null;
-  const editable = state.status === "active" && state.current === 3 && !completed;
-  const disabled = !editable || busy;
-  const toggle = (ids: string[], id: string) => ids.includes(id) ? ids.filter(value => value !== id) : [...ids, id];
-  const checks = [
-    { label: "Timeline arranged", detail: `${eventOrder.length} of ${eventOrder.length} cards placed`, done: true },
-    { label: "Evidence pinned", detail: `${support.length} of 5 minimum`, done: support.length >= 5 },
-    { label: "Immediate batch", detail: `${immediate.length} selected`, done: immediate.length > 0 },
-    { label: "Recovery sequence", detail: `${recovery.length} ordered`, done: recovery.length > 0 },
-  ];
-  const ready = checks.every(item => item.done);
+export function ContainmentDesk({ evidence, initialCctv, initialState, initialDrafts }: { evidence: ContainmentEvidence; initialCctv: Snapshot | null; initialState: ChapterState; initialDrafts: ServerDraft[] }) {
+  const { state, busy, feedback, result, connection, send, submitTask, remaining, retrySeconds } = useChapter(3, initialState);
+  const editable = isEditable(state, 3);
+  const drafts = useDrafts(3, initialDrafts, editable), f = fieldApi(drafts);
+  const [movement, setMovement] = useState(""), [dragging, setDragging] = useState<string | null>(null), [cctv, setCctv] = useState(initialCctv), [copyStatus, setCopyStatus] = useState("");
+  const knownEvents = new Set(evidence.events.map(e => e.id));
+  const saved = f.arr(DRAFT.timeline, "eventOrder").filter(id => knownEvents.has(id));
+  const eventOrder = saved.length === evidence.events.length ? saved : evidence.events.map(e => e.id);
+  const immediate = f.arr(DRAFT.immediate, "immediateActions"), recovery = f.arr(DRAFT.recovery, "recoveryOrder"), support = f.arr(DRAFT.evidence, "supportingEvidenceIds");
+  const optionById = (list: Option[], id: string) => list.find(o => o.id === id);
 
-  function move(ids: string[], setOrder: (order: string[]) => void, id: string, delta: number) {
+  function reorder(key: string, task: string, ids: string[], id: string, delta: number) {
     const index = ids.indexOf(id), target = index + delta;
-    if (disabled || index < 0 || target < 0 || target >= ids.length) return;
+    if (!editable || index < 0 || target < 0 || target >= ids.length) return;
     const next = [...ids]; [next[index], next[target]] = [next[target], next[index]];
-    setOrder(next); setMovement(`${id} moved to position ${target + 1} of ${ids.length}.`);
+    f.set(task, key, next); setMovement(`${id} moved to position ${target + 1} of ${ids.length}.`);
   }
-  function dropOn(ids: string[], setOrder: (order: string[]) => void, targetId: string) {
-    if (!dragging || disabled || dragging === targetId) return setDragging(null);
+  function dropOn(key: string, task: string, ids: string[], targetId: string) {
+    if (!dragging || !editable || dragging === targetId) return setDragging(null);
     const next = ids.filter(id => id !== dragging); next.splice(ids.indexOf(targetId), 0, dragging);
-    setOrder(next); setMovement(`${dragging} moved to position ${next.indexOf(dragging) + 1} of ${ids.length}.`); setDragging(null);
+    f.set(task, key, next); setMovement(`${dragging} moved to position ${next.indexOf(dragging) + 1} of ${ids.length}.`); setDragging(null);
+  }
+  const controls = (key: string, task: string, ids: string[], id: string, label: string) => { const index = ids.indexOf(id);
+    return <div className="k-order-controls"><button type="button" className="k-btn k-btn-sm" disabled={!editable || index === 0} aria-label={`Move ${label} ${id} up`} onClick={() => reorder(key, task, ids, id, -1)}>↑</button><button type="button" className="k-btn k-btn-sm" disabled={!editable || index === ids.length - 1} aria-label={`Move ${label} ${id} down`} onClick={() => reorder(key, task, ids, id, 1)}>↓</button></div>; };
+  const drag = (key: string, task: string, ids: string[], id: string) => ({ draggable: editable, className: dragging === id ? "is-dragging" : "", onDragStart: (e: React.DragEvent) => { e.dataTransfer.setData("text/plain", id); e.dataTransfer.effectAllowed = "move"; setDragging(id); }, onDragEnd: () => setDragging(null), onDragOver: (e: React.DragEvent) => e.preventDefault(), onDrop: () => dropOn(key, task, ids, id) });
+  async function submit(task: string) {
+    await drafts.flush();
+    const answer = task === DRAFT.timeline ? { eventOrder } : task === DRAFT.identity ? { account: f.str(task, "account").trim(), sessionId: f.str(task, "sessionId").trim() } : task === DRAFT.immediate ? { immediateActions: immediate } : task === DRAFT.recovery ? { recoveryOrder: recovery } : { supportingEvidenceIds: support };
+    await submitTask(task, answer);
   }
   async function checkCopy() {
-    setCopyStatus("Checking organizer authorization…");
-    try { const response = await fetch("/api/game/containment", { cache: "no-store" }); if (!response.ok) throw new Error(); const data = await response.json(); setCctv(data.fallbackCctv); setCopyStatus(data.fallbackCctv ? "Authorized accessible copy loaded. No hint charge or progression change." : "No accessible-copy grant is recorded. Ask the organizer to verify your team and authorize a copy."); }
-    catch { setCopyStatus("Unable to check the copy. Reconnect or sign in and retry; no game progress was changed."); }
+    setCopyStatus("Checking…");
+    try { const response = await fetch("/api/game/containment", { cache: "no-store" }); if (!response.ok) throw new Error(); const data = await response.json(); setCctv(data.fallbackCctv); setCopyStatus(data.fallbackCctv ? "Accessible copy loaded. No hint charge." : "No accessible copy granted. Ask the organizer."); }
+    catch { setCopyStatus("Unable to check. Retry; nothing changed."); }
   }
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); const data = new FormData(event.currentTarget);
-    void send("submit", { kind: "plan", eventOrder, account: data.get("account"), sessionId: data.get("sessionId"), immediateActions: immediate, recoveryOrder: recovery, supportingEvidenceIds: support, explanation: data.get("explanation") });
-  }
-  function controls(ids: string[], setOrder: (order: string[]) => void, id: string, label: string) {
-    const index = ids.indexOf(id);
-    return <div className="k-order-controls"><button type="button" className="k-btn k-btn-sm" disabled={disabled || index === 0} aria-label={`Move ${label} ${id} up`} onClick={() => move(ids, setOrder, id, -1)}>↑ Move up</button><button type="button" className="k-btn k-btn-sm" disabled={disabled || index === ids.length - 1} aria-label={`Move ${label} ${id} down`} onClick={() => move(ids, setOrder, id, 1)}>↓ Move down</button></div>;
-  }
-  const choice = (item: Option, picked: boolean, change: () => void, aria: string) => <label key={item.id} className={`k-choice ${picked ? "is-picked" : ""}`}><input type="checkbox" checked={picked} onChange={change} aria-label={aria} /><span><strong>{item.id} · {item.title}</strong><small>{item.detail}</small></span></label>;
+  const choice = (item: Option, picked: boolean, change: () => void, aria: string) => <label key={item.id} className={`k-choice ${picked ? "is-picked" : ""}`}><input type="checkbox" checked={picked} disabled={!editable} onChange={change} aria-label={aria} /><span><strong>{item.id} · {item.title}</strong><small>{item.detail}</small></span></label>;
+  const evidenceItems = [...evidence.artifacts.map(item => ({ id: item.id, title: item.title })), { id: evidence.cctvReference.id, title: "Security-room snapshot" }];
 
-  return <div className="k-desk">
-    <MissionBar chapter={3} title="Containment" caseId={evidence.caseId} state={state} remaining={remaining} objective="Stop the breach, keep the evidence, restore safely. Suggested budget: 12 minutes." />
-    <p className="k-banner k-banner-warn">FICTIONAL SIMULATION ONLY. Every action is an inert decision submitted for scoring. No account, network, notification, log or server is operated. Student timing is unverified.</p>
-    {completed && <div className="k-banner k-banner-ok" role="status"><div><strong>Chapter 4 completed. Final Verdict unlocked.</strong><span>Your plan and score are saved. Continue to the final incident review.</span></div><a className="k-btn k-btn-primary" href="/play/verdict">Open Chapter 5</a></div>}
-    {!editable && !completed && <p className="k-banner k-banner-warn" role="status">The round is {state.status}. This permitted historical evidence is read-only; new plans and hints are unavailable.</p>}
-    {connection && <p className="k-banner k-banner-warn" role="alert">{connection} <a href="/login?next=/play/containment">Sign in</a></p>}
-    <div className="k-actions"><a href="/play/inbox" className="k-btn">Review Inbox</a><a href="/play/trail" className="k-btn">Review Trail</a><a href="/play/insider" className="k-btn">Review Insider</a></div>
-
-    <Card id="checkpoint" className="containment-brief" eyebrow="INCIDENT COMMAND" title="Response checkpoint" aside={<Badge tone="alert">Data already exfiltrated</Badge>}>
-      <div className="k-badges"><Badge tone="info">{evidence.checkpoint} UTC</Badge><Badge>{evidence.account}</Badge><Badge className="k-mono">{evidence.sessionId}</Badge></div>
-      <p>Treat this session as still usable until targeted containment is verified. A password reset alone is not proof that a stolen session was revoked.</p>
-      <p>Keep customer support and approved archive/maintenance workloads available. Read the incident-lead constraints in the evidence drawer before choosing. The four urgent decisions form a parallel batch; later recovery steps require a defensible sequence.</p>
-    </Card>
-
+  return <DeskFrame chapter={3} title="Containment" caseId={evidence.caseId} state={state} remaining={remaining} drafts={drafts} objective="Stop it, keep the evidence, restore safely. All actions are fictional decisions." banner={<><StateBanner state={state} chapter={3} /><ConnectionBanner text={connection} next="/play/containment" /></>}>
+    <section className="pg-command" aria-label="Response checkpoint">
+      <Badge tone="alert">Data already exfiltrated</Badge><Badge tone="info">{evidence.checkpoint} UTC</Badge><Badge>{evidence.account}</Badge><Badge className="k-mono">{evidence.sessionId}</Badge>
+      <p>Treat the session as usable until revocation is verified. Keep support and approved archive/maintenance jobs running.</p>
+    </section>
+    <ChainDiagram label="Response stages" nodes={[
+      { id: "t", label: "1 · Reconstruct", value: "7 events", note: "order below" }, { id: "i", label: "2 · Immediate (parallel)", value: immediate.length ? `${immediate.length} chosen` : "", note: "no order needed" },
+      { id: "r", label: "3 · Recovery (ordered)", value: recovery.length ? `${recovery.length} steps` : "", note: "dependencies matter" }, { id: "e", label: "Evidence kept", value: support.length ? `${support.length} pinned` : "", note: "need 5" }]} />
     {cctv && <ContainmentCctv snapshot={cctv} />}
 
-    <div className="k-contain-grid">
-      <form onSubmit={submit} id="containment-plan" className="k-plan">
-        <input type="hidden" name="eventOrder" value={JSON.stringify(eventOrder)} /><input type="hidden" name="immediateActions" value={JSON.stringify(immediate)} /><input type="hidden" name="recoveryOrder" value={JSON.stringify(recovery)} /><input type="hidden" name="supportingEvidenceIds" value={JSON.stringify(support)} />
+    <section className="pg-tasks" aria-label="Scored tasks">
+      <h2 className="pg-h">Tasks <small>Submit each one when ready. Points are saved per task.</small></h2>
 
-        <Card id="timeline" className="containment-timeline" eyebrow="STEP 1" title="Seven-event reconstruction" aside={<Badge tone="ok">✓ placed</Badge>}>
-          <p>Arrange all seven cards from earliest to latest using the cited sources and causal links. Card IDs and starting positions are not ranks. Drag cards, or use the move buttons (Tab, Enter, Space). Two supporting observations belong outside this chain.</p>
-          <ol className="k-timeline containment-order" aria-label="Seven-event timeline">{eventOrder.map((id, index) => { const event = evidence.events.find(item => item.id === id)!; return <li key={id} data-event-id={id} draggable={!disabled} className={dragging === id ? "is-dragging" : ""} onDragStart={e => { e.dataTransfer.setData("text/plain", id); e.dataTransfer.effectAllowed = "move"; setDragging(id); }} onDragEnd={() => setDragging(null)} onDragOver={e => e.preventDefault()} onDrop={() => dropOn(eventOrder, setEventOrder, id)}>
-            <span className="k-tl-pos" aria-hidden="true">{index + 1}</span>
-            <div className="k-tl-card"><header><span className="k-mono k-muted">{event.id}</span><time dateTime={event.timestamp} className="k-mono">{event.timestamp} UTC</time></header><h3>{event.title}</h3><p>{event.description}</p>
-              <p className="k-meta">Principal: {event.principal}<br />Session: {event.sessionId}<br />Sources: {event.sourceIds.join(", ")}<br />Confidence: {event.confidence}</p>{controls(eventOrder, setEventOrder, id, "event")}</div></li>; })}</ol>
-          <p role="status" aria-live="polite" className="k-feedback">{movement}</p>
-        </Card>
+      <TaskPanel step={1} task={taskOf(state, 3, DRAFT.timeline)} editable={editable} busy={busy} retrySeconds={retrySeconds} result={result} ready onSubmit={() => void submit(DRAFT.timeline)}>
+        <p className="pg-hint-line">Earliest first. Use cited timestamps and causal links, not card order. Drag, or use ↑ ↓.</p>
+        <ol className="k-timeline containment-order pg-order" aria-label="Seven-event timeline">{eventOrder.map((id, index) => { const event = evidence.events.find(item => item.id === id)!, d = drag("eventOrder", DRAFT.timeline, eventOrder, id);
+          return <li key={id} data-event-id={id} {...d}><span className="k-tl-pos" aria-hidden="true">{index + 1}</span>
+            <div className="k-tl-card"><header><span className="k-mono k-muted">{event.id}</span><time dateTime={event.timestamp} className="k-mono">{event.timestamp} UTC</time></header><h4>{event.title}</h4><p>{event.description}</p>
+              <details><summary>Sources</summary><p className="k-meta">Principal: {event.principal}<br />Session: {event.sessionId}<br />Sources: {event.sourceIds.join(", ")}<br />Confidence: {event.confidence}</p></details>{controls("eventOrder", DRAFT.timeline, eventOrder, id, "event")}</div></li>; })}</ol>
+        <p role="status" aria-live="polite" className="pg-live">{movement}</p>
+      </TaskPanel>
 
-        <Card id="support" className="containment-support" eyebrow="STEP 2" title="Supporting evidence drawer" aside={<Badge tone={support.length >= 5 ? "ok" : "neutral"}>{support.length} pinned · need 5</Badge>}>
-          <p>Compare the seven cards with these retained records. Pin at least five relevant IDs, including the physical or authorized CCTV reference. Approved workload observations are separate from the incident chain.</p>
-          <div className="k-drawer">{evidence.observations.map(item => <details key={item.id}><summary>{item.id} · {item.title} · Supporting observation</summary><p>{item.timestamp} UTC · {item.principal} · {item.sessionId}</p><p>{item.description}</p><p>Sources: {item.sourceIds.join(", ")} · {item.confidence}</p></details>)}
-            {evidence.artifacts.map(item => <details key={item.id}><summary>{item.id} · {item.title}</summary><dl className="k-facts">{Object.entries(item.facts).map(([key, value]) => <div key={key}><dt>{key}</dt><dd className="k-mono">{value}</dd></div>)}</dl></details>)}</div>
-          <fieldset disabled={disabled}><legend>Supporting evidence notebook</legend><div className="k-choices">{[...evidence.artifacts.map(item => ({ id: item.id, title: item.title })), { id: evidence.cctvReference.id, title: "Physical / authorized security-room snapshot" }].map(item => <label key={item.id} className={`k-choice k-choice-sm ${support.includes(item.id) ? "is-picked" : ""}`}><input type="checkbox" checked={support.includes(item.id)} onChange={() => setSupport(toggle(support, item.id))} aria-label={`Pin evidence ${item.id}`} /><span><strong className="k-mono">{item.id}</strong><small>{item.title}</small></span></label>)}</div></fieldset>
-        </Card>
+      <TaskPanel step={2} task={taskOf(state, 3, DRAFT.identity)} editable={editable} busy={busy} retrySeconds={retrySeconds} result={result} ready={!!(f.str(DRAFT.identity, "account").trim() && f.str(DRAFT.identity, "sessionId").trim())} why="Enter the affected account and session." onSubmit={() => void submit(DRAFT.identity)}>
+        <div className="pg-fields"><label>Affected account<input type="email" maxLength={120} disabled={!editable} value={f.str(DRAFT.identity, "account")} onChange={e => f.set(DRAFT.identity, "account", e.target.value)} /></label>
+          <label>Affected session<input maxLength={100} disabled={!editable} value={f.str(DRAFT.identity, "sessionId")} onChange={e => f.set(DRAFT.identity, "sessionId", e.target.value)} /></label></div>
+      </TaskPanel>
 
-        <Card id="immediate" eyebrow="STEP 3" title="Immediate containment batch" aside={<Badge tone={immediate.length ? "ok" : "neutral"}>{immediate.length} selected</Badge>}>
-          <p>Select the scoped urgent decisions. Evidence preservation can begin in parallel with revocation, export restriction and internal escalation. Complete this batch before entering the recovery sequence.</p>
-          <fieldset disabled={disabled}><legend>Simulated immediate actions</legend><div className="k-choices">{evidence.immediateOptions.map(item => choice(item, immediate.includes(item.id), () => setImmediate(toggle(immediate, item.id)), `Select immediate ${item.id}`))}</div></fieldset>
-        </Card>
+      <TaskPanel step={3} task={taskOf(state, 3, DRAFT.immediate)} editable={editable} busy={busy} retrySeconds={retrySeconds} result={result} ready={immediate.length > 0} why="Choose the scoped urgent actions." onSubmit={() => void submit(DRAFT.immediate)}>
+        <p className="pg-hint-line">Urgent steps run in parallel. Over-broad actions score nothing for this task.</p>
+        <fieldset disabled={!editable}><legend className="k-sr">Immediate actions</legend><div className="k-choices">{evidence.immediateOptions.map(item => choice(item, immediate.includes(item.id), () => f.toggle(DRAFT.immediate, "immediateActions", item.id, 10), `Select immediate ${item.id}`))}</div></fieldset>
+      </TaskPanel>
 
-        <Card id="recovery" eyebrow="STEP 4" title="Recovery plan" aside={<Badge tone={recovery.length ? "ok" : "neutral"}>{recovery.length} ordered</Badge>}>
-          <p>Select supported recovery steps, then order them. Equivalent safe sequences are accepted; independent work need not have one arbitrary order. All selections remain simulated.</p>
-          <fieldset disabled={disabled}><legend>Available recovery decisions</legend><div className="k-choices">{evidence.recoveryOptions.map(item => choice(item, recovery.includes(item.id), () => setRecovery(toggle(recovery, item.id)), `Select recovery ${item.id}`))}</div></fieldset>
-          <ol className="k-timeline k-timeline-recovery containment-order recovery-order" aria-label="Ordered recovery plan">{recovery.map((id, index) => { const item = evidence.recoveryOptions.find(option => option.id === id)!; return <li key={id} data-recovery-id={id} draggable={!disabled} className={dragging === id ? "is-dragging" : ""} onDragStart={e => { e.dataTransfer.setData("text/plain", id); e.dataTransfer.effectAllowed = "move"; setDragging(id); }} onDragEnd={() => setDragging(null)} onDragOver={e => e.preventDefault()} onDrop={() => dropOn(recovery, setRecovery, id)}>
-            <span className="k-tl-pos" aria-hidden="true">{index + 1}</span><div className="k-tl-card"><h3>{item.id} · {item.title}</h3><p>{item.detail}</p>{controls(recovery, setRecovery, id, "recovery")}</div></li>; })}</ol>
-          {recovery.length === 0 && <p className="k-empty">No recovery steps chosen yet.</p>}
-        </Card>
+      <TaskPanel step={4} task={taskOf(state, 3, DRAFT.recovery)} editable={editable} busy={busy} retrySeconds={retrySeconds} result={result} ready={recovery.length > 0} why="Choose recovery steps, then order them." onSubmit={() => void submit(DRAFT.recovery)}>
+        <p className="pg-hint-line">Pick supported steps, then order them. Close the weakness before the barrier check; verify before restoring.</p>
+        <fieldset disabled={!editable}><legend className="k-sr">Recovery decisions</legend><div className="k-choices">{evidence.recoveryOptions.map(item => choice(item, recovery.includes(item.id), () => f.toggle(DRAFT.recovery, "recoveryOrder", item.id, 9), `Select recovery ${item.id}`))}</div></fieldset>
+        {recovery.length > 0 ? <ol className="k-timeline k-timeline-recovery containment-order recovery-order pg-order pg-flow" aria-label="Ordered recovery plan">{recovery.map((id, index) => { const item = optionById(evidence.recoveryOptions, id)!, d = drag("recoveryOrder", DRAFT.recovery, recovery, id);
+          return <li key={id} data-recovery-id={id} {...d}><span className="k-tl-pos" aria-hidden="true">{index + 1}</span><div className="k-tl-card"><h4>{item.id} · {item.title}</h4>{controls("recoveryOrder", DRAFT.recovery, recovery, id, "recovery")}</div></li>; })}</ol> : <p className="k-empty">No recovery steps chosen yet.</p>}
+      </TaskPanel>
 
-        <Card id="submit" className="k-conclusion" eyebrow="STEP 5" title="Submit the simulated response plan" aside={<Badge tone={ready ? "ok" : "neutral"}>{checks.filter(c => c.done).length}/4 ready</Badge>}>
-          {completed && <p className="k-lock">🔒 Plan accepted and locked.</p>}
-          <p>The server checks the chronology, affected identity/session, action scope, preserved evidence and recovery dependencies. Explanations are optional and never keyword-scored. Incorrect plans award no chapter points.</p>
-          <fieldset disabled={disabled || retrySeconds > 0}>
-            <div className="k-answer-grid"><label>Affected account<input name="account" type="email" required maxLength={120} /></label><label>Affected session<input name="sessionId" required maxLength={100} /></label></div>
-            <label>Response explanation (optional)<textarea name="explanation" maxLength={1000} rows={4} /></label>
-            <div className="k-submit-row"><button className="k-btn k-btn-primary k-btn-lg" disabled={support.length < 5 || immediate.length === 0 || recovery.length === 0}>Submit containment plan</button>{!ready && !completed && <small>Complete steps 2–4 to submit.</small>}</div>
-          </fieldset>
-          <Feedback busy={busy} text={feedback} extra={retrySeconds > 0 && editable ? `Next submission available in ${retrySeconds}s.` : ""} /><ContinueBar chapter={3} state={state} />
-        </Card>
-      </form>
+      <TaskPanel step={5} task={taskOf(state, 3, DRAFT.evidence)} editable={editable} busy={busy} retrySeconds={retrySeconds} result={result} ready={support.length >= 5} why="Pin at least five records (include the security-room snapshot)." onSubmit={() => void submit(DRAFT.evidence)}>
+        <div className="pg-preserve" aria-label="Evidence preservation">{evidenceItems.map(item => { const on = support.includes(item.id); return <label key={item.id} className={`k-choice k-choice-sm ${on ? "is-picked" : ""}`}><input type="checkbox" checked={on} disabled={!editable} onChange={() => f.toggle(DRAFT.evidence, "supportingEvidenceIds", item.id, 10)} aria-label={`Pin evidence ${item.id}`} /><span><strong className="k-mono">{item.id}</strong><small>{item.title}</small></span><span className="pg-preserved" aria-hidden="true">{on ? "preserved" : ""}</span></label>; })}</div>
+        <details className="pg-hints"><summary>Read the records</summary><div className="k-drawer">{evidence.observations.map(item => <details key={item.id}><summary>{item.id} · {item.title} · observation</summary><p>{item.timestamp} UTC · {item.principal} · {item.sessionId}</p><p>{item.description}</p><p>Sources: {item.sourceIds.join(", ")} · {item.confidence}</p></details>)}
+          {evidence.artifacts.map(item => <details key={item.id}><summary>{item.id} · {item.title}</summary><dl className="k-facts">{Object.entries(item.facts).map(([key, value]) => <div key={key}><dt>{key}</dt><dd className="k-mono">{value}</dd></div>)}</dl></details>)}</div></details>
+      </TaskPanel>
+      <ResultStrip result={result} /><p role="status" className="pg-live">{feedback}</p>
+    </section>
 
-      <aside className="k-contain-rail" aria-label="Plan status and assistance">
-        <Card title="Plan progress" eyebrow="LIVE CHECKLIST"><ol className="k-checklist">{checks.map(item => <li key={item.label} className={item.done ? "is-done" : ""}><span aria-hidden="true">{item.done ? "✓" : "○"}</span><div><strong>{item.label}</strong><small>{item.detail}</small></div></li>)}</ol></Card>
-        <Card id="physical" className="containment-physical" eyebrow="PHYSICAL SECURITY-ROOM CLUE" title={evidence.cctvReference.id}>
-          <p>{evidence.cctvReference.placement}</p>
-          <p>Use the printed clue or an organizer-authorized accessible copy. Its badge/console observation corroborates opportunity; it does not prove intent or dictate a plan.</p>
-          <button type="button" className="k-btn" onClick={() => void checkCopy()}>Check authorized CCTV copy</button><p role="status" className="k-feedback">{copyStatus}</p>
-        </Card>
-        <Card id="contain-hints" className="containment-hints" eyebrow="ASSISTANCE" title="Containment hints" aside={<Badge tone="amber">{state.progress.chapters[3].hints} / 2 used</Badge>}>
-          <p>First hint −3 points; second −6 more. The global Tamper Alert is {state.progress.bonus ? "recorded at +5" : "not claimed in earlier chapters"}; Containment grants no new bonus.</p>
-          <ol className="released-hints k-hints">{state.chapterHints[3].map((hint, i) => <li key={hint}><strong>Hint {i + 1}</strong><p>{hint}</p></li>)}</ol>
-          <button type="button" className="k-btn" disabled={disabled || state.progress.chapters[3].hints >= 2} onClick={() => void send("hint")}>Request Containment hint {Math.min(2, state.progress.chapters[3].hints + 1)}</button>
-        </Card>
-      </aside>
+    <div className="pg-aux">
+      <details className="pg-hints"><summary>Security-room clue <span className="pg-chip">{evidence.cctvReference.id}</span></summary><p>{evidence.cctvReference.placement}</p>
+        <button type="button" className="k-btn k-btn-sm" onClick={() => void checkCopy()}>Check authorized copy</button><p role="status" className="pg-live">{copyStatus}</p></details>
+      <HintBox chapter={3} state={state} editable={editable} busy={busy} onHint={() => void send("hint")} />
+      <details className="pg-hints"><summary>Notes <span className="pg-chip">private to your team</span></summary><label>Scratchpad<textarea rows={4} maxLength={900} disabled={!editable} value={f.str("notes", "text")} onChange={e => f.set("notes", "text", e.target.value)} /></label></details>
     </div>
-  </div>;
+  </DeskFrame>;
 }

@@ -1,133 +1,119 @@
 "use client";
-import { useState, type FormEvent } from "react";
+import { useMemo, useState } from "react";
 import { useChapter, type ChapterState } from "./use-chapter";
-import { Badge, Card, Feedback, MissionBar, ContinueBar } from "@/components/ui/kit";
+import { useDrafts, type ServerDraft } from "./use-drafts";
+import { ChainDiagram, ConnectionBanner, DeskFrame, HintBox, ResultStrip, StateBanner, TaskPanel, fieldApi, isEditable, taskOf } from "./workspace";
+import { Badge } from "@/components/ui/kit";
 import { emptyTrailFilters, filterTrailRows } from "@/lib/game/trail-view";
-import type { TrailEvidence } from "@/types/trail";
+import type { TrailEvidence, TrailEvent } from "@/types/trail";
 
-const PAGE = 25;
-const resultTone = { success: "ok", failure: "alert", challenge: "amber" } as const;
-const ids = (text: string) => text.split(/[,\s]+/).filter(Boolean);
+const PAGE = 20;
+// Outcome only: allowed / denied / challenged. Never a verdict about intent; correlation is the player's job.
+const OUTCOME = { success: { tone: "ok", mark: "✓", text: "Allowed" }, failure: { tone: "alert", mark: "✕", text: "Denied" }, challenge: { tone: "amber", mark: "◔", text: "Challenged" } } as const;
 
-export function TrailDesk({ evidence, initialState }: { evidence: TrailEvidence; initialState: ChapterState }) {
-  const { state, busy, feedback, connection, send, remaining, retrySeconds } = useChapter(1, initialState);
-  const [filters, setFilters] = useState(emptyTrailFilters);
-  const [page, setPage] = useState(0);
-  const [selectedId, setSelectedId] = useState(evidence.rows[0].id);
-  const [clipboard, setClipboard] = useState("");
-  const [evidenceIds, setEvidenceIds] = useState("");
-  const [conclusion, setConclusion] = useState({ account: "", sourceIp: "", sessionId: "", eventId: "" });
+function SessionPath({ rows, sessionId }: { rows: TrailEvent[]; sessionId: string }) {
+  const seq = [...rows].filter(r => r.sessionId === sessionId).sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+  if (sessionId === "none" || seq.length === 0) return <p className="k-empty">This event has no session.</p>;
+  return <div className="pg-path"><p><b className="k-mono">{sessionId}</b> · {seq.length} event{seq.length > 1 ? "s" : ""} · {new Set(seq.map(r => r.device)).size} device(s) · {new Set(seq.map(r => r.sourceIp)).size} source(s)</p>
+    <ol>{seq.map((r, i) => { const prev = seq[i - 1], moved = prev && (prev.device !== r.device || prev.sourceIp !== r.sourceIp); const o = OUTCOME[r.result];
+      return <li key={r.id}><time className="k-mono">{r.timestamp.slice(11, 19)}</time><span className="k-mono">{r.id}</span><span>{r.eventType}</span><span className="k-mono">{r.device} @ {r.sourceIp}</span>{moved && <Badge tone="info">device or source changed</Badge>}<Badge tone={o.tone}>{o.mark} {o.text}</Badge></li>; })}</ol></div>;
+}
+
+export function TrailDesk({ evidence, initialState, initialDrafts }: { evidence: TrailEvidence; initialState: ChapterState; initialDrafts: ServerDraft[] }) {
+  const { state, busy, feedback, result, connection, send, submitTask, remaining, retrySeconds } = useChapter(1, initialState);
+  const editable = isEditable(state, 1);
+  const drafts = useDrafts(1, initialDrafts, editable), f = fieldApi(drafts);
+  const [filters, setFilters] = useState(emptyTrailFilters), [page, setPage] = useState(0), [selectedId, setSelectedId] = useState(evidence.rows[0].id), [copied, setCopied] = useState("");
+  const [tamper, setTamper] = useState({ eventId: "", field: "", technique: "" });
   const selected = evidence.rows.find(row => row.id === selectedId)!;
-  const filtered = filterTrailRows(evidence.rows, filters);
-  const pages = Math.max(1, Math.ceil(filtered.length / PAGE));
-  const visible = filtered.slice(page * PAGE, (page + 1) * PAGE);
-  const completed = state.progress.chapters[1].completedAt !== null;
-  const editable = state.status === "active" && state.current === 1 && !completed;
-  const locked = !editable || busy || retrySeconds > 0;
-  const pinned = ids(evidenceIds), related = selected.sessionId === "none" ? 0 : evidence.rows.filter(r => r.sessionId === selected.sessionId).length;
+  const filtered = useMemo(() => filterTrailRows(evidence.rows, filters), [evidence.rows, filters]);
+  const pages = Math.max(1, Math.ceil(filtered.length / PAGE)), visible = filtered.slice(page * PAGE, (page + 1) * PAGE);
+  const pinned = f.arr("trail.corroboration", "supportingEvidenceIds");
   const active = Object.entries(filters).filter(([k, v]) => k !== "descending" && v).length;
   const choices = (key: "account" | "sourceIp" | "eventType") => [...new Set(evidence.rows.map(row => row[key]))].sort();
+  const counts = { success: 0, failure: 0, challenge: 0 }; for (const r of filtered) counts[r.result]++;
   function updateFilters(update: Partial<typeof emptyTrailFilters>) { setFilters(old => ({ ...old, ...update })); setPage(0); }
-  const pin = (id: string) => setEvidenceIds([...new Set([...pinned, id])].join(", "));
-  const unpin = (id: string) => setEvidenceIds(pinned.filter(p => p !== id).join(", "));
-  async function copy(id: string) {
-    try { await navigator.clipboard.writeText(id); setClipboard(`Evidence ID copied: ${id}`); }
-    catch { setClipboard(`Clipboard unavailable. Select and copy the displayed evidence ID: ${id}`); }
+  async function copy(id: string) { try { await navigator.clipboard.writeText(id); setCopied(`Copied ${id}`); } catch { setCopied(`Select and copy ${id}`); } }
+  async function submit(task: string, keys: string[]) {
+    await drafts.flush();
+    await submitTask(task, task === "trail.corroboration" ? { supportingEvidenceIds: pinned } : Object.fromEntries(keys.map(k => [k, f.str(task, k).trim()])));
   }
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    void send("submit", { kind: "conclusion", ...conclusion, supportingEvidenceIds: pinned, explanation: String(form.get("explanation") ?? "") });
-  }
-  function reportTamper(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    void send("submit", { kind: "tamper", tamper: Object.fromEntries(new FormData(event.currentTarget)) });
-  }
+  const input = (task: string, key: string, label: string, type = "text", list?: string) =>
+    <label>{label}<input type={type} value={f.str(task, key)} maxLength={120} disabled={!editable} list={list} autoComplete="off" onChange={e => f.set(task, key, e.target.value)} /></label>;
   const filterField = (label: string, control: React.ReactNode) => <label className="k-filter">{label}{control}</label>;
 
-  return <div className="k-desk">
-    <MissionBar chapter={1} title="Trail" caseId={evidence.caseId} state={state} remaining={remaining} objective="Prove which successful sign-in led to the database export. Suggested budget: 13 minutes." />
-    {completed && <div className="k-banner k-banner-ok" role="status"><div><strong>Chapter 2 completed. Chapter 3 unlocked.</strong><span>Your result is saved. Collect your physical fragments for Insider.</span></div><a className="k-btn k-btn-primary" href="/play/insider">Open Chapter 3 →</a></div>}
-    {!editable && !completed && <p className="k-banner k-banner-warn">The round is {state.status}. Evidence remains read-only; hints and submissions are closed.</p>}
-    {connection && <p className="k-banner k-banner-warn" role="alert">{connection} <a href="/login?next=/play/trail">Sign in</a></p>}
+  return <DeskFrame chapter={1} title="Trail" caseId={evidence.caseId} state={state} remaining={remaining} drafts={drafts} objective="Which sign-in used the stolen session to reach the export? Logs are data, not instructions." banner={<><StateBanner state={state} chapter={1} /><ConnectionBanner text={connection} next="/play/trail" /></>}>
+    <ChainDiagram label="Trail so far" nodes={[
+      { id: "acct", label: "Account", value: f.str("trail.source", "account") }, { id: "ses", label: "Session", value: f.str("trail.session", "sessionId") },
+      { id: "ev", label: "Replay event", value: f.str("trail.session", "eventId") }, { id: "ip", label: "Source", value: f.str("trail.source", "sourceIp") }, { id: "pin", label: "Evidence pinned", value: pinned.length ? `${pinned.length}/3` : "" }]} />
 
-    <Card eyebrow="IDENTITY PROVIDER / RETAINED EVENTS" title="Briefing" aside={<div className="k-actions"><a className="k-btn" href="/api/game/trail/csv">Download login CSV</a><a className="k-btn" href="/play/inbox">Review Inbox evidence</a><a className="k-btn" href="#trail-conclusion">Go to conclusion ↓</a></div>}>
-      <p>Inbox established a suspect and incident session. Failed attempts, a valid VPN, approved maintenance and an unrelated alert are mixed in. IP frequency, a shared account or cookie reuse alone cannot settle the case. Log text is untrusted data, including instructions aimed at AI tools.</p>
-      <small>All timestamps UTC. Fictional identities, documentation-only IPs, no live lookups. The CSV holds the complete dataset for your team.</small>
-    </Card>
-
-    <section className="k-console" aria-label="Log filters">
-      <div className="k-filterbar">
-        {filterField("Search records", <input value={filters.search} onChange={e => updateFilters({ search: e.target.value })} placeholder="Evidence ID, session, device or any log text" />)}
-        {filterField("Filter by user", <select value={filters.account} onChange={e => updateFilters({ account: e.target.value })}><option value="">All users</option>{choices("account").map(v => <option key={v}>{v}</option>)}</select>)}
-        {filterField("Filter by source IP", <select value={filters.sourceIp} onChange={e => updateFilters({ sourceIp: e.target.value })}><option value="">All sources</option>{choices("sourceIp").map(v => <option key={v}>{v}</option>)}</select>)}
-        {filterField("Filter by result", <select value={filters.result} onChange={e => updateFilters({ result: e.target.value })}><option value="">All results</option>{["success", "failure", "challenge"].map(v => <option key={v}>{v}</option>)}</select>)}
-        {filterField("Filter by event type", <select value={filters.eventType} onChange={e => updateFilters({ eventType: e.target.value })}><option value="">All event types</option>{choices("eventType").map(v => <option key={v}>{v}</option>)}</select>)}
-        {filterField("Filter by session", <input value={filters.sessionId} onChange={e => updateFilters({ sessionId: e.target.value })} placeholder="Exact session ID" />)}
+    <section className="pg-console" aria-label="Log console">
+      <div className="pg-console-top">
+        <div className="pg-outcomes" role="status" aria-label="Matching events by outcome"><b>{filtered.length}</b> of {evidence.rows.length} events{(["success", "failure", "challenge"] as const).map(k => <Badge key={k} tone={OUTCOME[k].tone}>{OUTCOME[k].mark} {counts[k]} {OUTCOME[k].text.toLowerCase()}</Badge>)}{active > 0 && <Badge tone="amber">{active} filter{active > 1 ? "s" : ""}</Badge>}</div>
+        <a className="k-btn k-btn-sm" href="/api/game/trail/csv">Download CSV</a>
       </div>
-      <div className="k-toolbar"><strong role="status">{filtered.length} of {evidence.rows.length} events</strong>{active > 0 && <Badge tone="amber">{active} filter{active > 1 ? "s" : ""} active</Badge>}
-        <span className="k-spacer" /><button type="button" className="k-btn" aria-pressed={filters.descending} onClick={() => updateFilters({ descending: !filters.descending })}>{filters.descending ? "Sort oldest first" : "Sort newest first"}</button><button type="button" className="k-btn" onClick={() => { setFilters(emptyTrailFilters); setPage(0); }}>Reset filters</button></div>
+      <div className="k-filterbar">
+        {filterField("Search", <input value={filters.search} onChange={e => updateFilters({ search: e.target.value })} placeholder="ID, session, device, text" />)}
+        {filterField("User", <select value={filters.account} onChange={e => updateFilters({ account: e.target.value })}><option value="">All</option>{choices("account").map(v => <option key={v}>{v}</option>)}</select>)}
+        {filterField("Source IP", <select value={filters.sourceIp} onChange={e => updateFilters({ sourceIp: e.target.value })}><option value="">All</option>{choices("sourceIp").map(v => <option key={v}>{v}</option>)}</select>)}
+        {filterField("Outcome", <select value={filters.result} onChange={e => updateFilters({ result: e.target.value })}><option value="">All</option>{["success", "failure", "challenge"].map(v => <option key={v} value={v}>{OUTCOME[v as keyof typeof OUTCOME].text}</option>)}</select>)}
+        {filterField("Event type", <select value={filters.eventType} onChange={e => updateFilters({ eventType: e.target.value })}><option value="">All</option>{choices("eventType").map(v => <option key={v}>{v}</option>)}</select>)}
+        {filterField("Session", <input value={filters.sessionId} onChange={e => updateFilters({ sessionId: e.target.value })} placeholder="Exact session ID" />)}
+      </div>
+      <div className="pg-console-grid">
+        <div className="k-tablecard"><div className="k-tablescroll"><table className="k-table pg-table"><caption className="k-sr">Authentication events. Select a row to inspect it.</caption>
+          <thead><tr><th scope="col">Event</th><th scope="col">Account</th><th scope="col">Source</th><th scope="col">Outcome</th><th scope="col">Session</th></tr></thead>
+          <tbody>{visible.map(row => { const o = OUTCOME[row.result]; return <tr key={row.id} className={selectedId === row.id ? "is-selected" : pinned.includes(row.id) ? "is-pinned" : ""} aria-selected={selectedId === row.id}>
+            <td><button type="button" className="pg-rowbtn k-mono" onClick={() => setSelectedId(row.id)} aria-label={`Inspect ${row.id}`}>{row.id}</button><time dateTime={row.timestamp}>{row.timestamp.slice(11, 19)}</time></td>
+            <td>{row.account}</td><td className="k-mono">{row.sourceIp}</td><td><Badge tone={o.tone}>{o.mark} {o.text}</Badge><small>{row.eventType}</small></td><td className="k-mono">{row.sessionId}</td></tr>; })}</tbody></table>
+          {visible.length === 0 && <p className="k-empty k-pad">No events match.</p>}</div>
+          <div className="k-toolbar k-pager"><button type="button" className="k-btn k-btn-sm" disabled={page === 0} onClick={() => setPage(p => p - 1)}>← Prev</button><span>Page {page + 1}/{pages}</span><button type="button" className="k-btn k-btn-sm" disabled={page + 1 >= pages} onClick={() => setPage(p => p + 1)}>Next →</button><span className="k-spacer" />
+            <button type="button" className="k-btn k-btn-sm" aria-pressed={filters.descending} onClick={() => updateFilters({ descending: !filters.descending })}>{filters.descending ? "Oldest first" : "Newest first"}</button><button type="button" className="k-btn k-btn-sm" onClick={() => { setFilters(emptyTrailFilters); setPage(0); }}>Reset</button></div></div>
+
+        <aside className="k-inspector pg-inspector" aria-label="Selected event">
+          <span className="k-eyebrow">EVENT</span><h2 className="k-mono">{selected.id}</h2>
+          <div className="k-badges"><Badge tone={OUTCOME[selected.result].tone}>{OUTCOME[selected.result].mark} {OUTCOME[selected.result].text}</Badge><Badge tone="info">{selected.eventType}</Badge></div>
+          <dl className="k-facts">{(["timestamp", "account", "sourceIp", "method", "device", "sessionId", "conditionalAccess", "correlationId", "details"] as const).map(k => <div key={k}><dt>{k}</dt><dd className="k-mono">{selected[k]}</dd></div>)}</dl>
+          <div className="pg-actions">
+            <button type="button" className="k-btn k-btn-sm" disabled={!editable || pinned.length >= 3 && !pinned.includes(selected.id)} onClick={() => f.toggle("trail.corroboration", "supportingEvidenceIds", selected.id, 3)}>{pinned.includes(selected.id) ? "★ Pinned as evidence" : "☆ Pin as evidence"}</button>
+            <button type="button" className="k-btn k-btn-sm" onClick={() => void copy(selected.id)}>Copy ID</button>
+            <button type="button" className="k-btn k-btn-sm" disabled={selected.sessionId === "none"} onClick={() => updateFilters({ ...emptyTrailFilters, sessionId: selected.sessionId })}>Filter to session</button>
+            <button type="button" className="k-btn k-btn-sm k-btn-primary" disabled={!editable} onClick={() => { f.set("trail.source", "account", selected.account); f.set("trail.source", "sourceIp", selected.sourceIp); f.set("trail.session", "sessionId", selected.sessionId); f.set("trail.session", "eventId", selected.id); }}>Use in my answer</button>
+          </div>
+          <p role="status" className="pg-live">{copied}</p>
+          <h3 className="pg-rail-h">Session path</h3><SessionPath rows={evidence.rows} sessionId={selected.sessionId} />
+        </aside>
+      </div>
     </section>
 
-    <div className="k-trail-grid">
-      <section className="k-tablecard" aria-label="Authentication events">
-        <div className="k-tablescroll"><table className="k-table"><thead><tr><th>Event / UTC</th><th>Account</th><th>Source IP</th><th>Result / type</th><th>Method</th><th>Session</th><th>Inspect</th></tr></thead>
-          <tbody>{visible.map(row => <tr key={row.id} aria-selected={selectedId === row.id} className={selectedId === row.id ? "is-selected" : pinned.includes(row.id) ? "is-pinned" : ""} onClick={() => setSelectedId(row.id)}>
-            <td><code className="k-mono">{row.id}</code><time dateTime={row.timestamp}>{row.timestamp.slice(11, 19)}</time></td><td>{row.account}</td><td><code className="k-mono">{row.sourceIp}</code></td>
-            <td><Badge tone={resultTone[row.result as keyof typeof resultTone] ?? "neutral"}>{row.result}</Badge><small>{row.eventType}</small></td><td>{row.method}</td><td><code className="k-mono">{row.sessionId}</code></td>
-            <td><button type="button" className="k-btn k-btn-sm" aria-label={`Inspect ${row.id}`} onClick={() => setSelectedId(row.id)}>Details →</button></td></tr>)}</tbody></table>
-          {visible.length === 0 && <p className="k-empty k-pad">No events match. Reset or adjust the filters.</p>}</div>
-        <div className="k-toolbar k-pager"><button type="button" className="k-btn" disabled={page === 0} onClick={() => setPage(p => p - 1)}>Previous page</button><span>Page {page + 1} of {pages}</span><button type="button" className="k-btn" disabled={page + 1 >= pages} onClick={() => setPage(p => p + 1)}>Next page</button></div>
-      </section>
+    <details className="pg-hints"><summary>Supporting records <span className="pg-chip">{evidence.artifacts.length}</span></summary>
+      <div className="k-artifact-grid">{evidence.artifacts.map(a => <article className={`k-artifact ${pinned.includes(a.id) ? "is-pinned" : ""}`} key={a.id}><div className="k-artifact-body"><span className="k-mono k-muted">{a.id}</span><strong>{a.title}</strong>
+        <details><summary>View record</summary><dl className="k-facts">{Object.entries(a.facts).map(([key, value]) => <div key={key}><dt>{key}</dt><dd className="k-mono">{value}</dd></div>)}</dl></details></div>
+        <div className="k-actions"><button type="button" className="k-btn k-btn-sm" aria-label={`${pinned.includes(a.id) ? "Unpin" : "Pin"} ${a.id}`} disabled={!editable || pinned.length >= 3 && !pinned.includes(a.id)} onClick={() => f.toggle("trail.corroboration", "supportingEvidenceIds", a.id, 3)}>{pinned.includes(a.id) ? "★ Pinned" : "☆ Pin"}</button><button type="button" className="k-btn k-btn-sm" onClick={() => void copy(a.id)}>Copy ID</button></div></article>)}</div></details>
 
-      <aside className="k-inspector" aria-label="Selected event details">
-        <span className="k-eyebrow">FULL EVENT / UNTRUSTED FIELDS</span><h2 className="k-mono">{selected.id}</h2>
-        <div className="k-badges"><Badge tone={resultTone[selected.result as keyof typeof resultTone] ?? "neutral"}>{selected.result}</Badge><Badge tone="info">{selected.eventType}</Badge>{pinned.includes(selected.id) && <Badge tone="amber">In evidence tray</Badge>}{related > 0 && <Badge>{related} in this session</Badge>}</div>
-        <dl className="k-facts">{Object.entries(selected).map(([label, value]) => <div key={label}><dt>{label}</dt><dd className="k-mono">{value}</dd></div>)}</dl>
-        <div className="k-actions k-stack">
-          <button type="button" className="k-btn" onClick={() => void copy(selected.id)}>Copy event ID</button>
-          <button type="button" className="k-btn" onClick={() => pin(selected.id)}>Add event as evidence</button>
-          <button type="button" className="k-btn" disabled={selected.sessionId === "none"} onClick={() => updateFilters({ ...emptyTrailFilters, sessionId: selected.sessionId })}>View related session events</button>
-          <button type="button" className="k-btn k-btn-primary" disabled={!editable} onClick={() => setConclusion({ account: selected.account, sourceIp: selected.sourceIp, sessionId: selected.sessionId, eventId: selected.id })}>Use event in conclusion</button>
-        </div>
-      </aside>
+    <section className="pg-tasks" aria-label="Scored tasks">
+      <h2 className="pg-h">Tasks <small>Submit each one when ready. Points are saved per task.</small></h2>
+      <datalist id="trail-accounts">{choices("account").map(v => <option key={v} value={v} />)}</datalist><datalist id="trail-ips">{choices("sourceIp").map(v => <option key={v} value={v} />)}</datalist>
+      <TaskPanel step={1} task={taskOf(state, 1, "trail.source")} editable={editable} busy={busy} retrySeconds={retrySeconds} result={result} ready={!!(f.str("trail.source", "account").trim() && f.str("trail.source", "sourceIp").trim())} why="Enter the compromised account and the attacker’s source IP." onSubmit={() => void submit("trail.source", ["account", "sourceIp"])}>
+        <div className="pg-fields">{input("trail.source", "account", "Compromised account", "email", "trail-accounts")}{input("trail.source", "sourceIp", "Attacker source IP", "text", "trail-ips")}</div></TaskPanel>
+      <TaskPanel step={2} task={taskOf(state, 1, "trail.session")} editable={editable} busy={busy} retrySeconds={retrySeconds} result={result} ready={!!(f.str("trail.session", "sessionId").trim() && f.str("trail.session", "eventId").trim())} why="Enter the incident session and the replay event." onSubmit={() => void submit("trail.session", ["sessionId", "eventId"])}>
+        <div className="pg-fields">{input("trail.session", "sessionId", "Incident session ID")}{input("trail.session", "eventId", "Replay event ID")}</div></TaskPanel>
+      <TaskPanel step={3} task={taskOf(state, 1, "trail.corroboration")} editable={editable} busy={busy} retrySeconds={retrySeconds} result={result} ready={pinned.length === 3} why="Pin exactly three: issuance event, browser capture, database audit." onSubmit={() => void submit("trail.corroboration", [])}>
+        <div className="k-tray" aria-label="Pinned evidence">{pinned.length ? pinned.map(id => <span className="k-chip" key={id}><span className="k-mono">{id}</span>{editable && <button type="button" aria-label={`Unpin ${id}`} onClick={() => f.toggle("trail.corroboration", "supportingEvidenceIds", id)}>×</button>}</span>) : <small>Pin events and records above. Exactly three.</small>}</div></TaskPanel>
+      <ResultStrip result={result} /><p role="status" className="pg-live">{feedback}</p>
+    </section>
+
+    <div className="pg-aux">
+      <details className="pg-hints pg-tamper"><summary>Tamper Alert <span className="pg-chip">{state.progress.bonus === 5 ? "+5 recorded" : "optional +5, once per team"}</span></summary>
+        {state.progress.bonus === 5 ? <p className="k-banner k-banner-ok">Bonus recorded.</p> : <form onSubmit={e => { e.preventDefault(); void send("submit", { kind: "tamper", tamper: { ...tamper, field: tamper.field } }); }}><fieldset disabled={!editable || busy || retrySeconds > 0}>
+          <p>Find a log field that tells an AI investigator to drop evidence.</p>
+          <div className="pg-fields"><label>Event ID<input required value={tamper.eventId} maxLength={100} onChange={e => setTamper({ ...tamper, eventId: e.target.value })} /></label>
+            <label>Field<select required value={tamper.field} onChange={e => setTamper({ ...tamper, field: e.target.value })}><option value="" disabled>Select…</option><option value="details">details</option><option value="account">account</option></select></label>
+            <label>Technique<select required value={tamper.technique} onChange={e => setTamper({ ...tamper, technique: e.target.value })}><option value="" disabled>Select…</option><option value="instruction-override">Overrides the investigation task</option><option value="failed-password">Repeated failed passwords</option></select></label></div>
+          <button className="k-btn k-btn-sm">Record Tamper Alert</button></fieldset></form>}
+      </details>
+      <HintBox chapter={1} state={state} editable={editable} busy={busy} onHint={() => void send("hint")} />
+      <details className="pg-hints"><summary>Notes <span className="pg-chip">private to your team</span></summary><label>Scratchpad<textarea rows={4} maxLength={900} disabled={!editable} value={f.str("notes", "text")} onChange={e => f.set("notes", "text", e.target.value)} /></label></details>
     </div>
-    <p className="k-feedback" role="status">{clipboard}</p>
-
-    <Card eyebrow="CORRELATION / CUSTODY RECORDS" title="Supporting forensic evidence" id="trail-artifacts" aside={<Badge>{evidence.artifacts.length} records</Badge>}>
-      <div className="k-artifact-grid">{evidence.artifacts.map(artifact => <article className={`k-artifact ${pinned.includes(artifact.id) ? "is-pinned" : ""}`} key={artifact.id}>
-        <div className="k-artifact-body"><span className="k-mono k-muted">{artifact.id}</span><strong>{artifact.title}</strong>
-          <details><summary>View record</summary><dl className="k-facts">{Object.entries(artifact.facts).map(([key, value]) => <div key={key}><dt>{key}</dt><dd className="k-mono">{value}</dd></div>)}</dl></details></div>
-        <div className="k-actions"><button type="button" className="k-btn k-btn-sm" aria-label={`Add evidence ${artifact.id}`} onClick={() => pin(artifact.id)}>{pinned.includes(artifact.id) ? "✓ Added" : "Add evidence ID"}</button><button type="button" className="k-btn k-btn-sm" aria-label={`Copy ${artifact.id}`} onClick={() => void copy(artifact.id)}>Copy ID</button></div></article>)}</div>
-    </Card>
-
-    <div className="k-two">
-      <Card id="trail-tamper" eyebrow="GLOBAL TAMPER ALERT / MAXIMUM +5" title="Untrusted log manipulation" aside={state.progress.bonus === 5 ? <Badge tone="ok">+5 recorded</Badge> : <Badge>Not recorded</Badge>}>
-        <p>Find a log field that tells an AI investigator to abandon evidence and accuse a decoy. Record it before completing Trail. It cannot award a second bonus if Inbox already did.</p>
-        {state.progress.bonus === 5 ? <p className="k-banner k-banner-ok">Global Tamper Alert bonus already recorded: +5.</p> : <form onSubmit={reportTamper}><fieldset disabled={locked}>
-          <label>Manipulation event ID<input required name="eventId" maxLength={100} /></label>
-          <label>Manipulation field<select required name="field" defaultValue=""><option value="" disabled>Select the untrusted field</option><option value="details">details</option><option value="account">account</option></select></label>
-          <label>Manipulation technique<select required name="technique" defaultValue=""><option value="" disabled>Select the technique</option><option value="instruction-override">Instructions overriding the investigation task</option><option value="failed-password">Repeated failed passwords only</option></select></label>
-          <button className="k-btn">Record Trail Tamper Alert</button></fieldset></form>}
-      </Card>
-      <Card id="trail-hints" eyebrow="ASSISTANCE / SERVER-SAVED" title="Trail hints" aside={<Badge tone="amber">{state.progress.chapters[1].hints} / 2 used</Badge>}>
-        <p>Hint 1 costs 3 points; hint 2 costs 6 more. Paid hints remain available after refresh or login.</p>
-        <ol className="released-hints k-hints">{state.chapterHints[1].map((hint, index) => <li key={hint}><strong>Hint {index + 1}</strong><p>{hint}</p></li>)}</ol>
-        <button className="k-btn" disabled={!editable || busy || state.progress.chapters[1].hints >= 2} onClick={() => void send("hint")}>Request Trail hint {Math.min(2, state.progress.chapters[1].hints + 1)} (−{state.progress.chapters[1].hints === 0 ? 3 : 6} points)</button>
-      </Card>
-    </div>
-
-    <Card id="trail-conclusion" className="k-conclusion" eyebrow="CONCLUSION / MAXIMUM 25 CHAPTER POINTS" title="Trail investigation conclusion" aside={<Badge tone={pinned.length === 3 ? "ok" : "neutral"}>{pinned.length}/3 supporting IDs</Badge>}>
-      {completed && <p className="k-lock">🔒 Findings accepted and locked.</p>}
-      <p>Identify the later sign-in using the compromised session. Supply exactly three supporting IDs: the original session issuance event, the retained browser capture, and the matching unauthorized database audit record. Prose is never keyword-scored.</p>
-      <form onSubmit={submit}><fieldset disabled={locked}>
-        <div className="k-answer-grid">{([["account", "Compromised account"], ["sourceIp", "Attacker source IP"], ["sessionId", "Incident session ID"], ["eventId", "Relevant authentication event ID"]] as const).map(([name, label]) => <label key={name}>{label}<input required type={name === "account" ? "email" : "text"} maxLength={name === "account" ? 120 : 100} value={conclusion[name]} onChange={e => setConclusion(old => ({ ...old, [name]: e.target.value }))} /></label>)}</div>
-        <div className="k-tray" aria-label="Evidence tray">{pinned.length ? pinned.map(id => <span className="k-chip" key={id}><span className="k-mono">{id}</span>{!locked && <button type="button" aria-label={`Remove ${id} from evidence tray`} onClick={() => unpin(id)}>×</button>}</span>) : <small>Evidence tray is empty. Add events and records above.</small>}</div>
-        <label>Supporting evidence IDs (exactly three)<input required maxLength={320} value={evidenceIds} onChange={e => setEvidenceIds(e.target.value)} placeholder="Issuance event ID, browser capture ID, database audit ID" /></label>
-        <label>Short explanation (optional)<textarea name="explanation" maxLength={800} rows={3} /></label>
-        <div className="k-submit-row"><button className="k-btn k-btn-primary k-btn-lg">Submit Trail conclusion</button></div>
-      </fieldset></form>
-      <Feedback busy={busy} text={feedback} extra={retrySeconds > 0 && editable ? `Next submission available in ${retrySeconds}s.` : ""} /><ContinueBar chapter={1} state={state} />
-    </Card>
-  </div>;
+  </DeskFrame>;
 }

@@ -77,7 +77,7 @@ export const verdictTasks: Record<string, TaskDef> = {
     const role = (name: keyof typeof expected) => { const required = expected[name], actual: string[] = a.evidenceMap[name], extras = name === "entry" ? [`GW-${variant}-01`] : name === "assistance" ? [`CHG-${variant}-219`] : []; return disjoint && required.every(x => actual.includes(x)) && actual.every(x => required.includes(x) || extras.includes(x)); };
     return earnedIds("verdict.evidence", { entry: role("entry"), session: role("session"), impact: role("impact"), assistance: role("assistance"), response: role("response") });
   } },
-  "verdict.reasoning": { schema: z.object({ hypothesisId: id, rejected: z.object({ hypothesisId: id, contradiction: z.enum(["device-and-policy", "outside-approved-scope"]), evidenceIds: distinct(2, 2) }).strict() }).strict(), grade: (a, variant) => {
+  "verdict.reasoning": { schema: z.object({ hypothesisId: id, attackerAttribution: z.literal("alias-only"), responseStatus: z.literal("plan-prepared"), rejected: z.object({ hypothesisId: id, contradiction: z.enum(["device-and-policy", "outside-approved-scope"]), evidenceIds: distinct(2, 2) }).strict() }).strict(), grade: (a, variant) => {
     const expected = verdictSolution(variant), alternative = verdictSolution(variant, "maintenance");
     return earnedIds("verdict.reasoning", { hypothesis: a.hypothesisId === expected.hypothesisId, rejection: [expected.rejected, alternative.rejected].some(r => a.rejected.hypothesisId === r.hypothesisId && a.rejected.contradiction === r.contradiction && sameSet(a.rejected.evidenceIds, r.evidenceIds)) });
   } },
