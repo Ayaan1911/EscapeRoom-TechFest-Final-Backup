@@ -18,10 +18,10 @@ export async function POST(req: NextRequest) {
   if (raw.length > 16_384) return new NextResponse(null, { status: 413 });
   let value: unknown;
   try { value = JSON.parse(raw); } catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
-  const parsed = z.object({ action: z.enum(["submit", "hint", "unlock"]), chapter: z.number().int().min(0).max(4), answer: z.unknown().optional() }).strict().refine(value => value.action !== "unlock" || value.chapter === 2).safeParse(value);
+  const parsed = z.object({ action: z.enum(["submit", "hint", "unlock"]), chapter: z.number().int().min(0).max(4), task: z.string().max(60).optional(), answer: z.unknown().optional() }).strict().refine(value => value.action !== "unlock" || value.chapter === 2).refine(value => value.task === undefined || value.action === "submit").safeParse(value);
   if (!parsed.success) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   try {
-    const result = await mutateTeam(auth.teamId, parsed.data.chapter, parsed.data.action, parsed.data.answer);
+    const result = await mutateTeam(auth.teamId, parsed.data.chapter, parsed.data.action, parsed.data.answer, parsed.data.task);
     return NextResponse.json(result, { status: "retryAfter" in result ? 429 : "error" in result ? 409 : 200, headers: "retryAfter" in result ? { "Retry-After": String(result.retryAfter) } : undefined });
   } catch { return NextResponse.json({ error: "Unable to save request. Refresh and retry." }, { status: 409 }); }
 }

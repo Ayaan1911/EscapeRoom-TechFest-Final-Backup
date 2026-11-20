@@ -5,7 +5,7 @@ import { trailEvidence, trailSolution } from "./trail.server";
 import { insiderDossier, insiderSolution } from "./insider.server";
 import { containmentEvidence } from "./containment.server";
 import type { ChapterValidator } from "./engine";
-import { earnedIds } from "./scoring";
+import { earnedIds, gradeAll, type TaskDef } from "./scoring";
 import type { VerdictEvidence, VerdictRecord } from "@/types/verdict";
 
 const hypotheses = { A: { replay: "27", employee: "64", maintenance: "91" }, B: { replay: "83", employee: "16", maintenance: "42" }, C: { replay: "38", employee: "72", maintenance: "15" } } as const;
@@ -66,26 +66,27 @@ const schema = z.object({
   rejected: z.object({ hypothesisId: id, contradiction: z.enum(["device-and-policy", "outside-approved-scope"]), evidenceIds: distinct(2, 2) }).strict(),
   attackerAttribution: z.literal("alias-only"), responseStatus: z.literal("plan-prepared"), explanation: z.string().trim().max(1000).optional(),
 }).strict();
+const sameSet = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every(x => b.includes(x));
+const roleSchema = distinct(1, 7);
+export const verdictTasks: Record<string, TaskDef> = {
+  "verdict.entry": { schema: z.object({ emailId: id, captureId: id, campaign: id }).strict(), grade: (a, variant) => { const c = verdictSolution(variant).chain; return earnedIds("verdict.entry", { emailId: a.emailId === c.emailId, captureId: a.captureId === c.captureId, campaign: a.campaign === c.campaign }); } },
+  "verdict.session": { schema: z.object({ victimAccount: z.string().trim().toLowerCase().max(120).pipe(z.email()), sessionId: id, exportId: id }).strict(), grade: (a, variant) => { const c = verdictSolution(variant).chain; return earnedIds("verdict.session", { victimAccount: a.victimAccount === c.victimAccount, sessionId: a.sessionId === c.sessionId, exportId: a.exportId === c.exportId }); } },
+  "verdict.insider": { schema: z.object({ insiderId: id, policyId: id }).strict(), grade: (a, variant) => { const c = verdictSolution(variant).chain; return earnedIds("verdict.insider", { insiderId: a.insiderId === c.insiderId, policyId: a.policyId === c.policyId }); } },
+  "verdict.evidence": { schema: z.object({ evidenceMap: z.object({ entry: roleSchema, session: roleSchema, impact: roleSchema, assistance: roleSchema, response: roleSchema }).strict() }).strict(), grade: (a, variant) => {
+    const expected = verdictSolution(variant).evidenceMap, mapped = Object.values(a.evidenceMap as Record<string, string[]>).flat(), disjoint = new Set(mapped).size === mapped.length;
+    const role = (name: keyof typeof expected) => { const required = expected[name], actual: string[] = a.evidenceMap[name], extras = name === "entry" ? [`GW-${variant}-01`] : name === "assistance" ? [`CHG-${variant}-219`] : []; return disjoint && required.every(x => actual.includes(x)) && actual.every(x => required.includes(x) || extras.includes(x)); };
+    return earnedIds("verdict.evidence", { entry: role("entry"), session: role("session"), impact: role("impact"), assistance: role("assistance"), response: role("response") });
+  } },
+  "verdict.reasoning": { schema: z.object({ hypothesisId: id, rejected: z.object({ hypothesisId: id, contradiction: z.enum(["device-and-policy", "outside-approved-scope"]), evidenceIds: distinct(2, 2) }).strict() }).strict(), grade: (a, variant) => {
+    const expected = verdictSolution(variant), alternative = verdictSolution(variant, "maintenance");
+    return earnedIds("verdict.reasoning", { hypothesis: a.hypothesisId === expected.hypothesisId, rejection: [expected.rejected, alternative.rejected].some(r => a.rejected.hypothesisId === r.hypothesisId && a.rejected.contradiction === r.contradiction && sameSet(a.rejected.evidenceIds, r.evidenceIds)) });
+  } },
+};
 export const verdictValidator: ChapterValidator = {
   hints: ["Map the entry, session, impact, internal-assistance and response claims to independent retained sources from all four chapters. A mailbox display name or one database principal cannot establish the whole causal chain.", "Keep account ownership separate from intent. Match the captured campaign to the exact replayed session and customer export, correlate the signed policy action with intent/access/custody, and use actual records to contradict an alternative. An attacker alias is not a proven real-world identity, and a prepared plan is not an executed recovery."],
   grade(answer, variant) {
     const parsed = schema.safeParse(answer);
-    if (!parsed.success || !Object.hasOwn(hypotheses, variant)) return [];
-    const value = parsed.data, expected = verdictSolution(variant), alternative = verdictSolution(variant, "maintenance");
-    const sameSet = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every(id => b.includes(id));
-    const mapped = Object.values(value.evidenceMap).flat(), disjoint = new Set(mapped).size === mapped.length;
-    const chain = (key: keyof typeof expected.chain) => value.chain[key] === expected.chain[key];
-    const role = (name: keyof typeof expected.evidenceMap) => {
-      const required = expected.evidenceMap[name], actual = value.evidenceMap[name], extras = name === "entry" ? [`GW-${variant}-01`] : name === "assistance" ? [`CHG-${variant}-219`] : [];
-      return disjoint && required.every(id => actual.includes(id)) && actual.every(id => required.includes(id) || extras.includes(id));
-    };
-    return [
-      ...earnedIds("verdict.entry", { emailId: chain("emailId"), captureId: chain("captureId"), campaign: chain("campaign") }),
-      ...earnedIds("verdict.session", { victimAccount: chain("victimAccount"), sessionId: chain("sessionId"), exportId: chain("exportId") }),
-      ...earnedIds("verdict.insider", { insiderId: chain("insiderId"), policyId: chain("policyId") }),
-      ...earnedIds("verdict.evidence", { entry: role("entry"), session: role("session"), impact: role("impact"), assistance: role("assistance"), response: role("response") }),
-      ...earnedIds("verdict.reasoning", { hypothesis: value.hypothesisId === expected.hypothesisId, rejection: [expected.rejected, alternative.rejected].some(rejected => value.rejected.hypothesisId === rejected.hypothesisId && value.rejected.contradiction === rejected.contradiction && sameSet(value.rejected.evidenceIds, rejected.evidenceIds)) }),
-    ];
+    return parsed.success ? gradeAll(verdictTasks, { ...parsed.data.chain, evidenceMap: parsed.data.evidenceMap, hypothesisId: parsed.data.hypothesisId, rejected: parsed.data.rejected }, variant) : [];
   },
   validate(answer, variant) {
     const parsed = schema.safeParse(answer);

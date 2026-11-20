@@ -9,6 +9,7 @@ import { trailAnswers } from "./fixtures/trail";
 import { insiderAnswers } from "./fixtures/insider";
 import { containmentAnswers } from "./fixtures/containment";
 import { verdictAnswers } from "./fixtures/verdict";
+import { taskAnswer } from "./fixtures/tasks";
 
 // Disposable local PostgreSQL only (scripts/pg-temp.mjs refuses non-local hosts). Opt in with GHOST_DB_TEST=1.
 const jar = vi.hoisted(() => new Map<string, string>());
@@ -33,6 +34,7 @@ describe.skipIf(process.env.GHOST_DB_TEST !== "1")("task scoring, unlocking and 
   const mk = async (patch: Patch = {}, variant = "A") => { const id = `S${++n}`; await db.team.create({ data: { id, name: id, participants: JSON.stringify(["One", "Two", "Three"]), codeHash: hashPassword(code), variant, progress: JSON.stringify(progressOf(patch)) } }); return id; };
   // The 3 s evidence cooldown is real behaviour; tests age the history instead of sleeping.
   const submit = async (id: string, chapter: number, answer: unknown) => { await db.submission.updateMany({ where: { teamId: id }, data: { createdAt: new Date(0) } }); return service.mutateTeam(id, chapter, "submit", answer); };
+  const submitTask = async (id: string, chapter: number, task: string, answer: unknown) => { await db.submission.updateMany({ where: { teamId: id }, data: { createdAt: new Date(0) } }); return service.mutateTeam(id, chapter, "submit", answer, task); };
   const state = (id: string) => service.teamState(id);
   const post = (body: unknown) => new NextRequest(`${origin}/api/game`, { method: "POST", headers: { origin, "Content-Type": "application/json" }, body: JSON.stringify(body) });
   const put = (body: unknown) => new NextRequest(`${origin}/api/game/drafts`, { method: "PUT", headers: { origin, "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -231,6 +233,49 @@ describe.skipIf(process.env.GHOST_DB_TEST !== "1")("task scoring, unlocking and 
       expect(await submit(id, 0, { ...a, emailId: "x-wrong", databaseId: "x-wrong" })).toMatchObject({ awarded: 10 });
       expect(await submit(id, 0, a)).toMatchObject({ accepted: true, chapterRaw: 15 });
     }
+  });
+
+  it("a single completed task earns its points while every other task is untouched, in all variants", async () => {
+    for (const variant of ["A", "B", "C"] as const) {
+      const id = await mk({}, variant);
+      const task = (chapter: number, taskId: string) => submitTask(id, chapter, taskId, taskAnswer(taskId, variant));
+      expect(await task(0, "inbox.entry")).toMatchObject({ awarded: 6, chapterRaw: 6, task: "inbox.entry", taskEarned: 6, taskMax: 6, accepted: false, partial: true, unlocked: [] });
+      expect(await task(0, "inbox.impact")).toMatchObject({ awarded: 3, chapterRaw: 9, unlocked: [1] }); // 6 + 3 = 9 >= 8
+      expect((await state(id)).tasks[0].map(t => t.earned)).toEqual([6, 0, 3]);
+      expect(await task(0, "inbox.entry")).toMatchObject({ error: "Task already complete" }); // no duplicate
+      expect((await state(id)).score).toBe(9);
+      // Trail is now open: one task alone, with no account/source/session answers at all.
+      expect(await task(1, "trail.corroboration")).toMatchObject({ awarded: 7, chapterRaw: 7, taskEarned: 7 });
+    }
+  });
+  it("task submissions are validated strictly: unknown task, wrong shape, extra fields and client points earn nothing", async () => {
+    const id = await mk();
+    expect(await submitTask(id, 0, "inbox.nope", {})).toMatchObject({ error: "Unknown task" });
+    expect(await submitTask(id, 0, "trail.source", taskAnswer("trail.source", "A"))).toMatchObject({ error: "Unknown task" }); // another chapter's task
+    for (const bad of [{}, { ...taskAnswer("inbox.entry", "A"), score: 99 }, { emailId: inboxAnswers.A.emailId }]) expect(await submitTask(id, 0, "inbox.entry", bad)).toMatchObject({ awarded: 0, chapterRaw: 0 });
+    const game = await import("../src/app/api/game/route"); jar.clear(); await auth.login("team", id, code);
+    await db.submission.updateMany({ where: { teamId: id }, data: { createdAt: new Date(0) } });
+    expect((await game.POST(post({ action: "submit", chapter: 0, task: "inbox.entry", points: 6, answer: taskAnswer("inbox.entry", "A") }))).status).toBe(400);
+    expect((await game.POST(post({ action: "hint", chapter: 0, task: "inbox.entry" }))).status).toBe(400);
+    const ok = await game.POST(post({ action: "submit", chapter: 0, task: "inbox.entry", answer: taskAnswer("inbox.entry", "A") }));
+    expect(ok.status).toBe(200); expect(await ok.json()).toMatchObject({ awarded: 6 });
+    jar.clear(); await auth.logout();
+    expect((await state(id)).score).toBe(6);
+  });
+  it("task scoring is concurrency-safe and the locked-chapter, deadline and Insider-fragment rules apply to tasks", async () => {
+    const id = await mk();
+    const results = await Promise.all(Array.from({ length: 10 }, () => service.mutateTeam(id, 0, "submit", taskAnswer("inbox.identity", "A"), "inbox.identity")));
+    expect(results.reduce((sum, r) => sum + ("awarded" in r ? (r.awarded as number) : 0), 0)).toBe(6);
+    expect(await db.taskScore.count({ where: { teamId: id } })).toBe(1);
+    expect(await submitTask(id, 1, "trail.source", taskAnswer("trail.source", "A"))).toMatchObject({ error: expect.stringMatching(/locked/) });
+    const sealed = await mk({ chapters: [{ score: 8 }, { score: 13 }] });
+    await db.insiderAccess.create({ data: { teamId: sealed, fragmentA: "fa-t", fragmentB: "fb-t" } });
+    expect(await submitTask(sealed, 2, "insider.suspect", taskAnswer("insider.suspect", "A"))).toMatchObject({ error: expect.stringMatching(/Unlock the dossier/) });
+    await db.insiderAccess.update({ where: { teamId: sealed }, data: { unlockedAt: new Date() } });
+    expect(await submitTask(sealed, 2, "insider.suspect", taskAnswer("insider.suspect", "A"))).toMatchObject({ awarded: 8, chapterRaw: 8 });
+    await db.gameSession.update({ where: { id: 1 }, data: { deadline: new Date(Date.now() - 1000) } });
+    try { expect(await submitTask(sealed, 2, "insider.action", taskAnswer("insider.action", "A"))).toMatchObject({ error: "Round is not active" }); }
+    finally { await db.gameSession.update({ where: { id: 1 }, data: { deadline: new Date(Date.now() + 3_600_000) } }); }
   });
 
   describe("drafts", () => {

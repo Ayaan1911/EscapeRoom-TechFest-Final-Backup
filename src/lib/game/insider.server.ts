@@ -3,7 +3,7 @@ import { z } from "zod";
 import { inboxEvidence, inboxSolution } from "./inbox.server";
 import { trailEvidence } from "./trail.server";
 import type { ChapterValidator } from "./engine";
-import { earnedIds } from "./scoring";
+import { earnedIds, gradeAll, type TaskDef } from "./scoring";
 import type { InsiderDossier, InsiderRecord, InsiderSuspect } from "@/types/insider";
 
 const cases = { A: { employee: 3, policy: "04", message: "09", access: "11", approval: "06" }, B: { employee: 1, policy: "07", message: "03", access: "14", approval: "08" }, C: { employee: 4, policy: "02", message: "12", access: "06", approval: "04" } } as const;
@@ -68,19 +68,21 @@ export function insiderSolution(variant: string) {
 }
 const id = z.string().trim().min(3).max(100);
 const answerSchema = z.object({ kind: z.literal("conclusion"), employeeId: id, actionId: id, supportingEvidenceIds: z.array(id).min(3).max(8).refine(ids => new Set(ids).size === ids.length), explanation: z.string().trim().max(800).optional() }).strict();
+export const insiderTasks: Record<string, TaskDef> = {
+  "insider.suspect": { schema: z.object({ employeeId: id }).strict(), grade: (a, variant) => earnedIds("insider.suspect", { employeeId: a.employeeId === insiderSolution(variant).employeeId }) },
+  "insider.action": { schema: z.object({ actionId: id }).strict(), grade: (a, variant) => earnedIds("insider.action", { actionId: a.actionId === insiderSolution(variant).actionId }) },
+  "insider.corroboration": { schema: z.object({ supportingEvidenceIds: z.array(id).min(3).max(8).refine(ids => new Set(ids).size === ids.length) }).strict(), grade: (a, variant) => {
+    const expected = insiderSolution(variant), [message, access, approval] = expected.supportingEvidenceIds;
+    const allowed = [...expected.supportingEvidenceIds, expected.actionId, `CUST-${variant}-01`, `MSG-${variant}-INTERVIEW`, `TIME-${variant}-01`];
+    const clean = a.supportingEvidenceIds.every((x: string) => allowed.includes(x)), has = (x: string) => clean && a.supportingEvidenceIds.includes(x);
+    return earnedIds("insider.corroboration", { message: has(message), access: has(access), approval: has(approval) });
+  } },
+};
 export const insiderValidator: ChapterValidator = {
   hints: ["Access privileges and badge proximity establish opportunity, not intent. Compare each employee's signed actions, approved scope and timestamps; keep the replayed victim account separate from the person changing controls.", "Compare the pre-export existing-session policy diff with the original maintenance approval, then correlate the journaled instruction's authoring device with console access and independent custody records. A copied approval reference is not an approving signature."],
   grade(answer, variant) {
     const parsed = answerSchema.safeParse(answer);
-    if (!parsed.success || !Object.hasOwn(cases, variant)) return [];
-    const value = parsed.data, expected = insiderSolution(variant), [message, access, approval] = expected.supportingEvidenceIds;
-    const allowed = [...expected.supportingEvidenceIds, expected.actionId, `CUST-${variant}-01`, `MSG-${variant}-INTERVIEW`, `TIME-${variant}-01`];
-    const clean = value.supportingEvidenceIds.every(id => allowed.includes(id)), has = (evidence: string) => clean && value.supportingEvidenceIds.includes(evidence);
-    return [
-      ...earnedIds("insider.suspect", { employeeId: value.employeeId === expected.employeeId }),
-      ...earnedIds("insider.action", { actionId: value.actionId === expected.actionId }),
-      ...earnedIds("insider.corroboration", { message: has(message), access: has(access), approval: has(approval) }),
-    ];
+    return parsed.success ? gradeAll(insiderTasks, parsed.data, variant) : [];
   },
   validate(answer, variant) {
     const parsed = answerSchema.safeParse(answer);

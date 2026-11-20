@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { applyRaw, initialProgress, overrideChapter, permit, points, progressSchema, score, start, unlocked, unlockThresholds, useHint } from "../src/lib/game/engine";
-import { catalog, chapterMax, criterionPoints } from "../src/lib/game/scoring";
-import { validators } from "../src/lib/game/validators";
+import { catalog, chapterMax, criterionPoints, gradeTask, taskMax } from "../src/lib/game/scoring";
+import { taskDefs, validators } from "../src/lib/game/validators";
+import { taskAnswer } from "./fixtures/tasks";
 import { inboxAnswers } from "./fixtures/inbox";
 import { trailAnswers } from "./fixtures/trail";
 import { insiderAnswers } from "./fixtures/insider";
@@ -136,5 +137,37 @@ describe("unlock progression (pure engine)", () => {
     const q = withRaw(0, 9); applyRaw(q, 1, 5, 2);
     expect(overrideChapter(q, 8)).toBe(1);
     expect(q.chapters[1].score).toBe(5); expect(unlocked(q, 2)).toBe(true); expect(q.chapters[0].completedAt).toBeNull();
+  });
+});
+
+describe("standalone task grading (one task, every other task unanswered)", () => {
+  const defsByChapter = taskDefs;
+  const tasksOf = (chapter: number) => catalog[chapter];
+  for (const chapter of [0, 1, 2, 3, 4]) for (const variant of V) for (const task of tasksOf(chapter)) {
+    it(`${task.id} variant ${variant}: its own answer earns exactly its criteria and nothing else`, () => {
+      const ids = gradeTask(defsByChapter[chapter], task.id, taskAnswer(task.id, variant), variant);
+      expect(ids.sort()).toEqual(Object.keys(task.criteria).map(key => `${task.id}:${key}`).sort());
+      expect(ids.reduce((n, id) => n + criterionPoints.get(id)!, 0)).toBe(taskMax(task));
+    });
+  }
+  it("a task answer cannot award another task's criteria, accept extras, or accept client points", () => {
+    for (const chapter of [0, 1, 2, 3, 4]) for (const task of tasksOf(chapter)) {
+      const own = taskAnswer(task.id, "A");
+      expect(gradeTask(defsByChapter[chapter], task.id, { ...own, score: 99 }, "A")).toEqual([]);
+      expect(gradeTask(defsByChapter[chapter], task.id, { ...own, criteria: ["x"] }, "A")).toEqual([]);
+      expect(gradeTask(defsByChapter[chapter], task.id, {}, "A")).toEqual([]);
+      for (const other of tasksOf(chapter)) if (other.id !== task.id) expect(gradeTask(defsByChapter[chapter], other.id, own, "A")).toEqual([]);
+    }
+    expect(gradeTask(defsByChapter[0], "inbox.nope", {}, "A")).toEqual([]);
+    expect(gradeTask(defsByChapter[0], "__proto__", {}, "A")).toEqual([]);
+  });
+  it("cross-field requirements inside a task still apply", () => {
+    const evidence = taskAnswer("insider.corroboration", "A") as { supportingEvidenceIds: string[] };
+    expect(gradeTask(taskDefs[2], "insider.corroboration", { supportingEvidenceIds: [...evidence.supportingEvidenceIds, "ACC-A-99"] }, "A")).toEqual([]);
+    const recovery = taskAnswer("containment.recovery", "A") as { recoveryOrder: string[] };
+    const shuffled = gradeTask(taskDefs[3], "containment.recovery", { recoveryOrder: [...recovery.recoveryOrder].reverse() }, "A");
+    expect(shuffled).toContain("containment.recovery:set"); expect(shuffled.length).toBeLessThan(6);
+    const map = taskAnswer("verdict.evidence", "A") as { evidenceMap: Record<string, string[]> };
+    expect(gradeTask(taskDefs[4], "verdict.evidence", { evidenceMap: { ...map.evidenceMap, response: map.evidenceMap.impact } }, "A")).toEqual([]);
   });
 });

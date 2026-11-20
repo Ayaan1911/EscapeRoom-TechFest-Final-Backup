@@ -2,7 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { inboxEvidence, inboxSolution } from "./inbox.server";
 import type { ChapterValidator } from "./engine";
-import { earnedIds } from "./scoring";
+import { earnedIds, gradeAll, type TaskDef } from "./scoring";
 import type { TrailArtifact, TrailEvidence, TrailEvent } from "@/types/trail";
 
 const slots = {
@@ -80,6 +80,12 @@ const answerSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("conclusion"), account: z.string().trim().toLowerCase().max(120).pipe(z.email()), sourceIp: z.string().trim().pipe(z.ipv4()), sessionId: id, eventId: id, supportingEvidenceIds: z.array(id).length(3).refine(ids => new Set(ids).size === 3), explanation: z.string().trim().max(800).optional(), tamper: tamper.optional() }).strict(),
   z.object({ kind: z.literal("tamper"), tamper }).strict(),
 ]);
+const supporting = z.array(id).length(3).refine(ids => new Set(ids).size === 3);
+export const trailTasks: Record<string, TaskDef> = {
+  "trail.source": { schema: z.object({ account: z.string().trim().toLowerCase().max(120).pipe(z.email()), sourceIp: z.string().trim().pipe(z.ipv4()) }).strict(), grade: (a, variant) => { const e = trailSolution(variant); return earnedIds("trail.source", { account: a.account === e.account, sourceIp: a.sourceIp === e.sourceIp }); } },
+  "trail.session": { schema: z.object({ sessionId: id, eventId: id }).strict(), grade: (a, variant) => { const e = trailSolution(variant); return earnedIds("trail.session", { sessionId: a.sessionId === e.sessionId, eventId: a.eventId === e.eventId }); } },
+  "trail.corroboration": { schema: z.object({ supportingEvidenceIds: supporting }).strict(), grade: (a, variant) => { const [mint, capture, audit] = trailSolution(variant).supportingEvidenceIds, has = (x: string) => a.supportingEvidenceIds.includes(x); return earnedIds("trail.corroboration", { mintEvent: has(mint), capture: has(capture), databaseAudit: has(audit) }); } },
+};
 export const trailValidator: ChapterValidator = {
   hints: [
     "Separate failed attempts and pending MFA from sessions that actually gained access. Source-IP frequency is not evidence of a successful compromise; eliminate denied, revoked and authorized activity using the supporting records.",
@@ -87,13 +93,7 @@ export const trailValidator: ChapterValidator = {
   ],
   grade(answer, variant) {
     const parsed = answerSchema.safeParse(answer);
-    if (!parsed.success || !Object.hasOwn(slots, variant) || parsed.data.kind !== "conclusion") return [];
-    const value = parsed.data, expected = trailSolution(variant), [mint, capture, audit] = expected.supportingEvidenceIds, has = (evidence: string) => value.supportingEvidenceIds.includes(evidence);
-    return [
-      ...earnedIds("trail.source", { account: value.account === expected.account, sourceIp: value.sourceIp === expected.sourceIp }),
-      ...earnedIds("trail.session", { sessionId: value.sessionId === expected.sessionId, eventId: value.eventId === expected.eventId }),
-      ...earnedIds("trail.corroboration", { mintEvent: has(mint), capture: has(capture), databaseAudit: has(audit) }),
-    ];
+    return parsed.success && parsed.data.kind === "conclusion" ? gradeAll(trailTasks, parsed.data, variant) : [];
   },
   validate(answer, variant) {
     const parsed = answerSchema.safeParse(answer);

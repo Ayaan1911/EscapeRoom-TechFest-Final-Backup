@@ -1,7 +1,7 @@
 import { db, serializable } from "../db";
 import { applyRaw, bonus, current, hints, overrideChapter, permit, points, progressSchema, ranking, score, start, status, unlockThresholds, unlocked, useHint } from "./engine";
-import { catalog, criterionPoints, MAX_SCORED_ATTEMPTS, taskMax } from "./scoring";
-import { validators } from "./validators";
+import { catalog, criterionPoints, gradeTask, MAX_SCORED_ATTEMPTS, taskIds, taskMax } from "./scoring";
+import { taskDefs, validators } from "./validators";
 import { matchesInsiderFragments } from "./insider-fragments.server";
 
 export async function roundState() {
@@ -26,7 +26,7 @@ export async function leaderboard() {
 export async function recentAudit() {
   return db.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: 100 });
 }
-export async function mutateTeam(id: string, chapter: number, action: "submit" | "hint" | "unlock", answer: unknown) {
+export async function mutateTeam(id: string, chapter: number, action: "submit" | "hint" | "unlock", answer: unknown, task?: string) {
   return serializable(async tx => {
     const team = await tx.team.findUniqueOrThrow({ where: { id }, include: { insiderAccess: { select: { unlockedAt: true } } } });
     const round = await tx.gameSession.findUniqueOrThrow({ where: { id: 1 } });
@@ -37,9 +37,10 @@ export async function mutateTeam(id: string, chapter: number, action: "submit" |
     const validator = validators[chapter];
     if (!reason && !validator) reason = "Chapter content is not implemented yet";
     if (!reason && action === "unlock" && chapter !== 2) reason = "Invalid unlock request";
+    if (!reason && task !== undefined && (action !== "submit" || !taskIds(chapter).includes(task))) reason = "Unknown task";
     if (!reason && chapter === 2 && action === "submit" && !team.insiderAccess?.unlockedAt) reason = "Unlock the dossier using both physical fragments first";
     if (reason) {
-      await tx.submission.create({ data: { teamId: id, chapter, accepted: false, reason, answer: action === "submit" ? JSON.stringify(answer ?? null) : null } });
+      await tx.submission.create({ data: { teamId: id, chapter, accepted: false, reason, answer: action === "submit" ? JSON.stringify(task ? { task, answer: answer ?? null } : answer ?? null) : null } });
       return { error: reason };
     }
     if (action === "hint") {
@@ -70,12 +71,21 @@ export async function mutateTeam(id: string, chapter: number, action: "submit" |
         return { error };
       }
     }
-    const result = validator!.validate(answer, team.variant);
-    const graded = validator!.grade(answer, team.variant).filter(criterion => criterionPoints.has(criterion));
+    const stored = await tx.taskScore.findMany({ where: { teamId: id, chapter } });
+    const recorded = JSON.stringify(task ? { task, answer: answer ?? null } : answer ?? null);
+    const taskDef = task ? catalog[chapter].find(t => t.id === task)! : undefined;
+    if (taskDef && (stored.find(r => r.taskId === task)?.earned ?? 0) >= taskMax(taskDef)) {
+      const error = "Task already complete";
+      await tx.submission.create({ data: { teamId: id, chapter, accepted: false, reason: error, answer: recorded } });
+      return { error };
+    }
+    // A task submission is graded by that task's own schema and grader only; a chapter submission by the full-chapter validator.
+    const result = task ? { correct: false, points: 0, tamperDetected: false } : validator!.validate(answer, team.variant);
+    const graded = (task ? gradeTask(taskDefs[chapter], task, answer, team.variant) : validator!.grade(answer, team.variant)).filter(criterion => criterionPoints.has(criterion));
     const decidedAt = Date.now();
     if (status(round, decidedAt) !== "active") {
       const error = "Round is not active";
-      await tx.submission.create({ data: { teamId: id, chapter, accepted: false, reason: error, answer: JSON.stringify(answer ?? null) } });
+      await tx.submission.create({ data: { teamId: id, chapter, accepted: false, reason: error, answer: recorded } });
       return { error };
     }
     const tamperAwarded = !!result.tamperDetected && !p.bonus;
@@ -84,7 +94,6 @@ export async function mutateTeam(id: string, chapter: number, action: "submit" |
       await tx.auditLog.create({ data: { actor: id, action: "tamper-alert", detail: JSON.stringify({ chapter }) } });
     }
     // Task scoring: every criterion is earned at most once (union with what is stored) and points are derived only from the server catalog.
-    const stored = await tx.taskScore.findMany({ where: { teamId: id, chapter } });
     const before = p.chapters[chapter].score;
     let taskSum = 0, newlyEarned: string[] = [];
     const tasks: { id: string; earned: number; max: number }[] = [];
@@ -107,8 +116,9 @@ export async function mutateTeam(id: string, chapter: number, action: "submit" |
     const full = taskSum === points[chapter];
     if (awarded > 0 || unlockedNow.length || tamperAwarded) await tx.team.update({ where: { id }, data: { progress: JSON.stringify(p) } });
     for (const next of unlockedNow) await tx.auditLog.create({ data: { actor: id, action: "chapter-unlock", detail: JSON.stringify({ chapter: next, rawAfter: p.chapters[chapter].score, threshold: unlockThresholds[chapter] }) } });
-    await tx.submission.create({ data: { teamId: id, chapter, accepted: full, reason: full ? "completed" : graded.length ? "partial" : "incorrect", answer: JSON.stringify(answer ?? null), scoringVersion: 2, awarded, chapterRaw: p.chapters[chapter].score, criteria: JSON.stringify(newlyEarned) } });
-    return { accepted: full, partial: !full && graded.length > 0, awarded, chapterRaw: p.chapters[chapter].score, chapterMax: points[chapter], tasks, unlocked: unlockedNow, tamperAwarded };
+    await tx.submission.create({ data: { teamId: id, chapter, accepted: full, reason: full ? "completed" : graded.length ? "partial" : "incorrect", answer: recorded, scoringVersion: 2, awarded, chapterRaw: p.chapters[chapter].score, criteria: JSON.stringify(newlyEarned) } });
+    const taskResult = task ? tasks.find(t => t.id === task) : undefined;
+    return { accepted: full, partial: !full && graded.length > 0, awarded, task: task ?? null, taskEarned: taskResult?.earned ?? null, taskMax: taskResult?.max ?? null, chapterRaw: p.chapters[chapter].score, chapterMax: points[chapter], tasks, unlocked: unlockedNow, tamperAwarded };
   });
 }
 export async function control(action: "start" | "stop" | "unlock", teamId?: string, reason?: string) {

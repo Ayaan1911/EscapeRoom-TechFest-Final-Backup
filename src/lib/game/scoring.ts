@@ -1,3 +1,4 @@
+import type { ZodType } from "zod";
 // Task/criterion catalog. Contains point values and ids only - never answers - so it is safe to import anywhere.
 // A criterion id is `<taskId>:<key>`. Graders (in each *.server.ts) return the criterion ids a submission satisfies.
 export type Task = { id: string; title: string; criteria: Record<string, number> };
@@ -37,6 +38,23 @@ export const taskMax = (task: Task) => sum(task);
 export const chapterMax = (chapter: number) => catalog[chapter].reduce((n, task) => n + sum(task), 0);
 export const criterionPoints = new Map<string, number>(catalog.flat().flatMap(task => Object.entries(task.criteria).map(([key, value]) => [`${task.id}:${key}`, value] as const)));
 export const taskIds = (chapter: number) => catalog[chapter].map(task => task.id);
-export const MAX_SCORED_ATTEMPTS = 40; // per chapter; the 3 s cooldown already limits a team to ~1200/hour. Caps answer-probing.
+export const MAX_SCORED_ATTEMPTS = 60; // per chapter; the 3 s cooldown already limits a team to ~1200/hour. Caps answer-probing.
 /** Criterion ids for the keys of `task` whose entry in `ok` is true. */
 export const earnedIds = (task: string, ok: Record<string, boolean>) => Object.entries(ok).filter(([, pass]) => pass).map(([key]) => `${task}:${key}`);
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type TaskDef = { schema: ZodType; grade: (value: any, variant: string) => string[] };
+/** A task grader may only award its own catalog criteria, whatever it returns. */
+function ownIds(taskId: string, ids: string[]) { return ids.filter(id => id.startsWith(`${taskId}:`) && criterionPoints.has(id)); }
+/** Standalone task answer: strict per-task schema, then only that task's grader. Invalid or unknown input earns nothing. */
+export function gradeTask(defs: Record<string, TaskDef>, taskId: string, answer: unknown, variant: string): string[] {
+  const def = Object.hasOwn(defs, taskId) ? defs[taskId] : undefined;
+  const parsed = def?.schema.safeParse(answer);
+  if (!def || !parsed?.success) return [];
+  try { return ownIds(taskId, def.grade(parsed.data, variant)); } catch { return []; }
+}
+/** Full-chapter compatibility: the already-validated chapter answer is graded by every task grader. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function gradeAll(defs: Record<string, TaskDef>, value: any, variant: string): string[] {
+  try { return Object.entries(defs).flatMap(([taskId, def]) => ownIds(taskId, def.grade(value, variant))); } catch { return []; }
+}

@@ -1,7 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import type { ChapterValidator } from "./engine";
-import { earnedIds } from "./scoring";
+import { earnedIds, gradeAll, type TaskDef } from "./scoring";
 import type { InboxArtifact, InboxEmail, InboxEvidence } from "@/types/inbox";
 
 const variants = {
@@ -80,6 +80,12 @@ const answerSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("tamper"), tamper: tamperSchema }).strict(),
 ]);
 
+const hit = (value: string, expected: string) => value === expected;
+export const inboxTasks: Record<string, TaskDef> = {
+  "inbox.entry": { schema: z.object({ emailId: evidenceId, deliveryId: evidenceId, snapshotId: evidenceId }).strict(), grade: (a, variant) => { const e = inboxSolution(variant); return earnedIds("inbox.entry", { emailId: hit(a.emailId, e.emailId), deliveryId: hit(a.deliveryId, e.deliveryId), snapshotId: hit(a.snapshotId, e.snapshotId) }); } },
+  "inbox.identity": { schema: z.object({ authenticationId: evidenceId, sessionId: evidenceId }).strict(), grade: (a, variant) => { const e = inboxSolution(variant); return earnedIds("inbox.identity", { authenticationId: hit(a.authenticationId, e.authenticationId), sessionId: hit(a.sessionId, e.sessionId) }); } },
+  "inbox.impact": { schema: z.object({ databaseId: evidenceId }).strict(), grade: (a, variant) => earnedIds("inbox.impact", { databaseId: hit(a.databaseId, inboxSolution(variant).databaseId) }) },
+};
 export const inboxValidator: ChapterValidator = {
   hints: [
     "Suspicious language and failed mail authentication are leads, not a verdict. Build a chronological chain from a delivered message through a recorded navigation to the first unauthorized database export.",
@@ -87,13 +93,7 @@ export const inboxValidator: ChapterValidator = {
   ],
   grade(answer, variant) {
     const parsed = answerSchema.safeParse(answer);
-    if (!parsed.success || !Object.hasOwn(variants, variant) || parsed.data.kind !== "conclusion") return [];
-    const value = parsed.data, expected = inboxSolution(variant), hit = (key: keyof typeof expected) => value[key as keyof typeof value] === expected[key];
-    return [
-      ...earnedIds("inbox.entry", { emailId: hit("emailId"), deliveryId: hit("deliveryId"), snapshotId: hit("snapshotId") }),
-      ...earnedIds("inbox.identity", { authenticationId: hit("authenticationId"), sessionId: hit("sessionId") }),
-      ...earnedIds("inbox.impact", { databaseId: hit("databaseId") }),
-    ];
+    return parsed.success && parsed.data.kind === "conclusion" ? gradeAll(inboxTasks, parsed.data, variant) : [];
   },
   validate(answer, variant) {
     const parsed = answerSchema.safeParse(answer);
