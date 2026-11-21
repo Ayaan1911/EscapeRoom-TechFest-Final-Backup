@@ -21,6 +21,12 @@ try {
     const p = initialProgress(); p.chapters[0].score = 15; p.chapters[1].score = 25; p.chapters[2].score = Math.max(0, 26 - 2 * i);
     await db.team.create({ data: { id: `P5-${String(i).padStart(2, "0")}`, name: `Finalist ${String(i).padStart(2, "0")}`, participants: JSON.stringify(["One", "Two", "Three"]), codeHash: hashPassword(code), variant: "A", progress: JSON.stringify(p) } });
   }
+  if (process.env.GHOST_P5_SEED === "1") { // fast path for visual specs ONLY (the lifecycle spec performs these steps through the real UI instead)
+    const ids = Array.from({ length: 12 }, (_, i) => `P5-${String(i + 1).padStart(2, "0")}`);
+    await db.auditLog.create({ data: { actor: "organizer", action: "qualification-confirmed", detail: JSON.stringify({ digest: "seeded-digest-0001", top10: ids.slice(0, 10), standby: ids.slice(10), reason: "seed" }) } });
+    await db.r2Finalist.createMany({ data: ids.map((teamId, i) => ({ teamId, status: i < 10 ? "active" : "standby", seed: i + 1, snapshotDigest: "seeded-digest-0001" })) });
+    await db.r2Session.create({ data: { id: 1, startsAt: new Date(Date.now() - 10 * 60_000), contentVersion: "r2-v1" } });
+  }
   const result = spawnSync(process.execPath, ["node_modules/@playwright/test/cli.js", "test", ...specs, "--workers=1", "--output", "test-results/phase5"], { env, stdio: "inherit", windowsHide: true });
   process.exitCode = result.status ?? 1;
 } finally { await db.$disconnect().catch(() => undefined); await temp.drop(); }

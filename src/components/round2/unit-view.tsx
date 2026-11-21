@@ -44,7 +44,7 @@ export function UnitView({ unit, bundle, status, clock, now, onScored, onNeedRef
   return <EvidenceProvider records={allRecords}>
     <div className="r2-unit" data-unit={key}>
       <header className="r2-unit-head"><span className="r2-eyebrow">{unit.part === "A" ? `PART A · INCIDENT ${unit.unit}` : `PART B · CHALLENGE ${unit.unit}`}</span><h2>{unit.title}</h2><p className="r2-story">{unit.story}</p></header>
-      <div className={`r2-unit-grid ${key === "A3" ? "is-split" : ""}`}>
+      <div className={`r2-unit-grid ${key === "A3" ? "is-split" : ""} ${key === "A2" ? "is-stacked" : ""}`}>
         <div className="r2-unit-visual">{visual}{key !== "A3" && browser}</div>
         <div className="r2-unit-main">{key === "A3" && browser}
           <section className="r2-tasks" aria-label={`Tasks for ${unit.title}`}><h3 className="r2-h">Tasks <small>Submit each one when ready. Points are saved per task.</small></h3>

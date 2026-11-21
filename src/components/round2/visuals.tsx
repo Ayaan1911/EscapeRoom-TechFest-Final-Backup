@@ -27,14 +27,14 @@ export function NetworkMap({ records, malicious, blocked, disabled, onMark, onBl
   return <section className="r2-panel r2-net" aria-label="Network connections">
     <h3>Connection map <span className="r2-count">{conns.length} connections</span></h3>
     <p className="r2-meta">Internal systems on the left, external endpoints on the right. Line weight follows bytes transferred. The table below has every detail and the same controls.</p>
-    <svg viewBox={`0 0 760 ${H}`} className="r2-svg" aria-hidden="true" focusable="false">
+    <div className="r2-svgscroll"><svg viewBox={`0 0 760 ${H}`} className="r2-svg" aria-hidden="true" focusable="false">
       <defs><marker id="r2arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L8 4L0 8z" fill="currentColor" /></marker></defs>
       <text x="160" y="14" className="r2-svg-h" textAnchor="middle">INTERNAL</text><text x="600" y="14" className="r2-svg-h" textAnchor="middle">EXTERNAL</text>
       {conns.map(c => { const a = pos(c.src), b = pos(c.dst), w = 1.5 + Math.min(4.5, Math.log10(Math.max(c.bytes, 1e3)) - 3) , mid = (a.x + b.x) / 2;
         const cls = `r2-edge ${malicious.includes(c.id) ? "is-mal" : ""} ${blocked.includes(c.id) ? "is-blocked" : ""} ${active === c.id ? "is-active" : ""}`;
         return <g key={c.id} className={cls} onClick={() => setActive(c.id)}><path d={`M${a.x} ${a.y} C ${mid} ${a.y}, ${mid} ${b.y}, ${b.x} ${b.y}`} strokeWidth={w} fill="none" markerEnd="url(#r2arrow)" /><text x={mid} y={(a.y + b.y) / 2 - 4} textAnchor="middle" className="r2-svg-id">{c.id}</text></g>; })}
       {[...left, ...right].map(n => { const p = pos(n); return <g key={n} className="r2-node"><rect x={p.x - 70} y={p.y - 13} width="140" height="26" rx="5" /><text x={p.x} y={p.y + 4} textAnchor="middle">{n}</text></g>; })}
-    </svg>
+    </svg></div>
     {cur && <div className="r2-inspect" role="region" aria-label={`Inspecting ${cur.id}`}><b className="r2-id">{cur.id}</b> <span className="r2-mono">{cur.src} → {cur.dst}{cur.port && `:${cur.port}`}</span> <span className="r2-tag">{cur.inbound ? "inbound" : "outbound"}</span><p>{cur.record.detail}</p><small className="r2-meta">Observed {cur.record.time}</small></div>}
     <div className="r2-tablewrap"><table className="r2-table"><caption className="r2-sr">All ten connections with traffic metadata and decisions</caption>
       <thead><tr><th scope="col">ID</th><th scope="col">Source → destination</th><th scope="col">Traffic and process</th><th scope="col">Malicious?</th><th scope="col">BLOCK (sim.)</th></tr></thead>
