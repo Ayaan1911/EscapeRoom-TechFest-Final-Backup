@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useId, useRef, useState } from "react";
+import { useId, useState } from "react";
+import { useCooldown } from "./cooldown";
 import { ApiError, postSubmit } from "./api";
 import { TaskFields } from "./fields";
 import { useDrafts, type DraftStatus } from "./use-draft-store";
@@ -29,13 +30,11 @@ export function describeError(e: unknown): Feedback {
 
 export function TaskCard({ task, status, editable, closedReason, onScored, onNeedRefresh, index }: { task: TaskDef; status: TaskStatus; editable: boolean; closedReason: string; onScored: (taskId: string, o: SubmitOutcome) => void; onNeedRefresh: () => void; index: number }) {
   const store = useDrafts(), entry = store.entry(task.id), id = useId();
-  const [busy, setBusy] = useState(false), [feedback, setFeedback] = useState<Feedback | null>(null), [wait, setWait] = useState(0);
-  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [busy, setBusy] = useState(false), [feedback, setFeedback] = useState<Feedback | null>(null);
+  const { remaining: wait, start: cooldown } = useCooldown();
   const done = status.earned >= status.max, partial = status.earned > 0 && !done;
   const missing = missingFields(task.fields, entry.working);
   const canSubmit = editable && !busy && wait === 0 && !done && missing.length === 0 && entry.status !== "conflict";
-  useEffect(() => () => { if (timer.current) clearInterval(timer.current); }, []);
-  const cooldown = (s: number) => { setWait(s); if (timer.current) clearInterval(timer.current); timer.current = setInterval(() => setWait(w => { if (w <= 1) { if (timer.current) clearInterval(timer.current); return 0; } return w - 1; }), 1000); };
 
   async function submit() {
     setBusy(true); setFeedback(null);

@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { UnitView } from "./unit-view";
+import { CooldownProvider } from "./cooldown";
 import { FinishedPanel, WaitingRoom } from "./states";
 import { DraftProvider, NOTES, useDrafts } from "./use-draft-store";
 import { useRound2 } from "./use-round2";
@@ -84,5 +85,5 @@ function TopBar({ teamName, status, label, value, connection }: { teamName: stri
 }
 
 export function Round2Shell({ teamName, initialStatus, initialDrafts }: { teamName: string; initialStatus: StatusPayload; initialDrafts: ServerDraft[] }) {
-  return <DraftProvider initial={initialDrafts}><Inner teamName={teamName} initial={initialStatus} /></DraftProvider>;
+  return <CooldownProvider><DraftProvider initial={initialDrafts}><Inner teamName={teamName} initial={initialStatus} /></DraftProvider></CooldownProvider>;
 }
