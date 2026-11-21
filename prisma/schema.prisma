@@ -17,6 +17,7 @@ model Team {
   insiderAccess InsiderAccess?
   taskScores TaskScore[]
   drafts ChapterDraft[]
+  r2Finalist R2Finalist?
 }
 model InsiderAccess {
   teamId String @id
@@ -90,4 +91,77 @@ model ChapterDraft {
   version Int @default(1)
   updatedAt DateTime @updatedAt
   @@id([teamId, chapter, taskId])
+}
+
+// ---------- Round 2 (GHOST RETURNS). Fully separate from Round 1 tables; the only link to Round 1 is the Team identity. ----------
+// Single-row clock. startsAt is set once by an organizer; every phase boundary is derived from it (src/lib/round2/clock.ts).
+model R2Session {
+  id Int @id
+  startsAt DateTime?
+  endedAt DateTime?
+  resultsPublishedAt DateTime?
+  contentVersion String?
+}
+// Enrollment from the organizer-confirmed qualification snapshot. status: active | standby | withdrawn.
+model R2Finalist {
+  teamId String @id
+  team Team @relation(fields: [teamId], references: [id], onDelete: Restrict)
+  status String
+  seed Int
+  snapshotDigest String
+  note String @default("")
+  enrolledAt DateTime @default(now())
+  statusChangedAt DateTime @default(now())
+  submissions R2Submission[]
+  scores R2TaskScore[]
+  drafts R2Draft[]
+  @@index([status])
+}
+// Append-only record of every graded attempt (answer hash makes identical re-submissions idempotent).
+model R2Submission {
+  id String @id @default(cuid())
+  teamId String
+  finalist R2Finalist @relation(fields: [teamId], references: [teamId], onDelete: Restrict)
+  taskId String
+  awarded Int
+  taskEarned Int
+  criteria String // JSON array: criterion ids first earned by this attempt
+  answerHash String
+  answer String
+  contentVersion String
+  createdAt DateTime @default(now())
+  @@index([teamId, taskId, createdAt])
+  @@index([teamId, createdAt])
+}
+// Best-ever earned criteria per task. Monotonic: criteria are only ever added.
+model R2TaskScore {
+  teamId String
+  finalist R2Finalist @relation(fields: [teamId], references: [teamId], onDelete: Restrict)
+  taskId String
+  part String
+  earned Int
+  max Int
+  criteria String // JSON array of earned criterion ids
+  firstScoredAt DateTime @default(now())
+  lastAwardAt DateTime @default(now()) // server time of the last attempt that added points (Part A timing tiebreak)
+  @@id([teamId, taskId])
+  @@index([teamId, part])
+}
+model R2Draft {
+  teamId String
+  finalist R2Finalist @relation(fields: [teamId], references: [teamId], onDelete: Restrict)
+  taskId String
+  data String
+  version Int @default(1)
+  updatedAt DateTime @updatedAt
+  @@id([teamId, taskId])
+}
+// Organizer and system actions for Round 2 only (Round 1 keeps AuditLog).
+model R2Audit {
+  id String @id @default(cuid())
+  actor String
+  action String
+  detail String
+  createdAt DateTime @default(now())
+  @@index([createdAt])
 }
