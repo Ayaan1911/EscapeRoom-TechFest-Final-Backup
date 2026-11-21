@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useChapter, type ChapterState } from "./use-chapter";
 import { useDrafts, type ServerDraft } from "./use-drafts";
 import { ContainmentCctv } from "./containment-cctv";
-import { ChainDiagram, ConnectionBanner, DeskFrame, HintBox, ResultStrip, StateBanner, TaskPanel, fieldApi, isEditable, taskOf } from "./workspace";
+import { ChainDiagram, ConnectionBanner, DeskFrame, HintBox, ResultStrip, StateBanner, TaskNav, TaskPanel, fieldApi, isEditable, taskOf } from "./workspace";
 import { Badge } from "@/components/ui/kit";
 import type { ContainmentCctv as Snapshot, ContainmentEvidence } from "@/types/containment";
 
@@ -60,6 +60,7 @@ export function ContainmentDesk({ evidence, initialCctv, initialState, initialDr
 
     <section className="pg-tasks" aria-label="Scored tasks">
       <h2 className="pg-h">Tasks <small>Submit each one when ready. Points are saved per task.</small></h2>
+      <TaskNav tasks={state.tasks[3]} />
 
       <TaskPanel step={1} task={taskOf(state, 3, DRAFT.timeline)} editable={editable} busy={busy} retrySeconds={retrySeconds} result={result} ready onSubmit={() => void submit(DRAFT.timeline)}>
         <p className="pg-hint-line">Earliest first. Use cited timestamps and causal links, not card order. Drag, or use ↑ ↓.</p>

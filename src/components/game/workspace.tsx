@@ -106,9 +106,13 @@ export function TaskPanel({ task, step, editable, busy, retrySeconds, result, re
     const query = window.matchMedia("(max-width: 700px)"), sync = () => setOpen(!(step > 1 && query.matches));
     sync(); query.addEventListener("change", sync); return () => query.removeEventListener("change", sync);
   }, [step]);
+  useEffect(() => { // task navigator: jump links open the target task, then scroll to it
+    const onOpen = (e: Event) => { if ((e as CustomEvent<number>).detail === step) setOpen(true); };
+    window.addEventListener("task-open", onOpen); return () => window.removeEventListener("task-open", onOpen);
+  }, [step]);
   const mine = result?.task === task.id ? result : null;
   const state = done ? "Complete" : partial ? "Partial" : "Not scored";
-  return <section className={`pg-task ${done ? "is-done" : partial ? "is-partial" : ""}`} aria-labelledby={`${id}-h`}>
+  return <section id={`task-${step}`} className={`pg-task ${done ? "is-done" : partial ? "is-partial" : ""}`} aria-labelledby={`${id}-h`}>
     <header>
       <span className="pg-task-n" aria-hidden="true">{done ? "✓" : step}</span>
       <h3 id={`${id}-h`}>{task.title}</h3>
@@ -126,6 +130,11 @@ export function TaskPanel({ task, step, editable, busy, retrySeconds, result, re
   </section>;
 }
 
+/** Compact jump links to every task of a chapter (phones; hidden on wide screens where all tasks are open). */
+export function TaskNav({ tasks }: { tasks: TaskRow[] }) {
+  return <nav className="pg-tasknav" aria-label="Task navigation"><ol>{tasks.map((t, i) => <li key={t.id}>
+    <a href={`#task-${i + 1}`} onClick={() => window.dispatchEvent(new CustomEvent("task-open", { detail: i + 1 }))} aria-label={`Task ${i + 1}: ${t.title}, ${t.earned} of ${t.max} points`}><b>{t.earned >= t.max ? "✓" : i + 1}</b><span>{t.earned}/{t.max}</span></a></li>)}</ol></nav>;
+}
 /** Compact hint control; text of released hints stays visible. Costs shown up front. */
 export function HintBox({ chapter, state, editable, busy, onHint }: { chapter: ChapterIndex; state: ChapterState; editable: boolean; busy: boolean; onHint: () => void }) {
   const used = state.progress.chapters[chapter].hints;
