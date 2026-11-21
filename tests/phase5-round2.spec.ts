@@ -143,7 +143,8 @@ test("minute 0: only Incident 1 is released; scoring is partial, honest and idem
   await assets.getByLabel("Account p.okafor").check(); await assets.getByLabel("Entire finance VLAN").check(); await assets.getByLabel("Laptop FIN-LT-09").check(); await assets.getByLabel("ERP production servers").check();
   await expect(assets.locator(".r2-draft")).toHaveText("Draft saved", { timeout: 10_000 });
   await submit(page, "i1.assets").click();
-  await expect(feedback(page, "i1.assets")).toContainText("No new points"); // 4 selections forfeit per-asset credit
+  await expect(feedback(page, "i1.assets")).toContainText("No points yet"); // 4 selections forfeit per-asset credit
+  await expect(assets.locator(".r2-chip", { hasText: "Attempts 1/3" })).toBeVisible(); // the counter comes from the server
   await assets.getByLabel("Entire finance VLAN").uncheck(); await assets.getByLabel("Laptop FIN-LT-09").uncheck(); await assets.getByLabel("ERP production servers").uncheck();
   await assets.getByLabel("Laptop FIN-LT-07").check();
   await waitReady(page, "i1.assets"); await submit(page, "i1.assets").click();
@@ -191,7 +192,13 @@ test("minute 7 and 19: incidents release by the server clock; Kill Switch map, A
   const v = task(page, "i3.verdicts");
   await v.getByRole("group", { name: /Claim A/ }).getByLabel("False").check(); await v.getByRole("group", { name: /Claim B/ }).getByLabel("False").check(); await v.getByRole("group", { name: /Claim C/ }).getByLabel("False").check();
   await expect(v.locator(".r2-draft")).toHaveText("Draft saved", { timeout: 10_000 });
-  await send(page, "i3.verdicts"); await expect(feedback(page, "i3.verdicts")).toContainText("+2 points"); // B was wrongly called false
+  await send(page, "i3.verdicts"); await expect(feedback(page, "i3.verdicts")).toContainText("New personal best: +2 points"); // B was wrongly called false
+  // a worse second answer keeps the best and uses the last attempt of this tier-A task
+  await v.getByRole("group", { name: /Claim A/ }).getByLabel("True").check(); await v.getByRole("group", { name: /Claim C/ }).getByLabel("True").check();
+  await expect(v.locator(".r2-draft")).toHaveText("Draft saved", { timeout: 10_000 }); await waitReady(page, "i3.verdicts"); await send(page, "i3.verdicts");
+  await expect(feedback(page, "i3.verdicts")).toContainText("No improvement. Your previous best score has been retained."); await expect(feedback(page, "i3.verdicts")).toContainText("No attempts remaining. Your highest score has been saved.");
+  await expect(v.getByRole("button", { name: "No attempts remaining" })).toBeDisabled(); await expect(v.locator(".r2-chip", { hasText: "Attempts 2/2" })).toBeVisible();
+  await expect(page.locator(".r2-score")).toContainText("A ");
   await open(page, /Incident 4/).click();
   await expect(page.getByText("EXECUTIVE PRESSURE")).toBeVisible();
   const seq = task(page, "i4.sequence");

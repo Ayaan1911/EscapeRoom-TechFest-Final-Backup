@@ -22,7 +22,8 @@ async function team(id, variant, p, sealed = false) {
 }
 let child;
 try {
-  await db.gameSession.create({ data: { id: 1, startsAt: new Date(), deadline: new Date(Date.now() + 3_600_000) } });
+  // GHOST_P2_POLICY=best-v1 runs the browser suites in a round that carries the approved scoring policy (default: a legacy round, scoringPolicy NULL)
+  await db.gameSession.create({ data: { id: 1, startsAt: new Date(), deadline: new Date(Date.now() + 3_600_000), scoringPolicy: process.env.GHOST_P2_POLICY || null } });
   for (const v of ["A", "B", "C"]) {
     await team(`P2-FRESH-${v}`, v, progress());
     await team(`P2-MID-${v}`, v, progress([8, 13, 13, 10, 0]));
