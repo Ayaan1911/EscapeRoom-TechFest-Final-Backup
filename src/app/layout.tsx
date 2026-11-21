@@ -4,6 +4,7 @@ import "./globals.css";
 import "./kit.css";
 import "./pages.css";
 import "./play.css";
+import "./design.css";
 
 const sans = Geist({ subsets: ["latin"], variable: "--font-geist-sans", display: "swap" });
 const mono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono", display: "swap" });

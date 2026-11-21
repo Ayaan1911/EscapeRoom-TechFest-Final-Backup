@@ -81,7 +81,7 @@ export function DraftBar({ drafts, state }: { drafts: Drafts; state: ChapterStat
 /** Server-confirmed unlock announcement. Not a modal: it never blocks the investigation, and "Keep investigating" simply hides it. */
 export function UnlockNotice({ state, chapter, confirmed, go }: { state: ChapterState; chapter: number; confirmed: readonly number[]; go: Go }) {
   const [hidden, setHidden] = useState(false), v = nextChapterView(state, chapter, confirmed);
-  if (!v.hasNext || !v.unlocked || hidden || v.nextStarted) return null;
+  if (!v.hasNext || !v.unlocked || hidden || v.nextStarted || state.progress.chapters[chapter].completedAt !== null) return null; // a completed chapter already shows its own banner
   const meta = CHAPTER_META[v.next];
   return <section className="pg-unlock" role="status" aria-live="polite" aria-labelledby={`unlock-${chapter}`}>
     <span className="pg-unlock-icon" aria-hidden="true">✓</span>
@@ -136,7 +136,7 @@ export function ConnectionBanner({ text, next }: { text: string; next: string })
 export function StateBanner({ state, chapter }: { state: ChapterState; chapter: ChapterIndex }) {
   if (state.progress.chapters[chapter].completedAt !== null) {
     const next = CHAPTER_META[chapter + 1], open = next && state.unlocked[chapter + 1];
-    return <div className="k-banner k-banner-ok" role="status"><div><strong>Chapter {chapter + 1} completed.{open ? ` Chapter ${chapter + 2} unlocked.` : ""}</strong><span>Saved. This chapter is now read-only.</span></div></div>;
+    return <div className="k-banner k-banner-ok" role="status"><div><strong>Chapter {chapter + 1} completed.{open ? ` Chapter ${chapter + 2} unlocked.` : ""}</strong><span>Saved. This chapter is now read-only.</span></div>{open && <a className="k-btn k-btn-primary" href={next.href}>Open Chapter {chapter + 2} →</a>}</div>;
   }
   if (state.status !== "active") return <p className="k-banner k-banner-warn" role="status">Round {state.status}. Evidence stays readable; submissions and hints are closed.</p>;
   return null;
