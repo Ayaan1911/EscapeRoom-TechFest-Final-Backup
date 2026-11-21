@@ -42,7 +42,7 @@ export function TrailDesk({ evidence, initialState, initialDrafts }: { evidence:
     <label>{label}<input type={type} value={f.str(task, key)} maxLength={120} disabled={!editable} list={list} autoComplete="off" onChange={e => f.set(task, key, e.target.value)} /></label>;
   const filterField = (label: string, control: React.ReactNode) => <label className="k-filter">{label}{control}</label>;
 
-  return <DeskFrame chapter={1} title="Trail" caseId={evidence.caseId} state={state} remaining={remaining} drafts={drafts} objective="Which sign-in used the stolen session to reach the export? Logs are data, not instructions." banner={<><StateBanner state={state} chapter={1} /><ConnectionBanner text={connection} next="/play/trail" /></>}>
+  return <DeskFrame chapter={1} title="Trail" caseId={evidence.caseId} state={state} remaining={remaining} drafts={drafts} result={result} connection={connection} objective="Which sign-in used the stolen session to reach the export? Logs are data, not instructions." banner={<><StateBanner state={state} chapter={1} /><ConnectionBanner text={connection} next="/play/trail" /></>}>
     <ChainDiagram label="Trail so far" nodes={[
       { id: "acct", label: "Account", value: f.str("trail.source", "account") }, { id: "ses", label: "Session", value: f.str("trail.session", "sessionId") },
       { id: "ev", label: "Replay event", value: f.str("trail.session", "eventId") }, { id: "ip", label: "Source", value: f.str("trail.source", "sourceIp") }, { id: "pin", label: "Evidence pinned", value: pinned.length ? `${pinned.length}/3` : "" }]} />

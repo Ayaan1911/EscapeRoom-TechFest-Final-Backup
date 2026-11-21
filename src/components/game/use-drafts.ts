@@ -110,5 +110,6 @@ export function useDrafts(chapter: number, initial: ServerDraft[], writable: boo
   const get = (taskId: string): DraftData => entries.get(taskId)?.data ?? {};
   const conflicts = [...entries.entries()].filter(([, e]) => e.conflict).map(([id]) => id);
   const errors = [...entries.values()].map(e => e.error).filter(Boolean);
-  return { status, message: errors[0] || message, savedAt, get, update, flush, resolve, conflicts, conflictOf: (taskId: string) => entries.get(taskId)?.conflict ?? null };
+  const hasUnsaved = () => [...entries.values()].some(e => e.dirty || e.conflict);
+  return { hasUnsaved, status, message: errors[0] || message, savedAt, get, update, flush, resolve, conflicts, conflictOf: (taskId: string) => entries.get(taskId)?.conflict ?? null };
 }

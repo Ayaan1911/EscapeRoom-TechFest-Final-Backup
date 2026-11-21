@@ -48,7 +48,7 @@ export function ContainmentDesk({ evidence, initialCctv, initialState, initialDr
   const choice = (item: Option, picked: boolean, change: () => void, aria: string) => <label key={item.id} className={`k-choice ${picked ? "is-picked" : ""}`}><input type="checkbox" checked={picked} disabled={!editable} onChange={change} aria-label={aria} /><span><strong>{item.id} · {item.title}</strong><small>{item.detail}</small></span></label>;
   const evidenceItems = [...evidence.artifacts.map(item => ({ id: item.id, title: item.title })), { id: evidence.cctvReference.id, title: "Security-room snapshot" }];
 
-  return <DeskFrame chapter={3} title="Containment" caseId={evidence.caseId} state={state} remaining={remaining} drafts={drafts} objective="Stop it, keep the evidence, restore safely. All actions are fictional decisions." banner={<><StateBanner state={state} chapter={3} /><ConnectionBanner text={connection} next="/play/containment" /></>}>
+  return <DeskFrame chapter={3} title="Containment" caseId={evidence.caseId} state={state} remaining={remaining} drafts={drafts} result={result} connection={connection} objective="Stop it, keep the evidence, restore safely. All actions are fictional decisions." banner={<><StateBanner state={state} chapter={3} /><ConnectionBanner text={connection} next="/play/containment" /></>}>
     <section className="pg-command" aria-label="Response checkpoint">
       <Badge tone="alert">Data already exfiltrated</Badge><Badge tone="info">{evidence.checkpoint} UTC</Badge><Badge>{evidence.account}</Badge><Badge className="k-mono">{evidence.sessionId}</Badge>
       <p>Treat the session as usable until revocation is verified. Keep support and approved archive/maintenance jobs running.</p>

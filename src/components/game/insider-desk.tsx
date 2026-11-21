@@ -42,7 +42,7 @@ export function InsiderDesk({ initialDossier, initialState, initialDrafts }: { i
   const nameOf = (id: string) => dossier?.suspects.find(s => s.id === id)?.name ?? id;
   const countFor = (id: string) => dossier?.records.filter(r => r.employees.includes(id)).length ?? 0;
 
-  return <DeskFrame chapter={2} title="Insider" caseId="PHYSICAL + DIGITAL" state={state} remaining={remaining} drafts={drafts} objective="Who deliberately weakened the controls? Access shows opportunity, not intent." banner={<><StateBanner state={state} chapter={2} /><ConnectionBanner text={connection || loadError} next="/play/insider" /></>}>
+  return <DeskFrame chapter={2} title="Insider" caseId="PHYSICAL + DIGITAL" state={state} remaining={remaining} drafts={drafts} result={result} connection={connection} objective="Who deliberately weakened the controls? Access shows opportunity, not intent." banner={<><StateBanner state={state} chapter={2} /><ConnectionBanner text={connection || loadError} next="/play/insider" /></>}>
     {sealed && <section className="pg-gate-card k-gate" aria-labelledby="gate-h">
       <div><span className="k-eyebrow">DOSSIER SEALED</span><h2 id="gate-h">Combine your two physical fragments</h2><p>Fragment A: your registration envelope. Fragment B: your team’s card on the Evidence Wall. Ask a volunteer if one is missing.</p></div>
       <form onSubmit={unlock}><fieldset disabled={!editable || busy || retrySeconds > 0}><div className="pg-fields">

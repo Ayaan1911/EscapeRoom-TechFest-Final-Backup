@@ -4,6 +4,7 @@ import { useEffect, useId, useState, type ReactNode } from "react";
 import type { ChapterState, SubmitResult, TaskRow } from "./use-chapter";
 import type { useDrafts } from "./use-drafts";
 import { formatClock } from "@/components/ui/kit";
+import { nextChapterView } from "@/lib/game/unlock-ui";
 
 export const CHAPTER_META = [
   { n: 1, name: "Inbox", max: 15, href: "/play/inbox", unlocksNext: "Trail" },
@@ -25,11 +26,26 @@ const STATUS_TEXT = { locked: "Locked", available: "Available", progress: "In pr
 /** Whether this chapter accepts new work: server says unlocked, round active, chapter not already completed. */
 export const isEditable = (state: ChapterState, i: number) => state.status === "active" && state.unlocked[i] && state.progress.chapters[i].completedAt === null;
 
-export function InvestigationMap({ state, chapter, beforeNavigate }: { state: ChapterState; chapter: number; beforeNavigate?: () => Promise<void> }) {
+/**
+ * Draft-safe in-app navigation: flush drafts first; if anything is still unsaved (offline, conflict, error) do NOT leave silently:
+ * show the honest warning and let the player stay or leave on purpose.
+ */
+export function useSafeNavigate(drafts: Drafts) {
+  const [leaving, setLeaving] = useState<string | null>(null), [busy, setBusy] = useState(false);
   const go = (href: string) => async (event: React.MouseEvent) => {
-    if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0 || !beforeNavigate) return;
-    event.preventDefault(); await beforeNavigate(); window.location.assign(href);
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+    event.preventDefault(); setBusy(true);
+    try { await drafts.flush(); } finally { setBusy(false); }
+    if (drafts.hasUnsaved()) { setLeaving(href); return; }
+    window.location.assign(href);
   };
+  const warning = leaving ? <div className="pg-leave" role="alert"><strong>Some edits are not saved yet.</strong><span>They are still on screen (offline, or changed on another device). Stay to fix them, or leave and lose them.</span>
+    <div><button type="button" className="k-btn k-btn-sm k-btn-primary" onClick={() => setLeaving(null)}>Stay and keep my edits</button><button type="button" className="k-btn k-btn-sm" onClick={() => window.location.assign(leaving)}>Leave anyway</button></div></div> : null;
+  return { go, busy, warning };
+}
+type Go = ReturnType<typeof useSafeNavigate>["go"];
+
+export function InvestigationMap({ state, chapter, go }: { state: ChapterState; chapter: number; go: Go }) {
   return <nav className="pg-map" aria-label="Investigation map">
     <ol>
       {CHAPTER_META.map((meta, i) => {
@@ -62,11 +78,39 @@ export function DraftBar({ drafts, state }: { drafts: Drafts; state: ChapterStat
   </div>;
 }
 
-export function DeskFrame({ chapter, title, objective, caseId, state, remaining, drafts, banner, children }: { chapter: ChapterIndex; title: string; objective: string; caseId?: string; state: ChapterState; remaining: number; drafts: Drafts; banner?: ReactNode; children: ReactNode }) {
+/** Server-confirmed unlock announcement. Not a modal: it never blocks the investigation, and "Keep investigating" simply hides it. */
+export function UnlockNotice({ state, chapter, confirmed, go }: { state: ChapterState; chapter: number; confirmed: readonly number[]; go: Go }) {
+  const [hidden, setHidden] = useState(false), v = nextChapterView(state, chapter, confirmed);
+  if (!v.hasNext || !v.unlocked || hidden || v.nextStarted) return null;
+  const meta = CHAPTER_META[v.next];
+  return <section className="pg-unlock" role="status" aria-live="polite" aria-labelledby={`unlock-${chapter}`}>
+    <span className="pg-unlock-icon" aria-hidden="true">✓</span>
+    <div className="pg-unlock-copy"><h2 id={`unlock-${chapter}`}>Chapter {meta.n} Unlocked</h2>
+      <p>{v.raw} points saved here · {v.need} required. You can keep improving this chapter or move on now.</p></div>
+    <div className="pg-unlock-actions"><a className="k-btn k-btn-primary k-btn-lg" href={meta.href} onClick={go(meta.href)}>Continue to Chapter {meta.n} — {meta.name} →</a>
+      <button type="button" className="k-btn" onClick={() => setHidden(true)}>Keep investigating</button>
+      <a className="k-btn k-btn-ghost" href="/play" onClick={go("/play")}>Back to Investigation Dashboard</a></div>
+  </section>;
+}
+
+/** Always present at the bottom of a chapter: what is next, how far away it is, and the way back. No scrolling to the top needed. */
+export function NextChapterFooter({ state, chapter, confirmed, connection, go }: { state: ChapterState; chapter: number; confirmed: readonly number[]; connection: string; go: Go }) {
+  const v = nextChapterView(state, chapter, confirmed);
+  const back = <a className="k-btn k-btn-ghost" href="/play" onClick={go("/play")}>Back to Investigation Dashboard</a>;
+  if (!v.hasNext) return <nav className="pg-foot" aria-label="Chapter navigation"><p>Final chapter. Your saved work is kept; the dashboard shows the case status.</p>{back}</nav>;
+  const meta = CHAPTER_META[v.next];
+  if (v.unlocked) return <nav className="pg-foot is-open" aria-label="Chapter navigation"><p><strong>Chapter {meta.n} — {meta.name} is unlocked.</strong> Work saved here stays saved.</p>
+    <a className="k-btn k-btn-primary" href={meta.href} onClick={go(meta.href)}>Continue to Chapter {meta.n} — {meta.name} →</a>{back}</nav>;
+  return <nav className="pg-foot" aria-label="Chapter navigation"><p><strong>{v.remaining} more point{v.remaining === 1 ? "" : "s"}</strong> in this chapter unlock Chapter {meta.n} — {meta.name} ({v.raw}/{v.need}).
+    {connection ? " Connection interrupted: the unlock will show here as soon as the server confirms it." : ""}</p>{back}</nav>;
+}
+
+export function DeskFrame({ chapter, title, objective, caseId, state, remaining, drafts, banner, result, connection = "", children }: { chapter: ChapterIndex; title: string; objective: string; caseId?: string; state: ChapterState; remaining: number; drafts: Drafts; banner?: ReactNode; result?: (SubmitResult & { at: number }) | null; connection?: string; children: ReactNode }) {
+  const nav = useSafeNavigate(drafts), confirmed = result?.unlocked ?? [];
   const mine = state.progress.chapters[chapter], urgent = state.status === "active" && remaining <= 300;
   const raw = mine.score, max = CHAPTER_META[chapter].max, left = max - raw;
   return <div className="pg" data-chapter={chapter + 1}>
-    <InvestigationMap state={state} chapter={chapter} beforeNavigate={drafts.flush} />
+    <InvestigationMap state={state} chapter={chapter} go={nav.go} />
     <div className="pg-main">
       <header className="pg-head">
         <div className="pg-title"><span className="k-eyebrow">CHAPTER {String(chapter + 1).padStart(2, "0")}{caseId ? ` · ${caseId}` : ""}</span><h1>{title}</h1><p>{objective}</p></div>
@@ -78,8 +122,11 @@ export function DeskFrame({ chapter, title, objective, caseId, state, remaining,
         </dl>
       </header>
       {banner}
+      {nav.warning}
+      <UnlockNotice state={state} chapter={chapter} confirmed={confirmed} go={nav.go} />
       <DraftBar drafts={drafts} state={state} />
       {children}
+      <NextChapterFooter state={state} chapter={chapter} confirmed={confirmed} connection={connection} go={nav.go} />
     </div>
   </div>;
 }
@@ -89,7 +136,7 @@ export function ConnectionBanner({ text, next }: { text: string; next: string })
 export function StateBanner({ state, chapter }: { state: ChapterState; chapter: ChapterIndex }) {
   if (state.progress.chapters[chapter].completedAt !== null) {
     const next = CHAPTER_META[chapter + 1], open = next && state.unlocked[chapter + 1];
-    return <div className="k-banner k-banner-ok" role="status"><div><strong>Chapter {chapter + 1} completed.{open ? ` Chapter ${chapter + 2} unlocked.` : ""}</strong><span>Saved. This chapter is now read-only.</span></div>{open && <a className="k-btn k-btn-primary" href={next.href}>Open Chapter {chapter + 2} →</a>}</div>;
+    return <div className="k-banner k-banner-ok" role="status"><div><strong>Chapter {chapter + 1} completed.{open ? ` Chapter ${chapter + 2} unlocked.` : ""}</strong><span>Saved. This chapter is now read-only.</span></div></div>;
   }
   if (state.status !== "active") return <p className="k-banner k-banner-warn" role="status">Round {state.status}. Evidence stays readable; submissions and hints are closed.</p>;
   return null;

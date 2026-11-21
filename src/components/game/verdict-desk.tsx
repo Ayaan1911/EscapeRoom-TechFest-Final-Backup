@@ -49,7 +49,7 @@ export function VerdictDesk({ evidence, initialState, initialDrafts, team }: { e
   const panel = (id: (typeof TASKS)[number]["id"], ready: boolean, why: string, body: React.ReactNode, step: number) =>
     <TaskPanel step={step} task={taskOf(state, 4, id)} editable={editable} busy={busy} retrySeconds={retrySeconds} result={result} ready={ready} why={why} onSubmit={() => void submit(id)}>{body}</TaskPanel>;
 
-  return <DeskFrame chapter={4} title="Final Verdict" caseId={evidence.caseId} state={state} remaining={remaining} drafts={drafts} objective="One causal chain, independent sources, one rejected alternative." banner={<><StateBanner state={state} chapter={4} /><ConnectionBanner text={connection} next="/play/verdict" /></>}>
+  return <DeskFrame chapter={4} title="Final Verdict" caseId={evidence.caseId} state={state} remaining={remaining} drafts={drafts} result={result} connection={connection} objective="One causal chain, independent sources, one rejected alternative." banner={<><StateBanner state={state} chapter={4} /><ConnectionBanner text={connection} next="/play/verdict" /></>}>
     {closed && <CaseClosed teamId={team.id} teamName={team.name} progress={state.progress} />}
 
     <details className="pg-hints"><summary>Case file <span className="pg-chip">read first</span></summary>{evidence.summary.map(text => <p key={text}>{text}</p>)}

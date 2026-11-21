@@ -181,3 +181,19 @@ a.pg-map-link:hover { color: var(--accent); }
 }
 
 .pg-task-rule { margin: 0; padding: 0 var(--s4); color: var(--muted); font-size: 13px; }
+
+/* Next-chapter unlock notice, bottom navigation and unsaved-edit warning. Non-modal; never overlaps task fields (normal flow, no sticky/fixed positioning). */
+.k-btn-ghost { background: transparent; border-color: transparent; color: var(--muted); }
+.k-btn-ghost:hover:not(:disabled) { color: var(--text); background: rgba(255,255,255,.05); border-color: var(--line); }
+.pg-unlock { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--s4); align-items: center; padding: var(--s4) var(--s5); border: 1px solid rgba(112,205,165,.5); border-left: 4px solid var(--ok); border-radius: 10px; background: linear-gradient(90deg, rgba(112,205,165,.12), rgba(112,205,165,.03)); animation: pg-rise .35s ease-out; }
+.pg-unlock-icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: var(--ok); color: #0c1a14; font-weight: 800; font-size: 20px; }
+.pg-unlock-copy h2 { margin: 0; font-size: 20px; letter-spacing: -.01em; }
+.pg-unlock-copy p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+.pg-unlock-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: var(--s3); }
+.pg-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s3) var(--s4); padding: var(--s4) var(--s5); border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.pg-foot p { margin: 0; flex: 1 1 280px; color: var(--muted); font-size: 14px; } .pg-foot strong { color: var(--text); }
+.pg-foot.is-open { border-color: rgba(112,205,165,.5); background: rgba(112,205,165,.06); }
+.pg-leave { display: grid; gap: var(--s3); padding: var(--s4); border: 1px solid var(--alert); border-radius: 10px; background: rgba(225,109,120,.08); }
+.pg-leave > div { display: flex; flex-wrap: wrap; gap: var(--s3); }
+@keyframes pg-rise { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .pg-unlock { animation: none; } }

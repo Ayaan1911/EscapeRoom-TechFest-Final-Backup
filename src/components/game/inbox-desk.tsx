@@ -44,7 +44,7 @@ export function InboxDesk({ evidence, initialState, initialDrafts }: { evidence:
     <label>{label}<select value={f.str(task, key)} disabled={!editable} onChange={e => f.set(task, key, e.target.value)}><option value="">Select…</option>{options.map(o => <option key={o.value} value={o.value}>{o.text}</option>)}</select></label>;
   const art = (kind: InboxArtifact["kind"]) => evidence.artifacts.filter(a => a.kind === kind).map(a => ({ value: a.id, text: `${a.id} · ${a.title}` }));
 
-  return <DeskFrame chapter={0} title="The Inbox" caseId={evidence.caseId} state={state} remaining={remaining} drafts={drafts} objective="Which email started it? Prove it: delivery → capture → sign-in → export, all on one session." banner={<><StateBanner state={state} chapter={0} /><ConnectionBanner text={connection} next="/play/inbox" /></>}>
+  return <DeskFrame chapter={0} title="The Inbox" caseId={evidence.caseId} state={state} remaining={remaining} drafts={drafts} result={result} connection={connection} objective="Which email started it? Prove it: delivery → capture → sign-in → export, all on one session." banner={<><StateBanner state={state} chapter={0} /><ConnectionBanner text={connection} next="/play/inbox" /></>}>
     <ChainDiagram label="Evidence chain so far" nodes={[
       { id: "mail", label: "Email", value: marked }, { id: "nav", label: "Navigation", value: pick("gateway") }, { id: "cap", label: "Capture", value: f.str("inbox.entry", "snapshotId") },
       { id: "auth", label: "Sign-in", value: pick("authentication") }, { id: "ses", label: "Session", value: sessionId }, { id: "db", label: "Export", value: pick("database") }]} />
