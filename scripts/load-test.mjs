@@ -63,11 +63,12 @@ class Client {
     return { status: res.status, text };
   }
   async login(role, id, code) {
-    const page = await this.req("login:page", `/login?role=${role}`);
+    const path = role === "admin" ? "/organizer/login" : "/login"; // organizer sign-in is a separate page since Phase 8
+    const page = await this.req("login:page", path);
     const action = /name="(\$ACTION_ID_[a-f0-9]+)"/.exec(page.text)?.[1];
     assert.ok(action, "login form action id not found");
-    const form = new FormData(); form.set(action, ""); form.set("role", role); form.set("id", id); form.set("code", code);
-    const r = await this.req("login:submit", `/login?role=${role}`, { method: "POST", body: form, ok: [303] });
+    const form = new FormData(); form.set(action, ""); if (role !== "admin") form.set("id", id); form.set("code", code);
+    const r = await this.req("login:submit", path, { method: "POST", body: form, ok: [303] });
     return r.status === 303 && !!this.cookie;
   }
   api(name, payload, ok = [200, 409, 429]) {
