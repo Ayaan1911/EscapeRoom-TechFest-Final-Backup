@@ -93,7 +93,7 @@ describe("round 2 graders", () => {
     expect(score("i1.response", { actions: ["rx-2", "rx-4", "rx-6", "rx-3"] })).toBe(2);
   });
   it("a wrong answer in one part does not erase unrelated correct answers", () => {
-    const answer = { ...(perfect["b3.verify"] as object), refutations: { "INT-2": "E-105", "INT-4": "E-107", "INT-5": "E-103" } };
+    const answer = { ...(perfect["b3.verify"] as object), refutations: { "INT-2": ["E-105"], "INT-4": ["E-107"], "INT-5": ["E-103"] } };
     expect(score("b3.verify", answer)).toBe(3);
   });
   it("clock normalization trap: raw-time ordering scores 0 on the trap pairs", () => {

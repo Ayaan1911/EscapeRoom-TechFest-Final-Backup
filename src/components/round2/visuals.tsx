@@ -82,9 +82,9 @@ export function HypothesisMatrix({ working, bestField, elimFields }: { working: 
 export function IntelBoard({ working, gradeFields }: { working: Answer; gradeFields: Field[] }) {
   const { records } = useEvidence();
   return <section className="r2-panel" aria-label="Intelligence bulletin"><h3>Bulletin claims vs. retained evidence</h3>
-    <ul className="r2-intel">{gradeFields.map(f => { const id = f.ref!, r = records.get(id), g = getAt(working, f.path) as string | undefined, src = getAt(working, ["refutations", id]) as string | undefined, s = src ? records.get(src) : undefined;
+    <ul className="r2-intel">{gradeFields.map(f => { const id = f.ref!, r = records.get(id), g = getAt(working, f.path) as string | undefined, src = (getAt(working, ["refutations", id]) as string[] | undefined)?.[0], s = src ? records.get(src) : undefined;
       return <li key={id}><div className="r2-intel-claim"><span className="r2-tag r2-tag-ai">CLAIM · {r?.source}</span><p><b className="r2-id">{id}</b> {r?.detail}</p><span className="r2-chip">{g ?? "ungraded"}</span></div>
-        <div className="r2-intel-src"><span className="r2-tag r2-tag-ok">SOURCE</span>{s ? <p><b className="r2-id">{s.id}</b> {s.title}</p> : <p className="r2-faint">{["INT-2", "INT-4", "INT-5"].includes(id) ? "No verification record chosen" : "Source verification not required for this item"}</p>}</div></li>; })}</ul></section>;
+        <div className="r2-intel-src"><span className="r2-tag r2-tag-ok">SOURCE</span>{s ? <p><b className="r2-id">{s.id}</b> {s.title}</p> : <p className="r2-faint">No verification record chosen</p>}</div></li>; })}</ul></section>;
 }
 
 /** Part B4: readable preview built only from the participant's own structured choices. */

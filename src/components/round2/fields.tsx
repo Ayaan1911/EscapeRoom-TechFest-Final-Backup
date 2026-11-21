@@ -58,7 +58,7 @@ function Keyed({ field, value, onChange, disabled }: Common & { field: Field; va
   return <div className="r2-field"><div className="r2-legend">{field.label}</div>
     {slots.map(key => <fieldset key={key} className="r2-slot" disabled={disabled}><legend><Described id={key} hint={false} /> <button type="button" className="k-btn k-btn-sm" onClick={() => drop(key)}>Remove</button></legend>
       <div className="r2-choices">{(field.options ?? []).map(o => { const on = (value[key] ?? []).includes(o.id); return <label key={o.id} className={`r2-choice ${on ? "is-picked" : ""}`}><input type="checkbox" checked={on} onChange={() => toggle(key, o.id)} /><Described id={o.id} text={o.text} /></label>; })}</div></fieldset>)}
-    {slots.length < maxKeys && <label className="r2-field"><span className="r2-legend">Add a connection to prove ({slots.length}/{maxKeys})</span><select disabled={disabled} value="" onChange={e => e.target.value && setSlots([...slots, e.target.value])}><option value="">Choose a connection…</option>{free.map(k => <option key={k.id} value={k.id}>{k.id}</option>)}</select></label>}</div>;
+    {slots.length < maxKeys && <label className="r2-field"><span className="r2-legend">Add an item ({slots.length}/{maxKeys})</span><select disabled={disabled} value="" onChange={e => e.target.value && setSlots([...slots, e.target.value])}><option value="">Choose an item…</option>{free.map(k => <option key={k.id} value={k.id}>{k.id}</option>)}</select></label>}</div>;
 }
 /** Rows of single-choice fields that share the same small option set (classification grids). */
 function Grid({ fields, working, onChange, disabled }: Common & { fields: Field[]; working: Answer; onChange: (f: Field, v: unknown) => void }) {

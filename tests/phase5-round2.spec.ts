@@ -275,6 +275,12 @@ test("minute 26: Part A is read-only, the Digital Tribunal is open and usable", 
   await task(page, "b2.best").getByRole("group", { name: /explanation the evidence supports/i }).getByLabel(/H4/).check();
   await shot(page, "tribunal-hypotheses");
   await open(page, /Challenge 3/).click(); await expect(page.getByText("Bulletin claims vs. retained evidence")).toBeVisible();
+  const ver = task(page, "b3.verify"); // the team chooses which bulletin items to refute: nothing names INT-2/4/5 for them
+  expect(await ver.textContent()).not.toMatch(/INT-2, INT-4/);
+  await ver.getByRole("combobox", { name: /^Add an item/ }).selectOption("INT-2");
+  await ver.getByLabel(/E-105/).first().check();
+  await expect(ver.locator(".r2-draft")).toHaveText("Draft saved", { timeout: 10_000 });
+  await submit(page, "b3.verify").click(); await expect(feedback(page, "b3.verify")).toContainText("+1 point");
   await open(page, /Challenge 4/).click(); await expect(page.getByRole("heading", { name: "Command brief preview" })).toBeVisible();
   const plan = task(page, "b4.plan");
   await plan.getByLabel(/Keep FIN-LT-07 isolated, block the three/).check(); await plan.getByLabel(/Image memory then disk/).check(); await plan.getByLabel(/Restore only after credentials/).check();

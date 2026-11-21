@@ -21,7 +21,7 @@ export const perfect: Record<string, unknown> = {
   "b2.best": { best: "H4", supportIds: ["E-102", "E-105", "E-107"] },
   "b2.eliminate": { eliminate: { H1: ["E-101", "P-302"], H2: ["T-502", "E-102"], H3: ["T-503", "P-305", "T-504"] } },
   "b3.classify": { grades: { "INT-1": "unverifiable", "INT-2": "false", "INT-3": "accurate", "INT-4": "false", "INT-5": "false", "INT-6": "accurate" } },
-  "b3.verify": { refutations: { "INT-2": "E-105", "INT-4": "P-308", "INT-5": "E-103" }, attributionLimit: "al-3" },
+  "b3.verify": { refutations: { "INT-2": ["E-105"], "INT-4": ["P-308"], "INT-5": ["E-103"] }, attributionLimit: "al-3" },
   "b4.facts": { factIds: ["fx-1", "fx-3", "fx-5", "fx-7", "fx-9"] },
   "b4.attribution": { level: "at-3", reasons: ["ar-1", "ar-3", "ar-5"] },
   "b4.plan": { containment: "pc-2", preservation: "pp-1", recovery: "pr-3" },

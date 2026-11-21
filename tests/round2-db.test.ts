@@ -176,6 +176,19 @@ describe.skipIf(process.env.GHOST_DB_TEST !== "1")("Round 2 backend (PostgreSQL)
     await db.r2Session.update({ where: { id: 1 }, data: { endedAt: null } }); // reopen the disposable clock for the following tests
     await gap();
   });
+  it("hostile requests: wrong or missing origin, oversize bodies and prototype-polluting JSON are refused before any scoring", async () => {
+    await ago(min(19)); await asTeam("R08");
+    const raw = (body: string, headers: Record<string, string>) => new NextRequest(`${origin}/api/round2/submit`, { method: "POST", headers: { "Content-Type": "application/json", ...headers }, body });
+    const ok = JSON.stringify({ taskId: "i1.assets", answer: perfect["i1.assets"] });
+    expect((await submitRoute.POST(raw(ok, { origin: "https://evil.example" }))).status).toBe(403);
+    expect((await submitRoute.POST(raw(ok, {}))).status).toBe(403);
+    expect((await submitRoute.POST(raw(JSON.stringify({ taskId: "i1.assets", answer: { pad: "x".repeat(20_000) } }), { origin }))).status).toBe(413);
+    expect((await submitRoute.POST(raw('{"taskId":"i1.assets","answer":{"__proto__":{"assets":["as-12"]}}}', { origin }))).status).toBe(400);
+    expect((await submitRoute.POST(raw('{"taskId":"i1.assets","answer":{"assets":["as-12"]},"teamId":"R01"}', { origin }))).status).toBe(400);
+    expect((await submitRoute.POST(raw("not json", { origin }))).status).toBe(400);
+    expect(await db.r2TaskScore.count({ where: { teamId: "R08", taskId: "i1.assets" } })).toBe(0);
+    await gap();
+  });
   it("Part A closes at minute 25, Part B opens, and Part B closes at minute 50", async () => {
     await ago(min(25) + 1000); await asTeam("R07"); await gap();
     await expect(play.submitTask("R07", "i1.assets", perfect["i1.assets"])).rejects.toMatchObject({ status: 403, message: expect.stringMatching(/closed/) });

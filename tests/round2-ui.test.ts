@@ -127,3 +127,16 @@ describe("Round 2 UI: visual data adapters", () => {
     expect(claimOf(records, "A")).toMatch(/phishing/);
   });
 });
+
+describe("Round 2 content: no prompt or form reveals which items are the answers (Phase 5 regression)", () => {
+  it("no task prompt names an option or record id", () => {
+    const idLike = /(?:[A-Z]{1,3}-\d{2,3}|[a-z]{2}-\d+|INT-\d)/;
+    for (const t of units.flatMap(u => u.tasks)) expect(t.prompt, t.id).not.toMatch(idLike);
+  });
+  it("Challenge 3 verification lets the team choose which bulletin items to refute (any of the six, at most three)", () => {
+    const f = fieldsFor("b3.verify")[0] as Field;
+    expect(f.keys!.map(k => k.id)).toEqual(["INT-1", "INT-2", "INT-3", "INT-4", "INT-5", "INT-6"]);
+    expect(score("b3.verify", { refutations: { "INT-3": ["E-105"], "INT-6": ["E-107"], "INT-1": ["E-102"], "INT-2": ["E-105"] } })).toBe(-1); // four keys
+    expect(score("b3.verify", { refutations: { "INT-3": ["E-105"] } })).toBe(0); // optional limitation, wrong item: nothing earned, nothing leaked
+  });
+});

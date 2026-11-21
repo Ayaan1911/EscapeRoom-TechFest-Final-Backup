@@ -37,7 +37,7 @@ const fields: Record<string, () => Field[]> = {
   "b2.best": () => [single(["best"], "The explanation the evidence supports", HYP), multi(["supportIds"], "Supporting records (2 to 4)", ev("b2.best"), 2, 4)],
   "b2.eliminate": () => ["H1", "H2", "H3"].map(h => multi(["eliminate", h], `Records that defeat ${h} (up to 3)`, ev("b2.eliminate"), 1, 3)),
   "b3.classify": () => rows("b3.classify", "items", ["grades"], GRADES),
-  "b3.verify": () => [...["INT-2", "INT-4", "INT-5"].map(i => single(["refutations", i], `Record that refutes ${i}`, ev("b3.verify"), { ref: i })), single(["attributionLimit"], "Limitation that applies to INT-1", L("b3.verify", "attributionLimit"), { ref: "INT-1" })],
+  "b3.verify": () => [{ kind: "keyed", path: ["refutations"], label: "Refuting record for each item you graded false (up to 3)", keys: L("b3.classify", "items"), options: ev("b3.verify"), max: 1, maxKeys: 3 }, single(["attributionLimit"], "Limitation that applies to an item you graded unverifiable (optional)", L("b3.verify", "attributionLimit"), { optional: true })],
   "b4.facts": () => [multi(["factIds"], "Statements the evidence confirms", L("b4.facts", "facts"), 1, 10)],
   "b4.attribution": () => [single(["level"], "Attribution level the evidence allows", L("b4.attribution", "level")), multi(["reasons"], "Reasons that limit attribution", L("b4.attribution", "reasons"), 1, 5)],
   "b4.plan": () => (["containment", "preservation", "recovery"] as const).map(k => single([k], k[0].toUpperCase() + k.slice(1), L("b4.plan", k))),
