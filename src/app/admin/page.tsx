@@ -41,6 +41,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         </Card>
         <Card eyebrow="PRINT" title="Event kits" id="kits">
           <ul className="k-tiles">
+            <li className="k-tile"><a href="/admin/round2">Round 2 control room</a><span>GHOST RETURNS: finalists, clock, scores, results</span></li>
             <li className="k-tile"><a href="/admin/inbox-kit">Print Chapter 1 evidence kit</a><span>QR snapshot cards for the Inbox investigation</span></li>
             <li className="k-tile"><a href="/admin/insider-kit">Print Insider Evidence Wall kit</a><span>Private envelope fragments and public wall cards</span></li>
             <li className="k-tile"><a href="/admin/containment-kit">Print Containment CCTV kit</a><span>Security-room snapshots by variant</span></li>

@@ -1,7 +1,7 @@
 import { Brand } from "@/components/ui/brand";
 import { signIn } from "./actions";
 
-const NEXT = ["/clue/inbox", "/play/inbox", "/play/trail", "/play/insider", "/play/containment", "/play/verdict"];
+const NEXT = ["/round2", "/clue/inbox", "/play/inbox", "/play/trail", "/play/insider", "/play/containment", "/play/verdict"];
 
 // Participant login only. Any ?role= parameter is ignored: this page always authenticates a team.
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string; next?: string }> }) {
