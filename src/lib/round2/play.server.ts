@@ -5,6 +5,7 @@ import { clockNow, R2Error } from "./common.server";
 import { availability, visible, type R2Clock } from "./clock";
 import { criterionPoints, CONTENT_VERSION, MAX_ATTEMPTS_PER_TASK, MIN_SUBMIT_GAP_MS, partMax, r2Catalog, r2TaskById, taskMax, unitMax, UNITS } from "./catalog";
 import { CASE_BRIEF, units } from "./content.server";
+import { fieldsFor } from "./forms.server";
 import { gradeValidated, validateAnswer } from "./tasks.server";
 import { answerHash, stableStringify } from "./safe-json";
 
@@ -29,7 +30,7 @@ export async function r2Status(teamId: string) {
 export async function r2Bundle() {
   const { clock } = await clockNow();
   const released = units.filter(u => visible(u, clock));
-  return { clock: clockView(clock), brief: released.length ? CASE_BRIEF : null, contentVersion: CONTENT_VERSION, units: released.map(u => ({ part: u.part, unit: u.unit, title: u.title, story: u.story, records: u.records, tasks: u.tasks.map(t => ({ ...t, max: taskMax(r2TaskById.get(t.id)!), availability: availability(u, clock) })) })) };
+  return { clock: clockView(clock), brief: released.length ? CASE_BRIEF : null, contentVersion: CONTENT_VERSION, units: released.map(u => ({ part: u.part, unit: u.unit, title: u.title, story: u.story, records: u.records, tasks: u.tasks.map(t => ({ id: t.id, prompt: t.prompt, max: taskMax(r2TaskById.get(t.id)!), availability: availability(u, clock), fields: fieldsFor(t.id) })) })) };
 }
 
 export type SubmitOutcome = { duplicate: boolean; accepted: boolean; awarded: number; task: { id: string; earned: number; max: number }; score: { partA: number; partB: number; total: number } };
