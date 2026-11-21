@@ -1,0 +1,36 @@
+# PREPARED, NOT APPLIED. Isolated hosted REHEARSAL service for GHOST_404 (Phase 6B). Nothing here creates a resource until the organizer explicitly authorizes it.
+# Isolation rules: its own Render service (never the existing preview ghost404-round1-preview), its own Neon PROJECT and database (ghost404_loadtest),
+# its own fresh secrets, synthetic teams only, autoDeploy OFF, deploys by explicit commit SHA ("Deploy a specific commit"), no real participant or organizer data.
+# Secrets are never stored here: every `sync: false` variable is typed into the Render dashboard by the owner and is never committed or printed.
+# The `plan` below is a PLACEHOLDER pending budget approval (see docs/phase6b-hosting-costs.md). Free/Starter are NOT sized for 150 participants
+# (measured server RSS ~451 MB and ~0.84 CPU core at 4x compressed load).
+services:
+  - type: web
+    name: ghost404-staging-loadtest # the load harness refuses any origin whose host does not contain "loadtest"
+    runtime: node
+    plan: standard # PLACEHOLDER: 1 CPU / 2 GB. Requires explicit budget approval before the Blueprint is applied.
+    region: singapore # keep in the same region family as the Neon project
+    branch: feat/phase6b-preflight # informational: the actual deployed commit is chosen manually and recorded in the rehearsal log
+    autoDeploy: false
+    buildCommand: npm ci --include=dev && npm run build
+    # Migrations are applied explicitly through DIRECT_URL in the runbook (step 2). start:render re-runs `prisma migrate deploy` (idempotent) before serving.
+    startCommand: npm run start:render
+    healthCheckPath: /api/health # liveness only; /api/health?db=1 is the readiness check used by the runbook
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
+      - key: DB_POOL_SIZE # per-process Prisma pool; one web instance only (login throttling and the pool are per process)
+        value: "5"
+      - key: DATABASE_URL # Neon POOLED string of the loadtest project (host contains -pooler), ?sslmode=require&pgbouncer=true&connect_timeout=30
+        sync: false
+      - key: DIRECT_URL # Neon DIRECT string of the same database: migrations and backups only
+        sync: false
+      - key: ADMIN_ACCESS_HASH # hash of a NEW organizer test code (GHOST_BOOTSTRAP_SECRET=... node scripts/bootstrap.mjs); never the real organizer code
+        sync: false
+      - key: APP_ORIGIN # exact public origin of THIS service, e.g. https://ghost404-staging-loadtest.onrender.com (no trailing slash)
+        sync: false
+      # GHOST_TX_MODE is deliberately NOT set: the default is the per-team lock. Set it to "serializable" only as a documented fallback if the pooler gate fails.

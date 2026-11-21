@@ -5,7 +5,7 @@ import { PrismaClient } from "@prisma/client";
 // The lifecycle is the legitimate one: confirm qualification -> enroll -> verify readiness -> start, all through the real UI.
 // Elapsed time is simulated by moving the TEST session's stored start time (no real 50-minute clock is ever run).
 // The lifecycle tests share one timeline, so they run serially; every gameplay test re-establishes the minute it needs.
-const code = process.env.GHOST_E2E_TEAM_CODE!, origin = "http://127.0.0.1:3000", prisma = new PrismaClient({ datasourceUrl: process.env.DATABASE_URL });
+const code = process.env.GHOST_E2E_TEAM_CODE!, origin = process.env.GHOST_BASE_URL ?? "http://127.0.0.1:3000", prisma = new PrismaClient({ datasourceUrl: process.env.DATABASE_URL });
 const shots = process.env.GHOST_SHOTS === "1";
 test.describe.configure({ mode: "serial" });
 test.setTimeout(180_000);
@@ -360,10 +360,12 @@ test("organizer: end/publish rules, FINAL tiebreakers, exact-tie acknowledgment 
   await ack.click(); await expect(page.getByRole("dialog")).toContainText("cannot select a winner");
   await page.getByRole("dialog").getByRole("button", { name: "Cancel" }).click();
   expect((await (await page.request.get("/api/round2/admin?view=results")).json()).unacknowledgedTies).toBeGreaterThan(0); // cancelling recorded nothing
-  while (await ties.getByRole("button", { name: "Acknowledge exact tie" }).count()) {
-    await ties.getByRole("button", { name: "Acknowledge exact tie" }).first().dispatchEvent("click"); // dev-server re-renders can detach the node mid-pointer-click; the handler is what matters
-    await page.getByRole("dialog").getByRole("button", { name: "Acknowledge exact tie" }).dispatchEvent("click"); // the control unmounts as soon as the server confirms, so a pointer click would race its own detachment
+  const unacknowledged = async () => (await (await page.request.get("/api/round2/admin?view=results")).json()).unacknowledgedTies as number;
+  for (let guard = 0; await unacknowledged() > 0 && guard < 5; guard++) { // one iteration per exact-tie group; each is an ordinary user interaction
+    await ties.getByRole("button", { name: "Acknowledge exact tie" }).first().click();
+    await page.getByRole("dialog").getByRole("button", { name: "Acknowledge exact tie" }).click();
     await expect(page.locator(".r2a-msg.is-ok")).toContainText("acknowledged");
+    expect(await ties.getByRole("button", { name: "Acknowledge exact tie" }).count()).toBeLessThanOrEqual(await unacknowledged()); // success is never shown next to a stale, still-clickable control
   }
   await expect(ties).toContainText("Acknowledged: Exact tie reviewed");
   const after = (await rows.allInnerTexts()).map(r => r.replace(/\s+/g, " ")); expect(after.length).toBe(order.length); expect(after.findIndex(r => r.includes("Finalist 07"))).toBe(i7); // acknowledgment reorders and rescores nothing

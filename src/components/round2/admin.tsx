@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { adminGet, adminPost, ApiError } from "./api";
 import { formatClock } from "@/lib/round2/client-clock";
 
@@ -15,13 +15,15 @@ type Msg = { tone: "ok" | "error"; text: string } | null;
 const utc = (s: string | null) => s ? new Date(s).toISOString().replace("T", " ").slice(0, 19) + " UTC" : "—";
 const errText = (e: unknown) => e instanceof ApiError ? (e.status === 401 ? "Organizer session expired. Sign in again." : e.message) : "Unexpected error";
 
+/** True while ANY organizer action is in flight (including the refresh that follows it): every action button is disabled, so a control can never be used twice or while stale. */
+const Pending = createContext(false);
 /** High-impact action behind a native <dialog>. Nothing is sent until the operator confirms; the real server response is shown. */
 function ConfirmButton({ label, title, children, word, danger, disabled, onConfirm }: { label: string; title: string; children: ReactNode; word?: string; danger?: boolean; disabled?: boolean; onConfirm: () => Promise<void> }) {
-  const ref = useRef<HTMLDialogElement>(null), [typed, setTyped] = useState(""), [busy, setBusy] = useState(false);
+  const ref = useRef<HTMLDialogElement>(null), [typed, setTyped] = useState(""), [busy, setBusy] = useState(false), pending = useContext(Pending), titleId = useId();
   const ok = !word || typed.trim() === word;
   return <>
-    <button type="button" className={`k-btn ${danger ? "k-btn-danger" : "k-btn-primary"}`} disabled={disabled} onClick={() => { setTyped(""); ref.current?.showModal(); }}>{label}</button>
-    <dialog ref={ref} className={`r2a-dialog ${danger ? "is-danger" : ""}`} aria-labelledby="r2a-t"><h2 id="r2a-t">{title}</h2><div>{children}</div>
+    <button type="button" className={`k-btn ${danger ? "k-btn-danger" : "k-btn-primary"}`} disabled={disabled || pending} onClick={() => { setTyped(""); ref.current?.showModal(); }}>{label}</button>
+    <dialog ref={ref} className={`r2a-dialog ${danger ? "is-danger" : ""}`} aria-labelledby={titleId}><h2 id={titleId}>{title}</h2><div>{children}</div>
       {word && <label className="r2a-form">Type <b className="r2-mono">{word}</b> to confirm<input value={typed} onChange={e => setTyped(e.target.value)} autoComplete="off" spellCheck={false} /></label>}
       <div className="r2-actions" style={{ marginTop: 16 }}><button type="button" className="k-btn" autoFocus onClick={() => ref.current?.close()}>Cancel</button>
         <button type="button" className={`k-btn ${danger ? "k-btn-danger" : "k-btn-primary"}`} disabled={!ok || busy} onClick={async () => { setBusy(true); try { await onConfirm(); } finally { setBusy(false); ref.current?.close(); } }}>{busy ? "Working…" : label}</button></div></dialog></>;
@@ -31,7 +33,7 @@ export function Round2Admin() {
   const [qual, setQual] = useState<Qual | null>(null), [qualErr, setQualErr] = useState(""), [ready, setReady] = useState<Ready | null>(null), [timing, setTiming] = useState<Timing | null>(null);
   const [scores, setScores] = useState<Score[]>([]), [audit, setAudit] = useState<Audit | null>(null), [results, setResults] = useState<Results | null>(null), [resultsErr, setResultsErr] = useState("");
   const [solutions, setSolutions] = useState<Solution[] | null>(null), [msg, setMsg] = useState<Msg>(null), [auto, setAuto] = useState(true), [offset, setOffset] = useState(0), [wall, setWall] = useState(() => Date.now());
-  const [standby, setStandby] = useState(""), [replaces, setReplaces] = useState(""), [reason, setReason] = useState(""), [endReason, setEndReason] = useState(""), [tieReason, setTieReason] = useState("");
+  const [standby, setStandby] = useState(""), [replaces, setReplaces] = useState(""), [reason, setReason] = useState(""), [endReason, setEndReason] = useState(""), [tieReason, setTieReason] = useState(""), [pending, setPending] = useState(false);
 
   // READ-ONLY refresh: only GETs. No administrative mutation can ever be triggered from here.
   const load = useCallback(async (full: boolean) => {
@@ -41,27 +43,28 @@ export function Round2Admin() {
     if (t.status === "fulfilled") { setTiming(t.value); setOffset(Date.parse(t.value.serverNow) - Math.round((t0 + Date.now()) / 2)); }
     const failed = [r, t, s].find(x => x.status === "rejected") as PromiseRejectedResult | undefined;
     if (failed) setMsg({ tone: "error", text: errText(failed.reason) });
-    if (full) {
-      adminGet<Qual>("qualification").then(q => { setQual(q); setQualErr(""); }).catch(e => setQualErr(errText(e)));
-      adminGet<Audit>("audit").then(setAudit).catch(() => undefined);
-      adminGet<Results>("results").then(x => { setResults(x); setResultsErr(""); }).catch(e => { setResults(null); setResultsErr(errText(e)); });
-    }
+    if (full) await Promise.allSettled([
+      adminGet<Qual>("qualification").then(q => { setQual(q); setQualErr(""); }).catch(e => setQualErr(errText(e))),
+      adminGet<Audit>("audit").then(setAudit).catch(() => undefined),
+      adminGet<Results>("results").then(x => { setResults(x); setResultsErr(""); }).catch(e => { setResults(null); setResultsErr(errText(e)); }),
+    ]);
   }, []);
   useEffect(() => { const id = setTimeout(() => void load(true), 0); return () => clearTimeout(id); }, [load]);
   useEffect(() => { const id = setInterval(() => setWall(Date.now()), 1000); return () => clearInterval(id); }, []);
   useEffect(() => { if (!auto) return; const id = setInterval(() => { if (document.visibilityState === "visible") void load(false); }, 15_000); return () => clearInterval(id); }, [auto, load]);
 
   async function act(body: Record<string, unknown>, okText: (r: Record<string, unknown>) => string) {
-    try { const r = await adminPost<Record<string, unknown>>(body); setMsg({ tone: "ok", text: okText(r) }); }
-    catch (e) { setMsg({ tone: "error", text: errText(e) }); }
-    await load(true);
+    setPending(true);
+    try { const r = await adminPost<Record<string, unknown>>(body); await load(true); setMsg({ tone: "ok", text: okText(r) }); } // success is announced only AFTER the refreshed state is on screen
+    catch (e) { setMsg({ tone: "error", text: errText(e) }); await load(true); }
+    finally { setPending(false); }
   }
   const nowMs = wall + offset, running = timing?.phase === "part_a" || timing?.phase === "part_b", finished = timing?.phase === "finished";
   const active = qual?.enrolled.filter(e => e.status === "active") ?? [], standbys = qual?.enrolled.filter(e => e.status === "standby") ?? [];
   const nameOf = (id: string) => qual?.top10.concat(qual.standby).find(t => t.id === id)?.name ?? id;
   const remaining = timing?.schedule ? Date.parse(timing.endedAt ?? timing.schedule.endsAt) - nowMs : null;
 
-  return <div className="k-desk r2a">
+  return <Pending.Provider value={pending}><div className="k-desk r2a">
     <header className="k-mission"><div className="k-mission-main"><div><span className="k-eyebrow">ORGANIZER · ROUND 2</span><h1>GHOST RETURNS control room</h1><p className="k-objective">Nothing here runs by itself: every start, end, enrollment, promotion and publication needs your explicit confirmation.</p></div></div></header>
     {msg && <p className={`r2a-msg is-${msg.tone}`} role={msg.tone === "error" ? "alert" : "status"}>{msg.text} <button type="button" className="k-btn k-btn-sm" onClick={() => setMsg(null)}>Dismiss</button></p>}
     <div className="r2-actions"><button type="button" className="k-btn" onClick={() => void load(true)}>Refresh now</button><label className="r2-check"><input type="checkbox" checked={auto} onChange={e => setAuto(e.target.checked)} /> Auto-refresh scores and clock every 15 s (read-only)</label><a className="k-btn" href="/admin">Back to Round 1 operations</a></div>
@@ -131,5 +134,5 @@ export function Round2Admin() {
 
       <section className="r2a-card is-wide"><h2>Organizer solutions</h2><p className="r2-meta">Answer-key explanations. Load only on a private screen; never shown to teams.</p>
         {solutions ? <ul className="r2a-list">{solutions.map(s => <li key={s.id}><b className="r2-mono">{s.id}</b> {s.explanation}</li>)}</ul> : <button type="button" className="k-btn" onClick={() => adminGet<Solution[]>("solutions").then(setSolutions).catch(e => setMsg({ tone: "error", text: errText(e) }))}>Load solutions</button>}</section>
-    </div></div>;
+    </div></div></Pending.Provider>;
 }

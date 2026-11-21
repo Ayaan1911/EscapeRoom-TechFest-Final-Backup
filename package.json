@@ -33,7 +33,10 @@
     "test:e2e:containment": "node scripts/inbox-demo.mjs --test --containment",
     "demo:verdict": "node scripts/inbox-demo.mjs --verdict",
     "test:e2e:verdict": "node scripts/inbox-demo.mjs --test --verdict",
-    "test:e2e:journey": "node scripts/inbox-demo.mjs --test --journey"
+    "test:e2e:journey": "node scripts/inbox-demo.mjs --test --journey",
+    "staging:check": "node scripts/staging-check.mjs",
+    "staging:gate": "node scripts/staging-pooler-gate.mjs",
+    "staging:gate:local": "node scripts/staging-pooler-gate.mjs --local"
   },
   "dependencies": {
     "@prisma/client": "^6.19.0",
