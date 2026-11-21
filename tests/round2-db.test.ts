@@ -83,6 +83,8 @@ describe.skipIf(process.env.GHOST_DB_TEST !== "1")("Round 2 backend (PostgreSQL)
     const started = await org.startRound();
     expect(started.partAClosesAt.getTime() - started.startsAt.getTime()).toBe(min(25));
     expect(await db.r2Audit.count({ where: { action: "start" } })).toBe(1);
+    expect((await db.r2Session.findUniqueOrThrow({ where: { id: 1 } })).scoringPolicy).toBe("best-v1"); // fixed at start
+    expect(JSON.parse((await db.r2Audit.findFirstOrThrow({ where: { action: "start" } })).detail).scoringPolicy).toBe("best-v1");
     await expect(org.startRound()).rejects.toMatchObject({ status: 409 });
     await expect(enroll.enrollFinalists()).rejects.toMatchObject({ status: 409 }); // roster frozen from the same snapshot only before start
   });
@@ -120,16 +122,15 @@ describe.skipIf(process.env.GHOST_DB_TEST !== "1")("Round 2 backend (PostgreSQL)
     expect(ok.reduce((n, r) => n + r.awarded, 0)).toBe(4);
     expect((await db.r2TaskScore.findUnique({ where: { teamId_taskId: { teamId: "R02", taskId: "i2.block" } } }))?.earned).toBe(4);
   });
-  it("attempt cap and cooldown limit brute forcing", async () => {
+  it("attempt cap and cooldown limit brute forcing (best-v1 tier B: 3 distinct attempts for i2.identify)", async () => {
     await ago(min(19)); await gap();
-    await expect(play.submitTask("R03", "i2.identify", { connectionIds: ["C-01"] })).resolves.toMatchObject({ awarded: 0 });
-    await expect(play.submitTask("R03", "i2.identify", { connectionIds: ["C-02"] })).rejects.toMatchObject({ status: 429, extra: { retryAfter: expect.any(Number) } });
-    const ids = ["C-01", "C-02", "C-04", "C-05", "C-06", "C-07", "C-09", "C-10"], pairs = ids.flatMap((a, i) => ids.slice(i + 1).map(b => [a, b])); // never the real pair, so the task cannot complete
-    for (const pair of pairs.slice(0, 10)) { await gap(); await expect(play.submitTask("R03", "i2.identify", { connectionIds: pair })).resolves.toMatchObject({ awarded: 0 }); } // attempts 3..12 (cooldown attempt above was refused, not graded)
-    expect(await db.r2Submission.count({ where: { teamId: "R03", taskId: "i2.identify" } })).toBe(11);
-    await gap(); await expect(play.submitTask("R03", "i2.identify", { connectionIds: pairs[10] })).resolves.toMatchObject({ awarded: 0 }); // 12th
-    await gap(); await expect(play.submitTask("R03", "i2.identify", { connectionIds: pairs[11] })).rejects.toMatchObject({ status: 429, message: expect.stringContaining("Attempt limit") });
-    await gap(); await expect(play.submitTask("R03", "i2.identify", { connectionIds: pairs[0] })).resolves.toMatchObject({ duplicate: true }); // an identical resend is still free at the cap
+    const ids = ["C-01", "C-02", "C-04", "C-05", "C-06", "C-07", "C-09", "C-10"], pairs = ids.flatMap((x, i) => ids.slice(i + 1).map(y => [x, y])); // never the real pair, so the task cannot complete
+    await expect(play.submitTask("R03", "i2.identify", { connectionIds: pairs[0] })).resolves.toMatchObject({ awarded: 0, attempts: { used: 1, cap: 3, remaining: 2 } });
+    await expect(play.submitTask("R03", "i2.identify", { connectionIds: pairs[1] })).rejects.toMatchObject({ status: 429, extra: { retryAfter: expect.any(Number) } }); // cooldown, not graded
+    for (const pair of pairs.slice(1, 3)) { await gap(); await expect(play.submitTask("R03", "i2.identify", { connectionIds: pair })).resolves.toMatchObject({ awarded: 0 }); }
+    expect(await db.r2Submission.count({ where: { teamId: "R03", taskId: "i2.identify" } })).toBe(3);
+    await gap(); await expect(play.submitTask("R03", "i2.identify", { connectionIds: pairs[3] })).rejects.toMatchObject({ status: 429, message: "No attempts remaining. Your highest score has been saved." });
+    await gap(); await expect(play.submitTask("R03", "i2.identify", { connectionIds: pairs[0] })).resolves.toMatchObject({ duplicate: true }); // an identical resend is free at the cap
   });
   it("teams cannot touch each other's data and non-finalists are refused", async () => {
     await asTeam("R13"); expect((await submitRoute.POST(post("/api/round2/submit", { taskId: "i1.assets", answer: perfect["i1.assets"] }))).status).toBe(403);

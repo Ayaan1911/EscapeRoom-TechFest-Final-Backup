@@ -2,12 +2,13 @@
 import { useEffect, useRef, useState } from "react";
 import type { Progress } from "@/lib/game/engine";
 
-export type TaskRow = { id: string; title: string; earned: number; max: number };
+export type Attempts = { used: number; cap: number; remaining: number };
+export type TaskRow = { id: string; title: string; earned: number; max: number; attempts?: Attempts | null };
 export type ChapterState = {
   progress: Progress; score: number; current: number; status: string; chapterHints: string[][]; serverNow: number; round: { deadline: string | null };
-  insiderUnlocked?: boolean; unlocked: boolean[]; unlockThresholds: readonly number[]; tasks: TaskRow[][];
+  policy?: string; insiderUnlocked?: boolean; unlocked: boolean[]; unlockThresholds: readonly number[]; tasks: TaskRow[][];
 };
-export type SubmitResult = { task: string | null; awarded: number; taskEarned: number | null; taskMax: number | null; chapterRaw: number; chapterMax: number; accepted: boolean; unlocked: number[]; tamperAwarded: boolean };
+export type SubmitResult = { duplicate?: boolean; improved?: boolean; tasks?: TaskRow[]; task: string | null; awarded: number; taskEarned: number | null; taskMax: number | null; chapterRaw: number; chapterMax: number; accepted: boolean; unlocked: number[]; tamperAwarded: boolean };
 
 /** Server-authoritative chapter state, polling, and the three mutations (task submit, hint, unlock). Nothing here computes a score. */
 export function useChapter(chapter: 0 | 1 | 2 | 3 | 4, initialState: ChapterState) {

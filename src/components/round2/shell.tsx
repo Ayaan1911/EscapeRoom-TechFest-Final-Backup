@@ -70,7 +70,7 @@ function Inner({ teamName, initial }: { teamName: string; initial: StatusPayload
         {clock.phase === "finished" && <FinishedPanel status={status} teamName={teamName} />}
         {locked && <p className="r2-banner is-warn" role="status">Part A is closing. Submissions are disabled; the server makes the final call.</p>}
         {item.state === "not released" ? <section className="r2-state"><h2>{item.title}</h2><p>Not released yet.</p></section>
-          : unit && bundle ? <UnitView key={current} unit={unit} bundle={bundle} status={status} clock={clock} now={nowMs} onScored={(id: string, o: SubmitOutcome) => { applyScore(id, o.task.earned, o.score); void refresh(); }} onNeedRefresh={() => void refresh()} />
+          : unit && bundle ? <UnitView key={current} unit={unit} bundle={bundle} status={status} clock={clock} now={nowMs} onScored={(id: string, o: SubmitOutcome) => { applyScore(id, o.task.earned, o.score, o.attempts); void refresh(); }} onNeedRefresh={() => void refresh()} />
           : <section className="r2-state" role="status"><p>Loading released evidence…</p></section>}
       </main>
     </div></div>;

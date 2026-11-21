@@ -38,6 +38,7 @@ model GameSession {
   startsAt DateTime?
   deadline DateTime?
   endedAt DateTime?
+  scoringPolicy String? // fixed when the round starts ("best-v1"); NULL on a round that started before policies existed = legacy "union-v0"
 }
 model Submission {
   id String @id @default(cuid())
@@ -51,8 +52,11 @@ model Submission {
   awarded Int?
   chapterRaw Int?
   criteria String?
+  taskId String? // best-v1 audit: task of a task submission (NULL = full-chapter submission)
+  answerHash String? // best-v1: identical re-submissions are idempotent
   createdAt DateTime @default(now())
   @@index([teamId, createdAt])
+  @@index([teamId, chapter, answerHash])
 }
 model AuditLog {
   id String @id @default(cuid())
@@ -75,7 +79,8 @@ model TaskScore {
   taskId String
   earned Int
   max Int
-  criteria String // JSON array of earned criterion ids
+  criteria String // JSON array of earned criterion ids (best-v1: the criteria of the single best submission)
+  attempts Int @default(0) // best-v1: distinct graded attempts used
   firstScoredAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@id([teamId, taskId])
@@ -101,6 +106,7 @@ model R2Session {
   endedAt DateTime?
   resultsPublishedAt DateTime?
   contentVersion String?
+  scoringPolicy String? // fixed at start ("best-v1"); NULL on a legacy session = "union-v0"
 }
 // Enrollment from the organizer-confirmed qualification snapshot. status: active | standby | withdrawn.
 model R2Finalist {
@@ -129,6 +135,7 @@ model R2Submission {
   answerHash String
   answer String
   contentVersion String
+  scoringPolicy String? // policy in force when graded
   createdAt DateTime @default(now())
   @@index([teamId, taskId, createdAt])
   @@index([teamId, createdAt])

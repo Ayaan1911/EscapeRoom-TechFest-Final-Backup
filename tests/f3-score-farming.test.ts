@@ -4,7 +4,7 @@ import { criterionPoints, r2Catalog, taskMax } from "../src/lib/round2/catalog";
 import { fieldsFor } from "../src/lib/round2/forms.server";
 import { buildAnswer, setAt, type Answer, type Field } from "../src/lib/round2/form-types";
 import { gradeValidated, validateAnswer } from "../src/lib/round2/tasks.server";
-import { attemptCap, scoreUnion, scoreBest, emptyState } from "../src/lib/round2/scoring-policy";
+import { capFor, scoreUnion, scoreBest, emptyState } from "../src/lib/round2/scoring-policy";
 import { taskDefs } from "../src/lib/game/validators";
 import { gradeTask, criterionPoints as r1Points } from "../src/lib/game/scoring";
 import { containmentEvidence } from "../src/lib/game/containment.server";
@@ -40,7 +40,7 @@ describe("F3 section 1: the union policy lets a team farm full credit from incom
     for (let k = 0; k < 3 && got < 3; k++) for (let j = 0; j < 3 && got < 3; j++) { all.push({ choices: { executives: ex[k], staff: st[k], vendor: vn[j], public: pb[(j + k) % 3] } }); n++; got = union("i4.comms", all); }
     expect(got).toBe(3); expect(n).toBeLessThanOrEqual(9);
   });
-  it("the current 12-attempt cap does not prevent it for any of those tasks (all need 9 attempts or fewer)", () => { expect(attemptCap("i1.classify", "union")).toBe(12); });
+  it("the current 12-attempt cap does not prevent it for any of those tasks (all need 9 attempts or fewer)", () => { expect(capFor("i1.classify", "union-v0")).toBe(12); });
 });
 
 // ---- section 2: Monte Carlo over EVERY task using the real graders ----
@@ -57,7 +57,7 @@ function randomValue(f: Field, r: () => number): unknown {
 const randomAnswer = (fields: Field[], r: () => number): Answer => { let a: Answer = {}; for (const f of fields) { const v = randomValue(f, r); if (v !== undefined) a = setAt(a, f.path, v); } return buildAnswer(fields, a); };
 const mutate = (fields: Field[], base: Answer, r: () => number): Answer => { const cand = fields.filter(f => f.kind !== "text"), f = cand[Math.floor(r() * cand.length)]; return buildAnswer(fields, setAt(base, f.path, randomValue(f, r))); };
 type Policy = { name: string; semantic: "union" | "best"; cap: (taskId: string) => number };
-const POLICIES: Policy[] = [{ name: "CURRENT union, cap 12", semantic: "union", cap: () => 12 }, { name: "best-coherent, cap 12", semantic: "best", cap: () => 12 }, { name: "best-coherent, tiered cap", semantic: "best", cap: id => attemptCap(id, "best") }, { name: "best-coherent, cap 2", semantic: "best", cap: () => 2 }, { name: "best-coherent, cap 3", semantic: "best", cap: () => 3 }, { name: "CHANCE FLOOR: one coherent attempt", semantic: "best", cap: () => 1 }];
+const POLICIES: Policy[] = [{ name: "CURRENT union, cap 12", semantic: "union", cap: () => 12 }, { name: "best-coherent, cap 12", semantic: "best", cap: () => 12 }, { name: "APPROVED best-v1 tiers 2/3/5", semantic: "best", cap: id => capFor(id, "best-v1") }, { name: "best-coherent, cap 2", semantic: "best", cap: () => 2 }, { name: "best-coherent, cap 3", semantic: "best", cap: () => 3 }, { name: "CHANCE FLOOR: one coherent attempt", semantic: "best", cap: () => 1 }];
 
 /** One attacker run: hill-climbing guesser that sees only the points-awarded delta of each submission. Returns the fraction of the task's maximum it holds. */
 function attack(taskId: string, policy: Policy, seed: number, attempts: number, adaptive: boolean) {
@@ -81,7 +81,7 @@ describe("F3 section 2: guessing attackers vs. scoring policies (all 26 R2 tasks
     result.set(t.id, out);
   }
   it("measures and records the farmed fraction per task and policy", () => {
-    for (const t of r2Catalog) rows.push({ task: t.id, part: t.part, max: taskMax(t), cap: attemptCap(t.id, "best"), ...Object.fromEntries(Object.entries(result.get(t.id)!).map(([k, v]) => [k, Math.round(v * 100)])) });
+    for (const t of r2Catalog) rows.push({ task: t.id, part: t.part, max: taskMax(t), cap: capFor(t.id, "best-v1"), ...Object.fromEntries(Object.entries(result.get(t.id)!).map(([k, v]) => [k, Math.round(v * 100)])) });
     mkdirSync("test-results/f3", { recursive: true }); writeFileSync("test-results/f3/farming.json", JSON.stringify(rows, null, 1));
     const agg = (key: string, w?: (t: (typeof r2Catalog)[number]) => boolean) => { const ts = r2Catalog.filter(t => !w || w(t)); const tot = ts.reduce((n, t) => n + taskMax(t), 0); return Math.round(100 * ts.reduce((n, t) => n + result.get(t.id)![key] * taskMax(t), 0) / tot); };
     const summary = Object.fromEntries(POLICIES.flatMap(p => ["random", "adaptive"].map(m => [`${p.name} | ${m}`, agg(`${p.name} | ${m}`)])));
@@ -91,8 +91,8 @@ describe("F3 section 2: guessing attackers vs. scoring policies (all 26 R2 tasks
   it("best-coherent scoring strictly reduces what an adaptive blind guesser can farm, and tiered caps reduce it further", () => {
     const a = (k: string) => mean(r2Catalog.map(t => result.get(t.id)![k] * taskMax(t)));
     expect(a("best-coherent, cap 12 | adaptive")).toBeLessThan(a("CURRENT union, cap 12 | adaptive"));
-    expect(a("best-coherent, tiered cap | adaptive")).toBeLessThanOrEqual(a("best-coherent, cap 12 | adaptive"));
-    expect(a("best-coherent, tiered cap | random")).toBeLessThan(a("CURRENT union, cap 12 | random"));
+    expect(a("APPROVED best-v1 tiers 2/3/5 | adaptive")).toBeLessThanOrEqual(a("best-coherent, cap 12 | adaptive"));
+    expect(a("APPROVED best-v1 tiers 2/3/5 | random")).toBeLessThan(a("CURRENT union, cap 12 | random"));
   });
   it("under the current policy even a blind guesser farms the majority of the small closed-choice tasks", () => {
     for (const id of ["i3.verdicts", "b3.classify", "b4.plan"]) expect(result.get(id)!["CURRENT union, cap 12 | adaptive"], id).toBeGreaterThan(0.5); // a blind hill-climber is a LOWER bound; section 1 shows the optimal attacker reaches 100%

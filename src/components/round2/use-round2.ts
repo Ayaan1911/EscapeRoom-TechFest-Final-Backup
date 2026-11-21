@@ -60,8 +60,8 @@ export function useRound2(initial: StatusPayload) {
   }, [status.clock.phase, refresh]);
 
   /** Apply a score already confirmed by the server (a submit response) without waiting for the next poll. */
-  const applyScore = useCallback((taskId: string, earned: number, score: { partA: number; partB: number; total: number }) => {
-    setStatus(s => ({ ...s, score: { ...s.score, ...score }, tasks: s.tasks.map(t => t.id === taskId ? { ...t, earned } : t) }));
+  const applyScore = useCallback((taskId: string, earned: number, score: { partA: number; partB: number; total: number }, attempts?: { used: number; cap: number; remaining: number }) => {
+    setStatus(s => ({ ...s, score: { ...s.score, ...score }, tasks: s.tasks.map(t => t.id === taskId ? { ...t, earned, attempts: attempts ?? t.attempts } : t) }));
   }, []);
   return { status, bundle, connection, now, tick, refresh, applyScore, announce, clearAnnounce: () => setAnnounce("") };
 }

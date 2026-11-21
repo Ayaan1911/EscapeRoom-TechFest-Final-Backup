@@ -24,7 +24,7 @@ export async function requireFinalist(): Promise<string> {
   return auth.teamId;
 }
 export async function readSession(tx: Tx = db) {
-  return (await tx.r2Session.findUnique({ where: { id: 1 } })) ?? { id: 1, ...NO_SESSION, resultsPublishedAt: null as Date | null, contentVersion: null as string | null };
+  return (await tx.r2Session.findUnique({ where: { id: 1 } })) ?? { id: 1, ...NO_SESSION, resultsPublishedAt: null as Date | null, contentVersion: null as string | null, scoringPolicy: null as string | null };
 }
 export async function clockNow(tx: Tx = db, now = Date.now()) {
   const row = await readSession(tx);

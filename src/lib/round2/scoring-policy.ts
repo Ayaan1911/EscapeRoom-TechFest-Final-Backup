@@ -1,13 +1,14 @@
 import "server-only";
-import { criterionPoints, MAX_ATTEMPTS_PER_TASK } from "./catalog";
+import { criterionPoints } from "./catalog";
 import { fieldsFor } from "./forms.server";
+import { attemptCap as tierCap, POLICY_BEST, POLICY_LEGACY } from "@/lib/attempts";
 
-// Scoring policies for Round 2 tasks. EXPERIMENTAL / DORMANT: the release default stays "union" (the behaviour all Phase 3-5 tests describe)
-// until the organizer approves "best". See docs/phase6a-release-hardening.md (F3).
-//   union: a task's score is the union of criteria earned by ANY submission. Incompatible guesses accumulate (farmable).
-//   best : a task's score is the score of the single best coherent submission. A later submission replaces the stored criteria only when it
-//          is worth strictly more, so the earned total never decreases and incompatible guesses never add up.
-export type Policy = "union" | "best";
+// Round 2 task scoring policies. The policy is FIXED PER SESSION: startRound persists it on R2Session and every submission reads it from the row,
+// never from the environment, so a restart or a config change cannot alter scoring mid-round.
+//   best-v1  (approved default for every new session): a task's score is the score of its single best coherent submission. A later submission replaces
+//            the stored criteria only when strictly better, so earned never decreases and incompatible guesses never combine. Tiered attempt caps.
+//   union-v0 (legacy; sessions started before policies existed, NULL in the database): criteria from any submission accumulate; flat 12-attempt cap.
+export type Policy = typeof POLICY_BEST | typeof POLICY_LEGACY;
 export type PolicyState = { earned: number; criteria: Set<string> };
 export const emptyState = (): PolicyState => ({ earned: 0, criteria: new Set() });
 const pointsOf = (criteria: Iterable<string>) => [...criteria].reduce((n, c) => n + (criterionPoints.get(c) ?? 0), 0);
@@ -19,10 +20,13 @@ export function scoreBest(state: PolicyState, satisfied: Set<string>): PolicySta
   const earned = pointsOf(satisfied);
   return earned > state.earned ? { earned, criteria: new Set(satisfied) } : state;
 }
-export const scoringPolicy = (): Policy => (process.env.GHOST_R2_SCORING_POLICY === "best" ? "best" : "union");
+/** The policy a stored session runs under. NULL (pre-policy session) is legacy, never silently upgraded. */
+export const policyOfSession = (row: { scoringPolicy?: string | null }): Policy => (row.scoringPolicy === POLICY_BEST ? POLICY_BEST : POLICY_LEGACY);
+export const LEGACY_CAP = 12;
+export const capFor = (taskId: string, policy: Policy) => (policy === POLICY_BEST ? tierCap(taskId) : LEGACY_CAP);
 
 const log2Choose = (n: number, k: number) => { let r = 0; for (let i = 0; i < k; i++) r += Math.log2((n - i) / (i + 1)); return r; };
-/** log2 of the number of distinct valid answers a participant could submit for a task (a measure of how guessable it is). */
+/** log2 of the number of distinct valid answers (informational: how guessable a task is; NOT used to pick caps). */
 export function answerSpaceBits(taskId: string): number {
   return fieldsFor(taskId).reduce((bits, f) => {
     const n = f.options?.length ?? 0;
@@ -32,13 +36,4 @@ export function answerSpaceBits(taskId: string): number {
     if (f.kind === "keyed") return bits + Math.log2(1 + (f.maxKeys ?? 1) * (f.keys?.length ?? 1) * 2 ** log2Choose(n, Math.min(f.max ?? 1, n)));
     return bits;
   }, 0);
-}
-/**
- * Graded attempts allowed per task. "union" keeps the legacy flat cap. "best" tiers the cap by how guessable the task is:
- * small closed-choice tasks (<= 2^8 possible answers) 3 attempts; medium (<= 2^20) 5; large 8. Identical re-submissions stay free.
- */
-export function attemptCap(taskId: string, policy: Policy): number {
-  if (policy === "union") return MAX_ATTEMPTS_PER_TASK;
-  const bits = answerSpaceBits(taskId);
-  return bits <= 8 ? 3 : bits <= 20 ? 5 : 8;
 }

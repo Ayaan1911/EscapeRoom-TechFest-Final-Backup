@@ -3,6 +3,11 @@ import { applyRaw, bonus, current, hints, overrideChapter, permit, points, progr
 import { catalog, criterionPoints, gradeTask, MAX_SCORED_ATTEMPTS, taskIds, taskMax } from "./scoring";
 import { taskDefs, validators } from "./validators";
 import { matchesInsiderFragments } from "./insider-fragments.server";
+import { attemptCap, POLICY_BEST } from "../attempts";
+import { answerHash } from "../round2/safe-json";
+
+/** Scoring policy of a stored round. A round that started before policies existed (NULL) stays legacy union-v0 and is never silently upgraded; a round that has not started will get best-v1 when it starts. */
+export const roundPolicy = (round: { scoringPolicy: string | null; startsAt: Date | null }) => round.scoringPolicy === POLICY_BEST || (!round.scoringPolicy && !round.startsAt) ? POLICY_BEST : "union-v0";
 
 export async function roundState() {
   // Read first (no write on the hot polling path). The row is created once; concurrent first requests must not fail on the unique id, so use skipDuplicates instead of upsert.
@@ -11,13 +16,14 @@ export async function roundState() {
   await db.gameSession.createMany({ data: [{ id: 1 }], skipDuplicates: true });
   return db.gameSession.findUniqueOrThrow({ where: { id: 1 } });
 }
+const attemptsView = (taskId: string, used: number) => { const cap = attemptCap(taskId); return { used, cap, remaining: Math.max(0, cap - used) }; };
 export async function teamState(id: string) {
   const team = await db.team.findUniqueOrThrow({ where: { id }, include: { insiderAccess: { select: { unlockedAt: true } } } });
   const progress = progressSchema.parse(JSON.parse(team.progress));
   const round = await roundState();
-  const taskRows = await db.taskScore.findMany({ where: { teamId: id }, select: { taskId: true, earned: true } });
-  const earned = new Map(taskRows.map(row => [row.taskId, row.earned]));
-  return { id: team.id, name: team.name, participants: JSON.parse(team.participants) as string[], variant: team.variant, progress, score: score(progress), hints: hints(progress), current: current(progress), round, status: status(round), serverNow: Date.now(), chapterHints: progress.chapters.map((chapter, i) => validators[i]?.hints.slice(0, chapter.hints) ?? []), insiderUnlocked: !!team.insiderAccess?.unlockedAt, unlocked: points.map((_, i) => unlocked(progress, i)), unlockThresholds, tasks: catalog.map(list => list.map(task => ({ id: task.id, title: task.title, earned: earned.get(task.id) ?? 0, max: taskMax(task) }))) };
+  const taskRows = await db.taskScore.findMany({ where: { teamId: id }, select: { taskId: true, earned: true, attempts: true } });
+  const earned = new Map(taskRows.map(row => [row.taskId, row.earned])), usedBy = new Map(taskRows.map(row => [row.taskId, row.attempts])), policy = roundPolicy(round);
+  return { id: team.id, name: team.name, participants: JSON.parse(team.participants) as string[], variant: team.variant, progress, score: score(progress), hints: hints(progress), current: current(progress), round, status: status(round), serverNow: Date.now(), chapterHints: progress.chapters.map((chapter, i) => validators[i]?.hints.slice(0, chapter.hints) ?? []), insiderUnlocked: !!team.insiderAccess?.unlockedAt, unlocked: points.map((_, i) => unlocked(progress, i)), unlockThresholds, policy, tasks: catalog.map(list => list.map(task => ({ id: task.id, title: task.title, earned: earned.get(task.id) ?? 0, max: taskMax(task), attempts: policy === POLICY_BEST ? attemptsView(task.id, usedBy.get(task.id) ?? 0) : null }))) };
 }
 export async function leaderboard() {
   const teams = await db.team.findMany({ select: { id: true, name: true, progress: true, variant: true, participants: true } });
@@ -63,7 +69,8 @@ export async function mutateTeam(id: string, chapter: number, action: "submit" |
       }
       return { unlocked };
     }
-    if (action === "submit") {
+    const best = round.scoringPolicy === POLICY_BEST; // fixed when the round started; never read from the environment
+    if (action === "submit" && !best) {
       const attempts = await tx.submission.count({ where: { teamId: id, chapter, scoringVersion: { not: null } } });
       if (attempts >= MAX_SCORED_ATTEMPTS) {
         const error = "Submission limit reached for this chapter. Ask an organizer if you need it reviewed.";
@@ -79,6 +86,24 @@ export async function mutateTeam(id: string, chapter: number, action: "submit" |
       await tx.submission.create({ data: { teamId: id, chapter, accepted: false, reason: error, answer: recorded } });
       return { error };
     }
+    const hash = answerHash({ task: task ?? null, answer: answer ?? null });
+    const affected = task ? [taskDef!] : catalog[chapter], rowOf = (taskId: string) => stored.find(r => r.taskId === taskId);
+    // A pure Tamper Alert probe ({kind:"tamper"}) is not an answer to any task: under best-v1 it consumes no attempt (the one-time bonus rule is unchanged).
+    const free = best && !task && typeof answer === "object" && answer !== null && (answer as { kind?: unknown }).kind === "tamper";
+    const eligible = free ? [] : best ? affected.filter(t => (rowOf(t.id)?.earned ?? 0) < taskMax(t) && (rowOf(t.id)?.attempts ?? 0) < attemptCap(t.id)) : affected;
+    if (best && action === "submit" && !free) {
+      // best-v1: an identical re-submission is idempotent and free (checked before attempts); otherwise every eligible task consumes one attempt, in BOTH request formats.
+      if (await tx.submission.findFirst({ where: { teamId: id, chapter, answerHash: hash, scoringVersion: 3 }, select: { id: true } })) {
+        const tasks = catalog[chapter].map(t => ({ id: t.id, earned: rowOf(t.id)?.earned ?? 0, max: taskMax(t), attempts: attemptsView(t.id, rowOf(t.id)?.attempts ?? 0) }));
+        const taskResult = task ? tasks.find(t => t.id === task) : undefined, raw = tasks.reduce((n, t) => n + t.earned, 0);
+        return { accepted: raw === points[chapter], partial: false, duplicate: true, improved: false, awarded: 0, task: task ?? null, taskEarned: taskResult?.earned ?? null, taskMax: taskResult?.max ?? null, chapterRaw: p.chapters[chapter].score, chapterMax: points[chapter], tasks, unlocked: [] as number[], tamperAwarded: false };
+      }
+      if (!eligible.length) {
+        const error = "No attempts remaining. Your highest score has been saved.";
+        await tx.submission.create({ data: { teamId: id, chapter, accepted: false, reason: error, answer: recorded } });
+        return { error };
+      }
+    }
     // A task submission is graded by that task's own schema and grader only; a chapter submission by the full-chapter validator.
     const result = task ? { correct: false, points: 0, tamperDetected: false } : validator!.validate(answer, team.variant);
     const graded = (task ? gradeTask(taskDefs[chapter], task, answer, team.variant) : validator!.grade(answer, team.variant)).filter(criterion => criterionPoints.has(criterion));
@@ -93,13 +118,25 @@ export async function mutateTeam(id: string, chapter: number, action: "submit" |
       bonus(p);
       await tx.auditLog.create({ data: { actor: id, action: "tamper-alert", detail: JSON.stringify({ chapter }) } });
     }
-    // Task scoring: every criterion is earned at most once (union with what is stored) and points are derived only from the server catalog.
+    // legacy union-v0: every criterion is earned at most once (union with what is stored). best-v1: a task keeps the criteria of its single best submission
+    // (replaced only when strictly better), so incompatible guesses never combine. Points always come from the server catalog.
     const before = p.chapters[chapter].score;
     let taskSum = 0, newlyEarned: string[] = [];
-    const tasks: { id: string; earned: number; max: number }[] = [];
+    const tasks: { id: string; earned: number; max: number; attempts?: { used: number; cap: number; remaining: number } }[] = [];
     for (const task of catalog[chapter]) {
       const row = stored.find(r => r.taskId === task.id);
       const had = new Set<string>(row ? JSON.parse(row.criteria) : []);
+      if (best) {
+        const satisfied = graded.filter(criterion => criterion.startsWith(`${task.id}:`)), pts = satisfied.reduce((n, c) => n + (criterionPoints.get(c) ?? 0), 0), prev = row?.earned ?? 0;
+        if (eligible.some(t => t.id === task.id)) { // this submission is an attempt for this task
+          const improved = pts > prev, earned = improved ? pts : prev, used = (row?.attempts ?? 0) + 1;
+          const data = { earned, max: taskMax(task), criteria: improved ? JSON.stringify(satisfied) : (row?.criteria ?? "[]"), attempts: used };
+          await tx.taskScore.upsert({ where: { teamId_taskId: { teamId: id, taskId: task.id } }, create: { teamId: id, chapter, taskId: task.id, ...data }, update: data });
+          if (improved) newlyEarned = [...newlyEarned, ...satisfied];
+          taskSum += earned; tasks.push({ id: task.id, earned, max: taskMax(task), attempts: attemptsView(task.id, used) });
+        } else { taskSum += prev; tasks.push({ id: task.id, earned: prev, max: taskMax(task), attempts: attemptsView(task.id, row?.attempts ?? 0) }); }
+        continue;
+      }
       const fresh = graded.filter(criterion => criterion.startsWith(`${task.id}:`) && !had.has(criterion));
       const all = [...had, ...fresh];
       const earned = all.reduce((n, criterion) => n + (criterionPoints.get(criterion) ?? 0), 0);
@@ -116,16 +153,16 @@ export async function mutateTeam(id: string, chapter: number, action: "submit" |
     const full = taskSum === points[chapter];
     if (awarded > 0 || unlockedNow.length || tamperAwarded) await tx.team.update({ where: { id }, data: { progress: JSON.stringify(p) } });
     for (const next of unlockedNow) await tx.auditLog.create({ data: { actor: id, action: "chapter-unlock", detail: JSON.stringify({ chapter: next, rawAfter: p.chapters[chapter].score, threshold: unlockThresholds[chapter] }) } });
-    await tx.submission.create({ data: { teamId: id, chapter, accepted: full, reason: full ? "completed" : graded.length ? "partial" : "incorrect", answer: recorded, scoringVersion: 2, awarded, chapterRaw: p.chapters[chapter].score, criteria: JSON.stringify(newlyEarned) } });
+    await tx.submission.create({ data: { teamId: id, chapter, accepted: full, reason: full ? "completed" : graded.length ? "partial" : "incorrect", answer: recorded, scoringVersion: best ? 3 : 2, taskId: task ?? null, answerHash: best && !free ? hash : null, awarded, chapterRaw: p.chapters[chapter].score, criteria: JSON.stringify(newlyEarned) } });
     const taskResult = task ? tasks.find(t => t.id === task) : undefined;
-    return { accepted: full, partial: !full && graded.length > 0, awarded, task: task ?? null, taskEarned: taskResult?.earned ?? null, taskMax: taskResult?.max ?? null, chapterRaw: p.chapters[chapter].score, chapterMax: points[chapter], tasks, unlocked: unlockedNow, tamperAwarded };
+    return { accepted: full, partial: !full && graded.length > 0, duplicate: false, improved: awarded > 0, awarded, task: task ?? null, taskEarned: taskResult?.earned ?? null, taskMax: taskResult?.max ?? null, chapterRaw: p.chapters[chapter].score, chapterMax: points[chapter], tasks, unlocked: unlockedNow, tamperAwarded };
   });
 }
 export async function control(action: "start" | "stop" | "unlock", teamId?: string, reason?: string) {
   return serializable(async tx => {
     let chapter: number | undefined;
     const round = await tx.gameSession.upsert({ where: { id: 1 }, create: { id: 1 }, update: {} });
-    if (action === "start") await tx.gameSession.update({ where: { id: 1 }, data: start(round) });
+    if (action === "start") await tx.gameSession.update({ where: { id: 1 }, data: { ...start(round), scoringPolicy: POLICY_BEST } }); // fixed for the whole round
     if (action === "stop") {
       if (!round.startsAt || status(round) !== "active") throw new Error("Round is not active");
       await tx.gameSession.update({ where: { id: 1 }, data: { endedAt: new Date() } });
@@ -140,6 +177,6 @@ export async function control(action: "start" | "stop" | "unlock", teamId?: stri
       chapter = overrideChapter(p, Date.now());
       await tx.team.update({ where: { id: teamId }, data: { progress: JSON.stringify(p) } });
     }
-    await tx.auditLog.create({ data: { actor: "organizer", action, detail: JSON.stringify({ teamId, reason, ...(chapter === undefined ? {} : { chapter }) }) } });
+    await tx.auditLog.create({ data: { actor: "organizer", action, detail: JSON.stringify({ teamId, reason, ...(chapter === undefined ? {} : { chapter }), ...(action === "start" ? { scoringPolicy: POLICY_BEST } : {}) }) } });
   });
 }

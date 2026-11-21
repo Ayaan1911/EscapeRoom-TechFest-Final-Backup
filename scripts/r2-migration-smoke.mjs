@@ -11,7 +11,7 @@ import { ADMIN_URL } from "./pg-temp.mjs";
 
 if (!["127.0.0.1", "localhost"].includes(new URL(ADMIN_URL).hostname)) throw new Error("non-local admin URL refused");
 const root = process.cwd(), migrations = join(root, "prisma", "migrations");
-const R2 = "20261121000000_round2", PRE = ["20261118000000_postgres_init", "20261120000000_task_scoring_and_drafts"];
+const R2 = "20261121000000_round2", SP = "20261122000000_scoring_policy", PRE = ["20261118000000_postgres_init", "20261120000000_task_scoring_and_drafts", R2];
 const names = [];
 const dbUrl = name => { const u = new URL(ADMIN_URL); u.pathname = `/${name}`; return u.href; };
 async function create(label) {
@@ -33,7 +33,7 @@ try {
   // ---- 1. fresh database through the real deploy command
   const fresh = await create("fresh"), freshUrl = dbUrl(fresh);
   const out = prisma(freshUrl, "migrate", "deploy");
-  check("fresh DB: prisma migrate deploy applies all migrations", /applied|No pending/i.test(out) && out.includes(R2), out.split("\n").filter(l => /^\d{14}_/.test(l.trim())).join(" | "));
+  check("fresh DB: prisma migrate deploy applies all migrations", /applied|No pending/i.test(out) && out.includes(R2) && out.includes(SP), out.split("\n").filter(l => /^\d{14}_/.test(l.trim())).join(" | "));
   const c = new PrismaClient({ datasourceUrl: freshUrl });
   const tables = (await c.$queryRaw`select table_name from information_schema.tables where table_schema='public' order by 1`).map(r => r.table_name);
   const r2 = ["R2Session", "R2Finalist", "R2Submission", "R2TaskScore", "R2Draft", "R2Audit"];
@@ -64,19 +64,26 @@ try {
   const pre = await create("pre"), preUrl = dbUrl(pre);
   for (const d of PRE) await applySql(preUrl, d);
   const p = new PrismaClient({ datasourceUrl: preUrl });
-  await p.team.createMany({ data: ["A", "B"].map(i => ({ id: `T${i}`, name: `Team ${i}`, participants: '["x"]', codeHash: "hash" + i, variant: i, progress: '{"chapters":[]}' })) });
-  await p.gameSession.create({ data: { id: 1, startsAt: new Date("2026-11-20T10:00:00Z"), deadline: new Date("2026-11-20T11:00:00Z") } });
-  await p.submission.create({ data: { teamId: "TA", chapter: 0, accepted: false, reason: "partial", answer: "{}", scoringVersion: 2, awarded: 5, chapterRaw: 5, criteria: "[]" } });
-  await p.taskScore.create({ data: { teamId: "TA", chapter: 0, taskId: "inbox.entry", earned: 2, max: 6, criteria: '["inbox.entry:emailId"]' } });
-  await p.chapterDraft.create({ data: { teamId: "TA", chapter: 0, taskId: "inbox.entry", data: '{"a":1}' } });
-  await p.auditLog.create({ data: { actor: "organizer", action: "qualification-confirmed", detail: '{"digest":"abcdef12","top10":["TA"],"standby":["TB"]}' } });
-  await p.teamSession.create({ data: { tokenHash: "tok", teamId: "TA", role: "team", expiresAt: new Date("2030-01-01") } });
-  const snap = async () => { const out = {}; for (const t of ROUND1) out[t] = hash(await p.$queryRawUnsafe(`select * from "${t}" order by 1,2`)); return out; };
+  // raw SQL: the generated client already knows the NEW columns, which do not exist in this pre-policy database yet
+  const x = sql => p.$executeRawUnsafe(sql);
+  for (const i of ["A", "B"]) await x(`INSERT INTO "Team" (id, name, participants, "codeHash", variant, progress) VALUES ('T${i}', 'Team ${i}', '["x"]', 'hash${i}', '${i}', '{"chapters":[]}')`);
+  await x(`INSERT INTO "GameSession" (id, "startsAt", deadline) VALUES (1, '2026-11-20T10:00:00Z', '2026-11-20T11:00:00Z')`);
+  await x(`INSERT INTO "Submission" (id, "teamId", chapter, accepted, reason, answer, "scoringVersion", awarded, "chapterRaw", criteria) VALUES ('s1', 'TA', 0, false, 'partial', '{}', 2, 5, 5, '[]')`);
+  await x(`INSERT INTO "TaskScore" ("teamId", chapter, "taskId", earned, max, criteria, "updatedAt") VALUES ('TA', 0, 'inbox.entry', 2, 6, '["inbox.entry:emailId"]', now())`);
+  await x(`INSERT INTO "ChapterDraft" ("teamId", chapter, "taskId", data, "updatedAt") VALUES ('TA', 0, 'inbox.entry', '{"a":1}', now())`);
+  await x(`INSERT INTO "AuditLog" (id, actor, action, detail) VALUES ('a1', 'organizer', 'qualification-confirmed', '{"digest":"abcdef12","top10":["TA"],"standby":["TB"]}')`);
+  await x(`INSERT INTO "TeamSession" ("tokenHash", "teamId", role, "expiresAt") VALUES ('tok', 'TA', 'team', '2030-01-01')`);
+  const colsOf = async t => (await p.$queryRawUnsafe(`select column_name from information_schema.columns where table_schema = 'public' and table_name = '${t}' order by ordinal_position`)).map(r => `"${r.column_name}"`).join(",");
+  const cols = Object.fromEntries(await Promise.all(ROUND1.map(async t => [t, await colsOf(t)])));
+  const snap = async () => { const out = {}; for (const t of ROUND1) out[t] = hash(await p.$queryRawUnsafe(`select ${cols[t]} from "${t}" order by 1,2`)); return out; };
   const before = await snap();
-  await applySql(preUrl, R2);
+  await applySql(preUrl, SP);
   const after = await snap();
-  check("pre-Round-2 DB: every Round 1 table's rows are unchanged after the Round 2 migration", JSON.stringify(before) === JSON.stringify(after), ROUND1.filter(t => before[t] !== after[t]).join(","));
-  check("pre-Round-2 DB: Round 2 tables are present and empty", (await p.r2Finalist.count()) === 0 && (await p.r2Session.count()) === 0);
+  check("pre-policy DB: every pre-existing Round 1 column of every row is unchanged after the scoring-policy migration", JSON.stringify(before) === JSON.stringify(after), ROUND1.filter(t => before[t] !== after[t]).join(","));
+  const g = await p.gameSession.findUniqueOrThrow({ where: { id: 1 } }), ts = await p.taskScore.findFirstOrThrow(), sub = await p.submission.findFirstOrThrow();
+  check("pre-policy DB: a round that already started keeps scoringPolicy NULL (legacy union-v0, never silently upgraded)", g.startsAt !== null && g.scoringPolicy === null);
+  check("pre-policy DB: historic TaskScore/Submission rows get attempts=0 and NULL taskId/answerHash", ts.attempts === 0 && sub.taskId === null && sub.answerHash === null && sub.scoringVersion === 2);
+  check("pre-policy DB: Round 2 tables present and empty", (await p.r2Finalist.count()) === 0 && (await p.r2Session.count()) === 0);
   await p.$disconnect();
 } catch (e) { check("smoke test ran without an exception", false, String(e.message ?? e).split("\n")[0].slice(0, 200)); }
 finally {

@@ -96,6 +96,15 @@ export function StateBanner({ state, chapter }: { state: ChapterState; chapter: 
 }
 
 /** One scored task: meter, status, fields, submit. A task is submitted and scored on its own. */
+/** Participant-facing outcome text. best-v1 wording never implies that correct parts of different answers add up. */
+export function taskNote(mine: SubmitResult & { at: number }, task: TaskRow) {
+  const used = mine.tasks?.find(t => t.id === task.id)?.attempts ?? task.attempts;
+  if (!used) return mine.awarded > 0 ? `+${mine.awarded} points. Task ${mine.taskEarned}/${mine.taskMax}${(mine.taskEarned ?? 0) < (mine.taskMax ?? 0) ? ". Not fully supported yet; revise and resubmit." : "."}` : "No new points. Revise using the evidence and resubmit.";
+  const out = used.remaining === 0 && (mine.taskEarned ?? 0) < (mine.taskMax ?? 0) ? " No attempts remaining. Your highest score has been saved." : "";
+  if (mine.duplicate) return `Already submitted: no change and no attempt used. Your highest-scoring submission counts.${out}`;
+  if (mine.awarded > 0) return `New personal best: +${mine.awarded} points. Task ${mine.taskEarned}/${mine.taskMax}.${out}`;
+  return ((mine.taskEarned ?? 0) > 0 ? "No improvement. Your previous best score has been retained." : "No points yet. Your highest-scoring submission counts.") + out;
+}
 export function TaskPanel({ task, step, editable, busy, retrySeconds, result, ready, why, onSubmit, children, aside }: {
   task: TaskRow; step: number; editable: boolean; busy: boolean; retrySeconds: number; result: (SubmitResult & { at: number }) | null; ready: boolean; why?: string; onSubmit: () => void; children: ReactNode; aside?: ReactNode;
 }) {
@@ -117,14 +126,15 @@ export function TaskPanel({ task, step, editable, busy, retrySeconds, result, re
       <span className="pg-task-n" aria-hidden="true">{done ? "✓" : step}</span>
       <h3 id={`${id}-h`}>{task.title}</h3>
       <button type="button" className="pg-task-toggle k-btn k-btn-sm" aria-expanded={open} aria-controls={`${id}-b`} onClick={() => setOpen(o => !o)}>{open ? "Hide" : "Open"}<span className="k-sr"> {task.title}</span></button>
-      <div className="pg-task-score"><span className="pg-meter" role="img" aria-label={`${task.earned} of ${task.max} points earned`}>{Array.from({ length: task.max }, (_, i) => <i key={i} className={i < task.earned ? "on" : ""} />)}</span><b>{task.earned}</b>/{task.max}<span className="pg-chip">{state}</span></div>
+      <div className="pg-task-score"><span className="pg-meter" role="img" aria-label={`${task.earned} of ${task.max} points earned`}>{Array.from({ length: task.max }, (_, i) => <i key={i} className={i < task.earned ? "on" : ""} />)}</span><b>{task.earned}</b>/{task.max}<span className="pg-chip">{state}</span>{task.attempts && <span className="pg-chip" aria-label={`${task.attempts.used} of ${task.attempts.cap} attempts used, ${task.attempts.remaining} remaining`}>Attempts {task.attempts.used}/{task.attempts.cap}</span>}</div>
     </header>
+    {task.attempts && !done && <p className="pg-task-rule" role="note">Your highest-scoring submission counts. {task.attempts.remaining > 0 ? `${task.attempts.remaining} attempt${task.attempts.remaining === 1 ? "" : "s"} remaining.` : "No attempts remaining. Your highest score has been saved."}</p>}
     {aside}
     <div className="pg-task-body" id={`${id}-b`} hidden={!open}>{children}</div>
     <footer hidden={!open}>
-      <button type="button" className="k-btn k-btn-primary" disabled={!editable || busy || retrySeconds > 0 || done || !ready} onClick={onSubmit}>{done ? "Task complete" : partial ? "Resubmit task" : "Submit task"}</button>
+      <button type="button" className="k-btn k-btn-primary" disabled={!editable || busy || retrySeconds > 0 || done || !ready || task.attempts?.remaining === 0} onClick={onSubmit}>{done ? "Task complete" : task.attempts?.remaining === 0 ? "No attempts remaining" : partial ? "Resubmit task" : "Submit task"}</button>
       <span className="pg-task-note" role="status">
-        {mine ? mine.awarded > 0 ? `+${mine.awarded} points. Task ${mine.taskEarned}/${mine.taskMax}${(mine.taskEarned ?? 0) < (mine.taskMax ?? 0) ? ". Not fully supported yet; revise and resubmit." : "."}` : "No new points. Revise using the evidence and resubmit." : !ready && editable && !done ? why ?? "Complete the fields to submit." : retrySeconds > 0 && editable ? `Next submission in ${retrySeconds}s.` : ""}
+        {mine ? taskNote(mine, task) : !ready && editable && !done ? why ?? "Complete the fields to submit." : retrySeconds > 0 && editable ? `Next submission in ${retrySeconds}s.` : ""}
       </span>
     </footer>
   </section>;
@@ -163,7 +173,7 @@ export function ResultStrip({ result }: { result: (SubmitResult & { at: number }
   if (!result) return null;
   const opened = result.unlocked.map(i => CHAPTER_META[i]);
   return <div className="pg-result" role="status">
-    <strong>{result.awarded > 0 ? `+${result.awarded} points` : "No new points"}</strong>
+    <strong>{result.duplicate ? "Already submitted" : result.awarded > 0 ? (result.tasks?.some(t => t.attempts) ? `New personal best: +${result.awarded} points` : `+${result.awarded} points`) : (result.tasks?.some(t => t.attempts) ? "No improvement" : "No new points")}</strong>
     <span>Chapter {result.chapterRaw}/{result.chapterMax}{result.accepted ? " · complete" : ""}</span>
     {result.tamperAwarded && <span>Tamper Alert +5</span>}
     {opened.map(m => <a key={m.n} className="k-btn k-btn-sm k-btn-primary" href={m.href}>{m.name} unlocked → Open</a>)}

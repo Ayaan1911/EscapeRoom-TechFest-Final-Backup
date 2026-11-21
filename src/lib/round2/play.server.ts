@@ -6,7 +6,8 @@ import { availability, visible, type R2Clock } from "./clock";
 import { criterionPoints, CONTENT_VERSION, MIN_SUBMIT_GAP_MS, partMax, r2Catalog, r2TaskById, taskMax, unitMax, UNITS } from "./catalog";
 import { CASE_BRIEF, units } from "./content.server";
 import { fieldsFor } from "./forms.server";
-import { attemptCap, scoreBest, scoringPolicy } from "./scoring-policy";
+import { capFor, policyOfSession, scoreBest, type Policy } from "./scoring-policy";
+import { POLICY_BEST } from "@/lib/attempts";
 import { gradeValidated, validateAnswer } from "./tasks.server";
 import { answerHash, stableStringify } from "./safe-json";
 
@@ -14,18 +15,20 @@ export const DRAFT_MAX_BYTES = 8192;
 export const NOTES_TASK = "notes";
 
 const clockView = (c: R2Clock) => ({ phase: c.phase, serverNow: Date.now(), elapsedMs: c.elapsedMs, startsAt: c.startsAt, partAClosesAt: c.partAClosesAt, endsAt: c.endsAt, releasedIncidents: c.releasedIncidents, partBReleased: c.partBReleased, nextEvent: c.nextEvent });
-async function scoreRows(teamId: string) {
-  const rows = await db.r2TaskScore.findMany({ where: { teamId } });
+const attemptsFor = (taskId: string, used: number, policy: Policy) => { const cap = capFor(taskId, policy); return { used, cap, remaining: Math.max(0, cap - used) }; };
+async function scoreRows(teamId: string, policy: Policy) {
+  const [rows, used] = await Promise.all([db.r2TaskScore.findMany({ where: { teamId } }), db.r2Submission.groupBy({ by: ["taskId"], where: { teamId }, _count: true })]);
+  const usedBy = new Map(used.map(u => [u.taskId, u._count]));
   const by = new Map(rows.map(r => [r.taskId, r.earned]));
-  const tasks = r2Catalog.map(t => ({ id: t.id, part: t.part, unit: t.unit, title: t.title, earned: by.get(t.id) ?? 0, max: taskMax(t) }));
+  const tasks = r2Catalog.map(t => ({ id: t.id, part: t.part, unit: t.unit, title: t.title, earned: by.get(t.id) ?? 0, max: taskMax(t), attempts: attemptsFor(t.id, usedBy.get(t.id) ?? 0, policy) }));
   const sum = (part: "A" | "B") => tasks.filter(t => t.part === part).reduce((n, t) => n + t.earned, 0);
   return { tasks, partA: sum("A"), partB: sum("B"), total: sum("A") + sum("B"), partAMax: partMax("A"), partBMax: partMax("B"), max: partMax("A") + partMax("B") };
 }
 /** Server-generated round status plus this team's own scoring state. Never includes criterion ids or any answer information. */
 export async function r2Status(teamId: string) {
-  const { clock } = await clockNow();
-  const scores = await scoreRows(teamId);
-  return { clock: clockView(clock), score: { partA: scores.partA, partB: scores.partB, total: scores.total, partAMax: scores.partAMax, partBMax: scores.partBMax, max: scores.max }, tasks: scores.tasks.map(t => ({ ...t, availability: availability(t, clock) })), units: { A: UNITS.A.map((title, i) => ({ unit: i + 1, title, max: unitMax("A", i + 1), released: clock.releasedIncidents.includes(i + 1) })), B: UNITS.B.map((title, i) => ({ unit: i + 1, title, max: unitMax("B", i + 1), released: clock.partBReleased })) }, hints: "disabled" };
+  const { clock, row } = await clockNow();
+  const policy = policyOfSession(row), scores = await scoreRows(teamId, policy);
+  return { clock: clockView(clock), policy, score: { partA: scores.partA, partB: scores.partB, total: scores.total, partAMax: scores.partAMax, partBMax: scores.partBMax, max: scores.max }, tasks: scores.tasks.map(t => ({ ...t, availability: availability(t, clock) })), units: { A: UNITS.A.map((title, i) => ({ unit: i + 1, title, max: unitMax("A", i + 1), released: clock.releasedIncidents.includes(i + 1) })), B: UNITS.B.map((title, i) => ({ unit: i + 1, title, max: unitMax("B", i + 1), released: clock.partBReleased })) }, hints: "disabled" };
 }
 /** Released evidence and task prompts only. Anything not yet released by the server clock is absent from the response. */
 export async function r2Bundle() {
@@ -34,7 +37,7 @@ export async function r2Bundle() {
   return { clock: clockView(clock), brief: released.length ? CASE_BRIEF : null, contentVersion: CONTENT_VERSION, units: released.map(u => ({ part: u.part, unit: u.unit, title: u.title, story: u.story, records: u.records, tasks: u.tasks.map(t => ({ id: t.id, prompt: t.prompt, max: taskMax(r2TaskById.get(t.id)!), availability: availability(u, clock), fields: fieldsFor(t.id) })) })) };
 }
 
-export type SubmitOutcome = { duplicate: boolean; accepted: boolean; awarded: number; task: { id: string; earned: number; max: number }; score: { partA: number; partB: number; total: number } };
+export type SubmitOutcome = { duplicate: boolean; accepted: boolean; awarded: number; improved: boolean; policy: Policy; attempts: { used: number; cap: number; remaining: number }; task: { id: string; earned: number; max: number }; score: { partA: number; partB: number; total: number } };
 /**
  * Graded, server-authoritative submission. One per-team locked transaction (READ COMMITTED + advisory lock + FOR SHARE on the round row): availability is evaluated on the SERVER clock at the moment of
  * decision, so a deadline can never be beaten by a slow request. Re-submitting an identical answer is free and awards nothing.
@@ -45,11 +48,13 @@ export async function submitTask(teamId: string, taskId: string, rawAnswer: unkn
   if (!task) throw new R2Error(400, "Unknown task");
   const valid = validateAnswer(taskId, rawAnswer);
   if (!valid.ok) throw new R2Error(400, "Invalid answer format");
-  const hash = answerHash(valid.data), json = stableStringify(valid.data), policy = scoringPolicy();
+  const hash = answerHash(valid.data), json = stableStringify(valid.data);
   return teamTx(teamId, async tx => {
     const finalist = await tx.r2Finalist.findUnique({ where: { teamId }, select: { status: true } });
     if (finalist?.status !== "active") throw new R2Error(403, "Round 2 is open to confirmed finalists only");
-    const { clock, now } = await clockNow(tx);
+    const { clock, now, row } = await clockNow(tx);
+    const policy = policyOfSession(row); // read from the stored session: immune to restarts and environment changes
+    const cap = capFor(taskId, policy);
     const state = availability(task, clock);
     if (state !== "open") throw new R2Error(403, state === "not_released" ? "This challenge has not been released yet" : "Submissions for this part are closed");
     const stored = await tx.r2TaskScore.findMany({ where: { teamId } });
@@ -59,27 +64,28 @@ export async function submitTask(teamId: string, taskId: string, rawAnswer: unkn
       return { partA: sum("A"), partB: sum("B"), total: sum("A") + sum("B") };
     };
     const mine = stored.find(r => r.taskId === taskId);
-    const max = taskMax(task);
-    if (await tx.r2Submission.findFirst({ where: { teamId, taskId, answerHash: hash }, select: { id: true } }))
-      return { duplicate: true, accepted: (mine?.earned ?? 0) >= max, awarded: 0, task: { id: taskId, earned: mine?.earned ?? 0, max }, score: summarize(mine?.earned ?? 0, taskId) };
+    const max = taskMax(task), used = await tx.r2Submission.count({ where: { teamId, taskId } });
+    const attempts = (n: number) => ({ used: n, cap, remaining: Math.max(0, cap - n) });
+    if (await tx.r2Submission.findFirst({ where: { teamId, taskId, answerHash: hash }, select: { id: true } })) // identical resubmission: idempotent, no attempt consumed
+      return { duplicate: true, accepted: (mine?.earned ?? 0) >= max, awarded: 0, improved: false, policy, attempts: attempts(used), task: { id: taskId, earned: mine?.earned ?? 0, max }, score: summarize(mine?.earned ?? 0, taskId) };
     if ((mine?.earned ?? 0) >= max) throw new R2Error(409, "Task already complete");
     const last = await tx.r2Submission.findFirst({ where: { teamId }, orderBy: { createdAt: "desc" }, select: { createdAt: true } });
     if (last && now - last.createdAt.getTime() < MIN_SUBMIT_GAP_MS) throw new R2Error(429, "Please wait between submissions.", { retryAfter: Math.max(1, Math.ceil((MIN_SUBMIT_GAP_MS - (now - last.createdAt.getTime())) / 1000)) });
-    if (await tx.r2Submission.count({ where: { teamId, taskId } }) >= attemptCap(taskId, policy)) throw new R2Error(429, "Attempt limit reached for this task. Ask an organizer to review it.");
+    if (used >= cap) throw new R2Error(429, policy === POLICY_BEST ? "No attempts remaining. Your highest score has been saved." : "Attempt limit reached for this task. Ask an organizer to review it.", { attempts: attempts(used) });
     const had = new Set<string>(mine ? JSON.parse(mine.criteria) : []);
     const satisfied = new Set(gradeValidated(taskId, valid.data));
-    // "union" (release default): criteria from any submission accumulate. "best" (dormant, needs organizer approval): only the best single coherent submission counts.
-    const next = policy === "best" ? scoreBest({ earned: mine?.earned ?? 0, criteria: had }, satisfied) : null;
+    // best-v1: only the best single coherent submission counts (replace only when strictly better). union-v0 (legacy sessions): criteria accumulate.
+    const next = policy === POLICY_BEST ? scoreBest({ earned: mine?.earned ?? 0, criteria: had }, satisfied) : null;
     const fresh = next ? (next.earned > (mine?.earned ?? 0) ? [...next.criteria] : []) : [...satisfied].filter(id => !had.has(id));
     const all = next ? [...next.criteria] : [...had, ...fresh];
     const earned = next ? next.earned : all.reduce((n, id) => n + (criterionPoints.get(id) ?? 0), 0);
     const awarded = earned - (mine?.earned ?? 0);
-    if (fresh.length) {
+    if (fresh.length) { // lastAwardAt (the Part A tiebreak time) only moves on a real improvement
       const at = new Date(now);
       await tx.r2TaskScore.upsert({ where: { teamId_taskId: { teamId, taskId } }, create: { teamId, taskId, part: task.part, earned, max, criteria: JSON.stringify(all), firstScoredAt: at, lastAwardAt: at }, update: { earned, criteria: JSON.stringify(all), lastAwardAt: at } });
     }
-    await tx.r2Submission.create({ data: { teamId, taskId, awarded, taskEarned: earned, criteria: JSON.stringify(fresh), answerHash: hash, answer: json, contentVersion: CONTENT_VERSION, createdAt: new Date(now) } });
-    return { duplicate: false, accepted: earned >= max, awarded, task: { id: taskId, earned, max }, score: summarize(earned, taskId) };
+    await tx.r2Submission.create({ data: { teamId, taskId, awarded, taskEarned: earned, criteria: JSON.stringify(fresh), answerHash: hash, answer: json, contentVersion: CONTENT_VERSION, scoringPolicy: policy, createdAt: new Date(now) } });
+    return { duplicate: false, accepted: earned >= max, awarded, improved: awarded > 0, policy, attempts: attempts(used + 1), task: { id: taskId, earned, max }, score: summarize(earned, taskId) };
   }, "R2Session");
 }
 

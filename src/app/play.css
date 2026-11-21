@@ -179,3 +179,5 @@ a.pg-map-link:hover { color: var(--accent); }
   .pg .pg-chain { overflow-x: auto; }
   .pg-task-body { gap: var(--s2); }
 }
+
+.pg-task-rule { margin: 0; padding: 0 var(--s4); color: var(--muted); font-size: 13px; }

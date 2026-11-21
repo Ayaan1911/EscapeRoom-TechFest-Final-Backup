@@ -7,6 +7,7 @@ import { CONTENT_VERSION, partMax, r2Catalog } from "./catalog";
 import { explanation } from "./tasks.server";
 import { readiness } from "./enrollment.server";
 import { rankR2 } from "./ranking";
+import { POLICY_BEST } from "@/lib/attempts";
 
 /** Start the Round 2 clock. Explicit organizer action only; nothing ever starts automatically. Blocked unless readiness has no blocking failures. */
 export async function startRound() {
@@ -17,9 +18,9 @@ export async function startRound() {
     const row = await tx.r2Session.findUnique({ where: { id: 1 } });
     if (row?.startsAt || row?.endedAt) throw new R2Error(409, "Round 2 was already started");
     const now = new Date();
-    await tx.r2Session.upsert({ where: { id: 1 }, create: { id: 1, startsAt: now, contentVersion: CONTENT_VERSION }, update: { startsAt: now, contentVersion: CONTENT_VERSION } });
+    await tx.r2Session.upsert({ where: { id: 1 }, create: { id: 1, startsAt: now, contentVersion: CONTENT_VERSION, scoringPolicy: POLICY_BEST }, update: { startsAt: now, contentVersion: CONTENT_VERSION, scoringPolicy: POLICY_BEST } }); // the policy is fixed here and never changed afterwards
     const active = await tx.r2Finalist.findMany({ where: { status: "active" }, select: { teamId: true } });
-    await audit(tx, "organizer", "start", { startsAt: now.toISOString(), contentVersion: CONTENT_VERSION, active: active.map(f => f.teamId) });
+    await audit(tx, "organizer", "start", { startsAt: now.toISOString(), contentVersion: CONTENT_VERSION, scoringPolicy: POLICY_BEST, active: active.map(f => f.teamId) });
     return { startsAt: now, partAClosesAt: new Date(now.getTime() + PART_A_MS), endsAt: new Date(now.getTime() + ROUND_MS) };
   });
 }
