@@ -48,6 +48,9 @@ describe.skipIf(process.env.GHOST_DB_TEST !== "1")("Round 2 backend (PostgreSQL)
     await asAdmin();
     await expect(enroll.enrollFinalists()).rejects.toMatchObject({ status: 409, message: expect.stringContaining("not been confirmed") });
     expect((await enroll.readiness().catch(() => null))?.ready).toBe(false);
+    await expect(org.startRound()).rejects.toMatchObject({ status: 409, extra: { checks: expect.arrayContaining(["qualification-confirmed"]) } }); // start is blocked while not ready
+    await expect(org.endRound("nothing is running")).rejects.toMatchObject({ status: 409 });
+    expect(await db.r2Session.findUnique({ where: { id: 1 } })).toBeNull(); // a refused start leaves no clock behind
   });
   it("enrolls exactly 10 active + 2 standby from the confirmed snapshot, idempotently, never from a live leaderboard", async () => {
     await db.auditLog.create({ data: { actor: "organizer", action: "qualification-confirmed", detail: JSON.stringify({ digest: "digest-0001", top10: ids.slice(0, 10), standby: ids.slice(10, 12), reason: "test" }) } });
@@ -121,8 +124,12 @@ describe.skipIf(process.env.GHOST_DB_TEST !== "1")("Round 2 backend (PostgreSQL)
     await ago(min(19)); await gap();
     await expect(play.submitTask("R03", "i2.identify", { connectionIds: ["C-01"] })).resolves.toMatchObject({ awarded: 0 });
     await expect(play.submitTask("R03", "i2.identify", { connectionIds: ["C-02"] })).rejects.toMatchObject({ status: 429, extra: { retryAfter: expect.any(Number) } });
-    for (let i = 0; i < 11; i++) { await gap(); await play.submitTask("R03", "i2.identify", { connectionIds: [`C-${String(i + 3).padStart(2, "0")}`] }).catch(() => null); }
-    await gap(); await expect(play.submitTask("R03", "i2.identify", { connectionIds: ["C-10", "C-09"] })).rejects.toMatchObject({ status: 429 });
+    const ids = ["C-01", "C-02", "C-04", "C-05", "C-06", "C-07", "C-09", "C-10"], pairs = ids.flatMap((a, i) => ids.slice(i + 1).map(b => [a, b])); // never the real pair, so the task cannot complete
+    for (const pair of pairs.slice(0, 10)) { await gap(); await expect(play.submitTask("R03", "i2.identify", { connectionIds: pair })).resolves.toMatchObject({ awarded: 0 }); } // attempts 3..12 (cooldown attempt above was refused, not graded)
+    expect(await db.r2Submission.count({ where: { teamId: "R03", taskId: "i2.identify" } })).toBe(11);
+    await gap(); await expect(play.submitTask("R03", "i2.identify", { connectionIds: pairs[10] })).resolves.toMatchObject({ awarded: 0 }); // 12th
+    await gap(); await expect(play.submitTask("R03", "i2.identify", { connectionIds: pairs[11] })).rejects.toMatchObject({ status: 429, message: expect.stringContaining("Attempt limit") });
+    await gap(); await expect(play.submitTask("R03", "i2.identify", { connectionIds: pairs[0] })).resolves.toMatchObject({ duplicate: true }); // an identical resend is still free at the cap
   });
   it("teams cannot touch each other's data and non-finalists are refused", async () => {
     await asTeam("R13"); expect((await submitRoute.POST(post("/api/round2/submit", { taskId: "i1.assets", answer: perfect["i1.assets"] }))).status).toBe(403);
@@ -146,6 +153,28 @@ describe.skipIf(process.env.GHOST_DB_TEST !== "1")("Round 2 backend (PostgreSQL)
     expect((await draftRoute.PUT(raw)).status).toBe(400);
     expect((await draftRoute.PUT(put("/api/round2/drafts", { taskId: "b1.chain", data: { eventIds: [] }, baseVersion: 0 }))).status).toBe(403); // Part B not open
     expect(await db.r2TaskScore.count({ where: { teamId: "R06" } })).toBe(0);
+  });
+  it("standby and withdrawn teams cannot play; a started roster only changes for a team with no submissions", async () => {
+    await ago(min(19)); await asTeam("R12"); // still standby
+    expect((await draftRoute.GET()).status).toBe(403);
+    expect((await submitRoute.POST(post("/api/round2/submit", { taskId: "i1.assets", answer: perfect["i1.assets"] }))).status).toBe(403);
+    await asAdmin();
+    await expect(enroll.promoteStandby({ standbyTeamId: "R12", replacesTeamId: "R01", reason: "R01 has already submitted" })).rejects.toMatchObject({ status: 409, message: expect.stringContaining("already submitted") });
+    expect((await db.r2Finalist.findUniqueOrThrow({ where: { teamId: "R01" } })).status).toBe("active");
+    expect(await enroll.promoteStandby({ standbyTeamId: "R12", replacesTeamId: "R09", reason: "R09 never joined" })).toEqual({ promoted: "R12", replaced: "R09" });
+    await asTeam("R12"); expect((await draftRoute.GET()).status).toBe(200);
+    await asTeam("R09"); expect((await draftRoute.GET()).status).toBe(403);
+  });
+  it("deadline race: submissions racing the organizer's end never land after the end", async () => {
+    await ago(min(19)); await gap(); await asAdmin();
+    const submits = Promise.allSettled(Array.from({ length: 8 }, (_, i) => play.submitTask("R08", "i4.contain", { actions: i % 2 ? ["kx-1"] : ["kx-3"] })));
+    await new Promise(r => setTimeout(r, 15));
+    await org.endRound("race test");
+    await submits;
+    const end = (await db.r2Session.findUniqueOrThrow({ where: { id: 1 } })).endedAt!;
+    expect(await db.r2Submission.count({ where: { createdAt: { gt: end } } })).toBe(0);
+    await db.r2Session.update({ where: { id: 1 }, data: { endedAt: null } }); // reopen the disposable clock for the following tests
+    await gap();
   });
   it("Part A closes at minute 25, Part B opens, and Part B closes at minute 50", async () => {
     await ago(min(25) + 1000); await asTeam("R07"); await gap();
@@ -172,6 +201,10 @@ describe.skipIf(process.env.GHOST_DB_TEST !== "1")("Round 2 backend (PostgreSQL)
     await asAdmin();
     const review = await org.reviewResults();
     expect(review.max).toEqual({ partA: 60, partB: 40, total: 100 }); expect(review.ranked[0].rank).toBe(1);
+    expect(review.tiesNeedAdjudication).toBe(true); expect(review.ranked.some(r => r.tie)).toBe(true); // several teams scored nothing: shared rank, flagged, no winner invented
+    expect(review.ranked.every((r, i, all) => i === 0 || all[i - 1].total >= r.total)).toBe(true);
+    expect(review.withdrawn.map(w => w.teamId).sort()).toEqual(["R09", "R10"]);
+    const csv = await org.resultsCsv(); expect(csv).toContain("Part A completion ms"); expect(csv).toContain("TIE");
     expect((await org.publishResults()).already).toBe(false); expect((await org.publishResults()).already).toBe(true);
     await asTeam("R01"); expect((await (await import("../src/app/api/round2/results/route")).GET()).status).toBe(200);
     expect(await db.r2Audit.count({ where: { action: "publish-results" } })).toBe(1);
