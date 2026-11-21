@@ -13,7 +13,7 @@ for (const [name, vp] of sizes) {
     const nav = page.getByRole("navigation", { name: "Incidents and challenges" });
     await expect(nav).toBeVisible({ timeout: 60_000 });
     const css = await page.evaluate(() => ({ top: getComputedStyle(document.querySelector(".r2-top")!).display, bg: getComputedStyle(document.querySelector(".r2-top")!).backgroundColor, nav: getComputedStyle(document.querySelector(".r2-nav")!).position }));
-    expect(css.top).toBe("grid"); expect(css.bg).not.toBe("rgba(0, 0, 0, 0)"); expect(css.nav).toBe("sticky");
+    expect(["grid", "flex"]).toContain(css.top); expect(css.bg).not.toBe("rgba(0, 0, 0, 0)"); expect(css.nav).toBe("sticky");
     const over = () => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(await over()).toBeLessThanOrEqual(1);
     await nav.getByRole("button", { name: /Incident 2/ }).click({ timeout: 15_000 });

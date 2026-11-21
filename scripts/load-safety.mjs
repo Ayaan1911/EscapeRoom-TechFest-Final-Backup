@@ -60,7 +60,7 @@ export class Scope {
 /** The ONLY way the harness changes the round: remembers the original state and the last value it wrote. */
 export async function writeRound(db, scope, { startsAt, deadline }) {
   if (!scope.round) scope.round = { original: await db.gameSession.findUnique({ where: { id: 1 } }), last: null };
-  await db.gameSession.upsert({ where: { id: 1 }, create: { id: 1, startsAt, deadline }, update: { startsAt, deadline, endedAt: null } });
+  await db.gameSession.upsert({ where: { id: 1 }, create: { id: 1, startsAt, deadline, scoringPolicy: "best-v1" }, update: { startsAt, deadline, endedAt: null, scoringPolicy: "best-v1" } }); // rehearse under the approved scoring policy
   scope.round.last = { startsAt, deadline };
 }
 

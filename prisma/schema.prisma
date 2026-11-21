@@ -172,3 +172,14 @@ model R2Audit {
   createdAt DateTime @default(now())
   @@index([createdAt])
 }
+// Append-only acknowledgment that an organizer has seen an EXACT Round 2 tie (equal on all four ranking criteria) and accepts the shared rank.
+// It never changes a score, a rank or an order. `signature` fingerprints the tie group, so one group can be acknowledged once.
+model R2TieAck {
+  id String @id @default(cuid())
+  rank Int
+  teamIds String // JSON array of the tied team ids (sorted)
+  signature String @unique
+  reason String
+  decidedBy String
+  createdAt DateTime @default(now())
+}

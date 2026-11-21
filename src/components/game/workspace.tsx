@@ -105,16 +105,16 @@ export function taskNote(mine: SubmitResult & { at: number }, task: TaskRow) {
   if (mine.awarded > 0) return `New personal best: +${mine.awarded} points. Task ${mine.taskEarned}/${mine.taskMax}.${out}`;
   return ((mine.taskEarned ?? 0) > 0 ? "No improvement. Your previous best score has been retained." : "No points yet. Your highest-scoring submission counts.") + out;
 }
-export function TaskPanel({ task, step, editable, busy, retrySeconds, result, ready, why, onSubmit, children, aside }: {
-  task: TaskRow; step: number; editable: boolean; busy: boolean; retrySeconds: number; result: (SubmitResult & { at: number }) | null; ready: boolean; why?: string; onSubmit: () => void; children: ReactNode; aside?: ReactNode;
+export function TaskPanel({ phoneCollapsed = false, task, step, editable, busy, retrySeconds, result, ready, why, onSubmit, children, aside }: {
+  phoneCollapsed?: boolean; task: TaskRow; step: number; editable: boolean; busy: boolean; retrySeconds: number; result: (SubmitResult & { at: number }) | null; ready: boolean; why?: string; onSubmit: () => void; children: ReactNode; aside?: ReactNode;
 }) {
   const id = useId(), done = task.earned >= task.max, partial = task.earned > 0 && !done;
   // Desktop: every task open. Phones: only the first task starts open, to keep the page short.
   const [open, setOpen] = useState(true);
   useEffect(() => { // follows the viewport: collapse extra tasks on a phone, reopen them when the window widens
-    const query = window.matchMedia("(max-width: 700px)"), sync = () => setOpen(!(step > 1 && query.matches));
+    const query = window.matchMedia("(max-width: 700px)"), sync = () => setOpen(!((step > 1 || phoneCollapsed) && query.matches));
     sync(); query.addEventListener("change", sync); return () => query.removeEventListener("change", sync);
-  }, [step]);
+  }, [step, phoneCollapsed]);
   useEffect(() => { // task navigator: jump links open the target task, then scroll to it
     const onOpen = (e: Event) => { if ((e as CustomEvent<number>).detail === step) setOpen(true); };
     window.addEventListener("task-open", onOpen); return () => window.removeEventListener("task-open", onOpen);

@@ -84,6 +84,7 @@ export const verdictTasks: Record<string, TaskDef> = {
 };
 export const verdictValidator: ChapterValidator = {
   hints: ["Map the entry, session, impact, internal-assistance and response claims to independent retained sources from all four chapters. A mailbox display name or one database principal cannot establish the whole causal chain.", "Keep account ownership separate from intent. Match the captured campaign to the exact replayed session and customer export, correlate the signed policy action with intent/access/custody, and use actual records to contradict an alternative. An attacker alias is not a proven real-world identity, and a prepared plan is not an executed recovery."],
+  valid: answer => schema.safeParse(answer).success, // well-formed payload? (best-v1: a malformed payload never consumes an attempt)
   grade(answer, variant) {
     const parsed = schema.safeParse(answer);
     return parsed.success ? gradeAll(verdictTasks, { ...parsed.data.chain, evidenceMap: parsed.data.evidenceMap, hypothesisId: parsed.data.hypothesisId, rejected: parsed.data.rejected }, variant) : [];

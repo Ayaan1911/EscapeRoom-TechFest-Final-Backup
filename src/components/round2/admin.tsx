@@ -8,7 +8,8 @@ type Ready = { ready: boolean; checks: { id: string; ok: boolean; blocking: bool
 type Timing = { phase: string; serverNow: string; startsAt: string | null; endedAt: string | null; elapsedMs: number; schedule: { incidentReleases: { incident: number; at: string }[]; partAClosesAt: string; partBOpensAt: string; endsAt: string } | null; nextEvent: { event: string; at: string; inMs: number } | null; resultsPublishedAt: string | null };
 type Score = { teamId: string; name: string; status: string; partA: number; partB: number; total: number; tasks: { id: string; earned: number }[]; submissions: number; lastSubmissionAt: string | null };
 type Audit = { events: { id: string; actor: string; action: string; detail: string; createdAt: string }[]; submissions: { id: string; teamId: string; taskId: string; awarded: number; taskEarned: number; createdAt: string }[] };
-type Results = { max: { total: number }; rules: string; ranked: { teamId: string; name: string; rank: number; tie: boolean; partA: number; partB: number; total: number; partAMs: number | null }[]; withdrawn: { teamId: string; name: string; partA: number; partB: number }[]; tiesNeedAdjudication: boolean; published: boolean; publishedAt: string | null };
+type Tie = { rank: number; teamIds: string[]; names: string[]; acknowledgment: { reason: string; by: string; at: string } | null };
+type Results = { max: { total: number; difficulty: number }; difficultTasks: string[]; rules: string; ranked: { teamId: string; name: string; rank: number; tie: boolean; partA: number; partB: number; total: number; partAMs: number | null; difficulty: number }[]; withdrawn: { teamId: string; name: string; partA: number; partB: number }[]; ties: Tie[]; unacknowledgedTies: number; tiesNeedAdjudication: boolean; published: boolean; publishedAt: string | null };
 type Solution = { id: string; part: string; title: string; explanation: string | null };
 type Msg = { tone: "ok" | "error"; text: string } | null;
 const utc = (s: string | null) => s ? new Date(s).toISOString().replace("T", " ").slice(0, 19) + " UTC" : "—";
@@ -30,7 +31,7 @@ export function Round2Admin() {
   const [qual, setQual] = useState<Qual | null>(null), [qualErr, setQualErr] = useState(""), [ready, setReady] = useState<Ready | null>(null), [timing, setTiming] = useState<Timing | null>(null);
   const [scores, setScores] = useState<Score[]>([]), [audit, setAudit] = useState<Audit | null>(null), [results, setResults] = useState<Results | null>(null), [resultsErr, setResultsErr] = useState("");
   const [solutions, setSolutions] = useState<Solution[] | null>(null), [msg, setMsg] = useState<Msg>(null), [auto, setAuto] = useState(true), [offset, setOffset] = useState(0), [wall, setWall] = useState(() => Date.now());
-  const [standby, setStandby] = useState(""), [replaces, setReplaces] = useState(""), [reason, setReason] = useState(""), [endReason, setEndReason] = useState("");
+  const [standby, setStandby] = useState(""), [replaces, setReplaces] = useState(""), [reason, setReason] = useState(""), [endReason, setEndReason] = useState(""), [tieReason, setTieReason] = useState("");
 
   // READ-ONLY refresh: only GETs. No administrative mutation can ever be triggered from here.
   const load = useCallback(async (full: boolean) => {
@@ -107,13 +108,21 @@ export function Round2Admin() {
       <section className="r2a-card is-wide" aria-labelledby="res-h"><h2 id="res-h">G · Results review</h2>
         {results ? <>
           <p className="r2-meta">{results.rules}</p>
-          {results.tiesNeedAdjudication && <p className="r2a-msg is-error" role="alert">Unresolved ties: ranks marked TIE are equal on every rule. No winner is declared for tied teams; adjudicate manually.</p>}
-          <div className="r2-tablewrap"><table className="r2-table"><thead><tr><th scope="col">Rank</th><th scope="col">Team</th><th scope="col">Part A</th><th scope="col">Part B</th><th scope="col">Total</th><th scope="col">Part A completion</th></tr></thead>
-            <tbody>{results.ranked.map(r => <tr key={r.teamId}><td>{r.rank}{r.tie && <b className="r2a-bad"> TIE</b>}</td><th scope="row">{r.name}</th><td>{r.partA}</td><td>{r.partB}</td><td><b>{r.total}</b>/{results.max.total}</td><td className="r2-mono">{r.partAMs === null ? "no Part A points" : formatClock(r.partAMs)}</td></tr>)}</tbody></table></div>
+          <p className="r2-meta">Tiebreak order: total, then Part B, then Part A completion, then difficulty subtotal (i1.justify, i2.evidence, i3.contradictions, b1.chain, b2.eliminate; max {results.max.difficulty}). The subtotal never adds points.</p>
+          {results.ties.length > 0 && <div className="r2a-ties" role="region" aria-label="Exact ties"><h3>Exact ties ({results.unacknowledgedTies} unacknowledged)</h3>
+            <p className="r2-meta">Teams below are equal on all four criteria and SHARE the rank. You cannot pick a winner; you can only acknowledge the shared rank. Publication is blocked until every exact tie is acknowledged.</p>
+            <label className="r2a-form">Reason for acknowledging (10–500 characters, recorded and audited)<textarea rows={2} maxLength={500} value={tieReason} onChange={e => setTieReason(e.target.value)} /></label>
+            <ul className="r2a-list">{results.ties.map(t => <li key={t.rank}><span><b>Rank {t.rank}:</b> {t.names.join(", ")}</span>
+              {t.acknowledgment ? <span className="r2a-ok">Acknowledged: {t.acknowledgment.reason}</span>
+                : <ConfirmButton label="Acknowledge exact tie" title={`Acknowledge the exact tie at rank ${t.rank}?`} disabled={tieReason.trim().length < 10 || results.published} onConfirm={() => act({ action: "acknowledge-tie", rank: t.rank, reason: tieReason.trim() }, () => `Exact tie at rank ${t.rank} acknowledged.`)}>
+                  <p>{t.names.join(" and ")} share rank {t.rank}: equal total, Part B, Part A time and difficulty subtotal. This records your acknowledgment and reason permanently. It does not change any score or rank and cannot select a winner.</p><p>Reason: <i>{tieReason}</i></p></ConfirmButton>}</li>)}</ul></div>}
+          <div className="r2-tablewrap"><table className="r2-table"><thead><tr><th scope="col">Rank</th><th scope="col">Team</th><th scope="col">Part A</th><th scope="col">Part B</th><th scope="col">Total</th><th scope="col">Part A completion</th><th scope="col">Difficulty</th></tr></thead>
+            <tbody>{results.ranked.map(r => <tr key={r.teamId}><td>{r.rank}{r.tie && <b className="r2a-bad"> TIE</b>}</td><th scope="row">{r.name}</th><td>{r.partA}</td><td>{r.partB}</td><td><b>{r.total}</b>/{results.max.total}</td><td className="r2-mono">{r.partAMs === null ? "no Part A points" : formatClock(r.partAMs)}</td><td>{r.difficulty}/{results.max.difficulty}</td></tr>)}</tbody></table></div>
           {!!results.withdrawn.length && <p className="r2-meta">Withdrawn (not ranked): {results.withdrawn.map(w => `${w.name} ${w.partA + w.partB}`).join(", ")}</p>}
           <div className="r2-actions"><a className="k-btn" href="/api/round2/admin?view=results-csv">Export CSV</a>
-            {results.published ? <span className="r2a-ok">Published {utc(results.publishedAt)}</span> : <ConfirmButton label="Publish results" danger word="PUBLISH" title="Publish Round 2 results to all finalists?" onConfirm={() => act({ action: "publish" }, () => "Results published.")}>
-              <p><b>Publication is irreversible.</b> Every finalist will see the full ranking (rank, team, Part A, Part B, total). Tied teams are shown as tied. Confirm that ties and scores have been reviewed.</p></ConfirmButton>}</div></>
+            {results.published ? <span className="r2a-ok">Published {utc(results.publishedAt)}</span> : <ConfirmButton label="Publish results" danger word="PUBLISH" disabled={results.unacknowledgedTies > 0} title="Publish Round 2 results to all finalists?" onConfirm={() => act({ action: "publish" }, () => "Results published.")}>
+              <p><b>Publication is irreversible.</b> Every finalist will see the full ranking (rank, team, Part A, Part B, total, difficulty subtotal). Exact ties are shown as shared ranks. Confirm that scores and acknowledged ties have been reviewed.</p></ConfirmButton>}
+            {!results.published && results.unacknowledgedTies > 0 && <span className="r2a-bad" role="status">Publishing is blocked: acknowledge every exact tie first.</span>}</div></>
           : <p className={resultsErr ? "r2-meta" : ""}>{resultsErr || "Loading…"} Results can be reviewed once the round has finished. Nothing is visible to teams until you publish.</p>}</section>
 
       <section className="r2a-card is-wide" aria-labelledby="a-h"><h2 id="a-h">F · Audit trail</h2>

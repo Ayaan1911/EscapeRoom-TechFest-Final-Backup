@@ -11,7 +11,7 @@ import { ADMIN_URL } from "./pg-temp.mjs";
 
 if (!["127.0.0.1", "localhost"].includes(new URL(ADMIN_URL).hostname)) throw new Error("non-local admin URL refused");
 const root = process.cwd(), migrations = join(root, "prisma", "migrations");
-const R2 = "20261121000000_round2", SP = "20261122000000_scoring_policy", PRE = ["20261118000000_postgres_init", "20261120000000_task_scoring_and_drafts", R2];
+const R2 = "20261121000000_round2", SP = "20261122000000_scoring_policy", TIE = "20261123000000_tie_acknowledgment", PRE = ["20261118000000_postgres_init", "20261120000000_task_scoring_and_drafts", R2];
 const names = [];
 const dbUrl = name => { const u = new URL(ADMIN_URL); u.pathname = `/${name}`; return u.href; };
 async function create(label) {
@@ -33,11 +33,11 @@ try {
   // ---- 1. fresh database through the real deploy command
   const fresh = await create("fresh"), freshUrl = dbUrl(fresh);
   const out = prisma(freshUrl, "migrate", "deploy");
-  check("fresh DB: prisma migrate deploy applies all migrations", /applied|No pending/i.test(out) && out.includes(R2) && out.includes(SP), out.split("\n").filter(l => /^\d{14}_/.test(l.trim())).join(" | "));
+  check("fresh DB: prisma migrate deploy applies all migrations", /applied|No pending/i.test(out) && out.includes(R2) && out.includes(SP) && out.includes(TIE), out.split("\n").filter(l => /^\d{14}_/.test(l.trim())).join(" | "));
   const c = new PrismaClient({ datasourceUrl: freshUrl });
   const tables = (await c.$queryRaw`select table_name from information_schema.tables where table_schema='public' order by 1`).map(r => r.table_name);
-  const r2 = ["R2Session", "R2Finalist", "R2Submission", "R2TaskScore", "R2Draft", "R2Audit"];
-  check("all six Round 2 tables exist", r2.every(t => tables.includes(t)), r2.filter(t => !tables.includes(t)).join(","));
+  const r2 = ["R2Session", "R2Finalist", "R2Submission", "R2TaskScore", "R2Draft", "R2Audit", "R2TieAck"];
+  check("all seven Round 2 tables exist (incl. the append-only R2TieAck)", r2.every(t => tables.includes(t)), r2.filter(t => !tables.includes(t)).join(","));
   check("all Round 1 tables still exist", ROUND1.every(t => tables.includes(t)));
   const fks = await c.$queryRaw`select conname, confdeltype from pg_constraint where contype='f' and conname like 'R2%' order by 1`;
   check("R2 foreign keys exist with ON DELETE RESTRICT", fks.length === 4 && fks.every(f => f.confdeltype === "r"), fks.map(f => `${f.conname}:${f.confdeltype}`).join(" "));
@@ -56,6 +56,11 @@ try {
   check("deleting a Team that is a finalist is blocked (RESTRICT)", blocked);
   let orphan = false; try { await c.r2Draft.create({ data: { teamId: "NOPE", taskId: "x", data: "{}" } }); } catch { orphan = true; }
   check("a Round 2 row for a non-finalist is rejected by the database", orphan);
+  const idx2 = await c.$queryRaw`select indexname from pg_indexes where tablename = 'R2TieAck' order by 1`;
+  check("R2TieAck has a primary key and a UNIQUE signature index (one acknowledgment per tie group)", idx2.some(i => i.indexname === "R2TieAck_signature_key") && idx2.some(i => i.indexname === "R2TieAck_pkey"));
+  await c.r2TieAck.create({ data: { rank: 1, teamIds: "[]", signature: "sig", reason: "r", decidedBy: "t" } });
+  let dup = false; try { await c.r2TieAck.create({ data: { rank: 1, teamIds: "[]", signature: "sig", reason: "r", decidedBy: "t" } }); } catch { dup = true; }
+  check("the same tie group cannot be acknowledged twice (database-enforced)", dup);
   await c.$disconnect();
   const diff = prisma(freshUrl, "migrate", "diff", "--from-url", freshUrl, "--to-schema-datamodel", "prisma/schema.prisma", "--exit-code").trim();
   check("live schema matches prisma/schema.prisma (empty migrate diff)", /No difference/i.test(diff) || diff === "", diff.slice(0, 120));
@@ -77,9 +82,9 @@ try {
   const cols = Object.fromEntries(await Promise.all(ROUND1.map(async t => [t, await colsOf(t)])));
   const snap = async () => { const out = {}; for (const t of ROUND1) out[t] = hash(await p.$queryRawUnsafe(`select ${cols[t]} from "${t}" order by 1,2`)); return out; };
   const before = await snap();
-  await applySql(preUrl, SP);
+  await applySql(preUrl, SP); await applySql(preUrl, TIE);
   const after = await snap();
-  check("pre-policy DB: every pre-existing Round 1 column of every row is unchanged after the scoring-policy migration", JSON.stringify(before) === JSON.stringify(after), ROUND1.filter(t => before[t] !== after[t]).join(","));
+  check("pre-policy DB: every pre-existing Round 1 column of every row is unchanged after the scoring-policy AND tie-acknowledgment migrations", JSON.stringify(before) === JSON.stringify(after), ROUND1.filter(t => before[t] !== after[t]).join(","));
   const g = await p.gameSession.findUniqueOrThrow({ where: { id: 1 } }), ts = await p.taskScore.findFirstOrThrow(), sub = await p.submission.findFirstOrThrow();
   check("pre-policy DB: a round that already started keeps scoringPolicy NULL (legacy union-v0, never silently upgraded)", g.startsAt !== null && g.scoringPolicy === null);
   check("pre-policy DB: historic TaskScore/Submission rows get attempts=0 and NULL taskId/answerHash", ts.attempts === 0 && sub.taskId === null && sub.answerHash === null && sub.scoringVersion === 2);

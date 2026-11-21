@@ -63,11 +63,13 @@ describe.skipIf(process.env.GHOST_DB_TEST !== "1")("Round 1 scoring policy best-
       const graded: number[] = [];
       for (const v of variants) {
         const res = await task(id, chapter, t.id, v);
+        if (!taskDefs[chapter][t.id].schema.safeParse(v).success) { expect(res, `${t.id} malformed payload`).toMatchObject({ error: "Invalid answer format. No attempt was used." }); continue; } // refused for free
         if (graded.length < cap) { expect(res.error, `${t.id} attempt ${graded.length + 1}`).toBeUndefined(); graded.push(pts(v)); }
         else expect(res, `${t.id} beyond the cap`).toMatchObject({ error: "No attempts remaining. Your highest score has been saved." });
         if ((await row(id, t.id))!.earned >= Object.values(t.criteria).reduce((a, b) => a + b, 0)) break; // task complete: nothing further to submit
       }
       const stored = await row(id, t.id);
+      if (!stored) { expect(graded).toEqual([]); continue; } // every variant was malformed
       expect(stored!.earned, `${t.id} earned`).toBe(Math.max(...graded));
       expect(stored!.attempts, `${t.id} attempts`).toBeLessThanOrEqual(cap);
       expect(stored!.attempts, `${t.id} attempts`).toBe(graded.length);
@@ -118,6 +120,22 @@ describe.skipIf(process.env.GHOST_DB_TEST !== "1")("Round 1 scoring policy best-
     expect(await chapterSubmit(id, 0, inboxAnswers.A)).toMatchObject({ error: "No attempts remaining. Your highest score has been saved." }); // even a perfect chapter answer is refused
     expect(await task(id, 0, "inbox.entry", taskAnswer("inbox.entry", "A"))).toMatchObject({ error: "No attempts remaining. Your highest score has been saved." });
     expect((await service.teamState(id)).score).toBe(0);
+  });
+  it("best-v1: malformed payloads (either format) never consume attempts; valid but wrong guesses still do", async () => {
+    await setPolicy("best-v1"); const id = await mk();
+    const attemptsOf = async () => (await service.teamState(id)).tasks[0].map(t => t.attempts?.used);
+    // malformed task payloads: wrong shape, extra field, wrong type
+    for (const bad of [{}, { databaseId: 42 }, { databaseId: "x", score: 15 }, "text", null, [1]]) expect(await task(id, 0, "inbox.impact", bad)).toMatchObject({ error: "Invalid answer format. No attempt was used." });
+    // malformed full-chapter payloads (the legacy path): nothing consumed on ANY task
+    for (const bad of [{}, { kind: "conclusion" }, { kind: "conclusion", emailId: 1 }, "nope", { ...inboxAnswers.A, unknownField: 1 }]) expect(await chapterSubmit(id, 0, bad)).toMatchObject({ error: "Invalid answer format. No attempt was used." });
+    expect(await attemptsOf()).toEqual([0, 0, 0]);
+    expect(await db.submission.count({ where: { teamId: id, scoringVersion: 3 } })).toBe(0); // refusals are audited but are not graded attempts
+    expect(await db.submission.count({ where: { teamId: id, accepted: false, reason: "Invalid answer format. No attempt was used." } })).toBeGreaterThan(5);
+    // a well-formed wrong answer still costs exactly one attempt
+    expect(await task(id, 0, "inbox.impact", { databaseId: "x-wrong" })).toMatchObject({ awarded: 0 });
+    expect(await attemptsOf()).toEqual([0, 0, 1]);
+    expect(await chapterSubmit(id, 0, { ...inboxAnswers.A, emailId: "x-wrong", deliveryId: "x-wrong", snapshotId: "x-wrong", authenticationId: "x-wrong", sessionId: "x-wrong", databaseId: "x-wrong" })).toMatchObject({ tasks: expect.any(Array) });
+    expect(await attemptsOf()).toEqual([1, 1, 2]);
   });
   it("best-v1: a perfect chapter submission within the caps still earns everything and completes the chapter", async () => {
     await setPolicy("best-v1"); const id = await mk();

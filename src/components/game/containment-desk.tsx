@@ -62,7 +62,7 @@ export function ContainmentDesk({ evidence, initialCctv, initialState, initialDr
       <h2 className="pg-h">Tasks <small>Submit each one when ready. Points are saved per task.</small></h2>
       <TaskNav tasks={state.tasks[3]} />
 
-      <TaskPanel step={1} task={taskOf(state, 3, DRAFT.timeline)} editable={editable} busy={busy} retrySeconds={retrySeconds} result={result} ready onSubmit={() => void submit(DRAFT.timeline)}>
+      <TaskPanel phoneCollapsed step={1} task={taskOf(state, 3, DRAFT.timeline)} editable={editable} busy={busy} retrySeconds={retrySeconds} result={result} ready onSubmit={() => void submit(DRAFT.timeline)}>
         <p className="pg-hint-line">Earliest first. Use cited timestamps and causal links, not card order. Drag, or use ↑ ↓.</p>
         <ol className="k-timeline containment-order pg-order" aria-label="Seven-event timeline">{eventOrder.map((id, index) => { const event = evidence.events.find(item => item.id === id)!, d = drag("eventOrder", DRAFT.timeline, eventOrder, id);
           return <li key={id} data-event-id={id} {...d}><span className="k-tl-pos" aria-hidden="true">{index + 1}</span>
@@ -71,24 +71,24 @@ export function ContainmentDesk({ evidence, initialCctv, initialState, initialDr
         <p role="status" aria-live="polite" className="pg-live">{movement}</p>
       </TaskPanel>
 
-      <TaskPanel step={2} task={taskOf(state, 3, DRAFT.identity)} editable={editable} busy={busy} retrySeconds={retrySeconds} result={result} ready={!!(f.str(DRAFT.identity, "account").trim() && f.str(DRAFT.identity, "sessionId").trim())} why="Enter the affected account and session." onSubmit={() => void submit(DRAFT.identity)}>
+      <TaskPanel phoneCollapsed step={2} task={taskOf(state, 3, DRAFT.identity)} editable={editable} busy={busy} retrySeconds={retrySeconds} result={result} ready={!!(f.str(DRAFT.identity, "account").trim() && f.str(DRAFT.identity, "sessionId").trim())} why="Enter the affected account and session." onSubmit={() => void submit(DRAFT.identity)}>
         <div className="pg-fields"><label>Affected account<input type="email" maxLength={120} disabled={!editable} value={f.str(DRAFT.identity, "account")} onChange={e => f.set(DRAFT.identity, "account", e.target.value)} /></label>
           <label>Affected session<input maxLength={100} disabled={!editable} value={f.str(DRAFT.identity, "sessionId")} onChange={e => f.set(DRAFT.identity, "sessionId", e.target.value)} /></label></div>
       </TaskPanel>
 
-      <TaskPanel step={3} task={taskOf(state, 3, DRAFT.immediate)} editable={editable} busy={busy} retrySeconds={retrySeconds} result={result} ready={immediate.length > 0} why="Choose the scoped urgent actions." onSubmit={() => void submit(DRAFT.immediate)}>
+      <TaskPanel phoneCollapsed step={3} task={taskOf(state, 3, DRAFT.immediate)} editable={editable} busy={busy} retrySeconds={retrySeconds} result={result} ready={immediate.length > 0} why="Choose the scoped urgent actions." onSubmit={() => void submit(DRAFT.immediate)}>
         <p className="pg-hint-line">Urgent steps run in parallel. Over-broad actions score nothing for this task.</p>
         <fieldset disabled={!editable}><legend className="k-sr">Immediate actions</legend><div className="k-choices">{evidence.immediateOptions.map(item => choice(item, immediate.includes(item.id), () => f.toggle(DRAFT.immediate, "immediateActions", item.id, 10), `Select immediate ${item.id}`))}</div></fieldset>
       </TaskPanel>
 
-      <TaskPanel step={4} task={taskOf(state, 3, DRAFT.recovery)} editable={editable} busy={busy} retrySeconds={retrySeconds} result={result} ready={recovery.length > 0} why="Choose recovery steps, then order them." onSubmit={() => void submit(DRAFT.recovery)}>
+      <TaskPanel phoneCollapsed step={4} task={taskOf(state, 3, DRAFT.recovery)} editable={editable} busy={busy} retrySeconds={retrySeconds} result={result} ready={recovery.length > 0} why="Choose recovery steps, then order them." onSubmit={() => void submit(DRAFT.recovery)}>
         <p className="pg-hint-line">Pick supported steps, then order them. Close the weakness before the barrier check; verify before restoring.</p>
         <fieldset disabled={!editable}><legend className="k-sr">Recovery decisions</legend><div className="k-choices">{evidence.recoveryOptions.map(item => choice(item, recovery.includes(item.id), () => f.toggle(DRAFT.recovery, "recoveryOrder", item.id, 9), `Select recovery ${item.id}`))}</div></fieldset>
         {recovery.length > 0 ? <ol className="k-timeline k-timeline-recovery containment-order recovery-order pg-order pg-flow" aria-label="Ordered recovery plan">{recovery.map((id, index) => { const item = optionById(evidence.recoveryOptions, id)!, d = drag("recoveryOrder", DRAFT.recovery, recovery, id);
           return <li key={id} data-recovery-id={id} {...d}><span className="k-tl-pos" aria-hidden="true">{index + 1}</span><div className="k-tl-card"><h4>{item.id} · {item.title}</h4>{controls("recoveryOrder", DRAFT.recovery, recovery, id, "recovery")}</div></li>; })}</ol> : <p className="k-empty">No recovery steps chosen yet.</p>}
       </TaskPanel>
 
-      <TaskPanel step={5} task={taskOf(state, 3, DRAFT.evidence)} editable={editable} busy={busy} retrySeconds={retrySeconds} result={result} ready={support.length >= 5} why="Pin at least five records (include the security-room snapshot)." onSubmit={() => void submit(DRAFT.evidence)}>
+      <TaskPanel phoneCollapsed step={5} task={taskOf(state, 3, DRAFT.evidence)} editable={editable} busy={busy} retrySeconds={retrySeconds} result={result} ready={support.length >= 5} why="Pin at least five records (include the security-room snapshot)." onSubmit={() => void submit(DRAFT.evidence)}>
         <div className="pg-preserve" aria-label="Evidence preservation">{evidenceItems.map(item => { const on = support.includes(item.id); return <label key={item.id} className={`k-choice k-choice-sm ${on ? "is-picked" : ""}`}><input type="checkbox" checked={on} disabled={!editable} onChange={() => f.toggle(DRAFT.evidence, "supportingEvidenceIds", item.id, 10)} aria-label={`Pin evidence ${item.id}`} /><span><strong className="k-mono">{item.id}</strong><small>{item.title}</small></span><span className="pg-preserved" aria-hidden="true">{on ? "preserved" : ""}</span></label>; })}</div>
         <details className="pg-hints"><summary>Read the records</summary><div className="k-drawer">{evidence.observations.map(item => <details key={item.id}><summary>{item.id} · {item.title} · observation</summary><p>{item.timestamp} UTC · {item.principal} · {item.sessionId}</p><p>{item.description}</p><p>Sources: {item.sourceIds.join(", ")} · {item.confidence}</p></details>)}
           {evidence.artifacts.map(item => <details key={item.id}><summary>{item.id} · {item.title}</summary><dl className="k-facts">{Object.entries(item.facts).map(([key, value]) => <div key={key}><dt>{key}</dt><dd className="k-mono">{value}</dd></div>)}</dl></details>)}</div></details>

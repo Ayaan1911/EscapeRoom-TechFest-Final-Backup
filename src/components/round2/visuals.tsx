@@ -19,8 +19,9 @@ const isExternal = (n: string) => IP.test(n);
 export function NetworkMap({ records, malicious, blocked, disabled, onMark, onBlock }: { records: R2Record[]; malicious: string[]; blocked: string[]; disabled: boolean; onMark: (id: string) => void; onBlock: (id: string) => void }) {
   const conns = records.map(parseConn).filter((c): c is Conn => !!c);
   const [active, setActive] = useState<string | null>(conns[0]?.id ?? null);
+  const idsAt = (n: string) => conns.filter(c => c.src === n || c.dst === n).map(c => c.id).join(" ");
   const nodes = (side: boolean) => [...new Set(conns.flatMap(c => [c.src, c.dst]).filter(n => isExternal(n) === side))];
-  const left = nodes(false), right = nodes(true), H = Math.max(left.length, right.length) * 44 + 40;
+  const left = nodes(false), right = nodes(true), H = Math.max(left.length, right.length) * 52 + 40;
   const y = (list: string[], n: string) => 30 + (list.indexOf(n) + 0.5) * ((H - 40) / list.length);
   const pos = (n: string) => isExternal(n) ? { x: 600, y: y(right, n) } : { x: 160, y: y(left, n) };
   const cur = conns.find(c => c.id === active);
@@ -32,8 +33,8 @@ export function NetworkMap({ records, malicious, blocked, disabled, onMark, onBl
       <text x="160" y="14" className="r2-svg-h" textAnchor="middle">INTERNAL</text><text x="600" y="14" className="r2-svg-h" textAnchor="middle">EXTERNAL</text>
       {conns.map(c => { const a = pos(c.src), b = pos(c.dst), w = 1.5 + Math.min(4.5, Math.log10(Math.max(c.bytes, 1e3)) - 3) , mid = (a.x + b.x) / 2;
         const cls = `r2-edge ${malicious.includes(c.id) ? "is-mal" : ""} ${blocked.includes(c.id) ? "is-blocked" : ""} ${active === c.id ? "is-active" : ""}`;
-        return <g key={c.id} className={cls} onClick={() => setActive(c.id)}><path d={`M${a.x} ${a.y} C ${mid} ${a.y}, ${mid} ${b.y}, ${b.x} ${b.y}`} strokeWidth={w} fill="none" markerEnd="url(#r2arrow)" /><text x={mid} y={(a.y + b.y) / 2 - 4} textAnchor="middle" className="r2-svg-id">{c.id}</text></g>; })}
-      {[...left, ...right].map(n => { const p = pos(n); return <g key={n} className="r2-node"><rect x={p.x - 70} y={p.y - 13} width="140" height="26" rx="5" /><text x={p.x} y={p.y + 4} textAnchor="middle">{n}</text></g>; })}
+        return <g key={c.id} className={cls} onClick={() => setActive(c.id)}><path d={`M${a.x} ${a.y} C ${mid} ${a.y}, ${mid} ${b.y}, ${b.x} ${b.y}`} strokeWidth={w} fill="none" markerEnd="url(#r2arrow)" /><title>{c.id}</title></g>; })}
+      {[...left, ...right].map(n => { const p = pos(n); return <g key={n} className="r2-node"><rect x={p.x - 70} y={p.y - 13} width="140" height="26" rx="5" /><text x={p.x} y={p.y + 4} textAnchor="middle">{n}</text><text x={p.x} y={p.y + 24} textAnchor="middle" className="r2-svg-id">{idsAt(n)}</text></g>; })}
     </svg></div>
     {cur && <div className="r2-inspect" role="region" aria-label={`Inspecting ${cur.id}`}><b className="r2-id">{cur.id}</b> <span className="r2-mono">{cur.src} → {cur.dst}{cur.port && `:${cur.port}`}</span> <span className="r2-tag">{cur.inbound ? "inbound" : "outbound"}</span><p>{cur.record.detail}</p><small className="r2-meta">Observed {cur.record.time}</small></div>}
     <div className="r2-tablewrap"><table className="r2-table"><caption className="r2-sr">All ten connections with traffic metadata and decisions</caption>

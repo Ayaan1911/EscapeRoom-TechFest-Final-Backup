@@ -205,22 +205,43 @@ describe.skipIf(process.env.GHOST_DB_TEST !== "1")("Round 2 backend (PostgreSQL)
     const fresh = await import("../src/lib/round2/play.server");
     expect((await fresh.r2Status("R07")).clock.phase).toBe("part_b");
   });
-  it("results stay private until the organizer ends the round and explicitly publishes", async () => {
+  it("results stay private until the organizer ends the round, acknowledges every exact tie and explicitly publishes", async () => {
     await ago(min(30)); await asAdmin();
     await expect(org.reviewResults()).rejects.toMatchObject({ status: 409 });
     await expect(org.publishResults()).rejects.toMatchObject({ status: 409 });
+    await expect(org.acknowledgeTie({ rank: 1, reason: "too early, the round is still running" })).rejects.toMatchObject({ status: 409 });
+    // fixture: R04 and R05 are equal on total, Part B and Part A time; only R04 earned its points on a frozen difficult task (i1.justify)
+    const at = new Date(Date.now() - 20 * 60_000);
+    await db.r2TaskScore.createMany({ data: [{ teamId: "R04", taskId: "i1.justify", part: "A", earned: 3, max: 3, criteria: "[]", firstScoredAt: at, lastAwardAt: at }, { teamId: "R05", taskId: "i1.response", part: "A", earned: 3, max: 3, criteria: "[]", firstScoredAt: at, lastAwardAt: at }] });
     await org.endRound("Test finish");
     await expect(org.endRound("again")).rejects.toMatchObject({ status: 409 });
     await asTeam("R01"); expect((await (await import("../src/app/api/round2/results/route")).GET()).status).toBe(404);
     await asAdmin();
     const review = await org.reviewResults();
-    expect(review.max).toEqual({ partA: 60, partB: 40, total: 100 }); expect(review.ranked[0].rank).toBe(1);
-    expect(review.tiesNeedAdjudication).toBe(true); expect(review.ranked.some(r => r.tie)).toBe(true); // several teams scored nothing: shared rank, flagged, no winner invented
+    expect(review.max).toEqual({ partA: 60, partB: 40, total: 100, difficulty: 22 }); expect(review.ranked[0].rank).toBe(1);
+    const i4 = review.ranked.findIndex(r => r.teamId === "R04"), i5 = review.ranked.findIndex(r => r.teamId === "R05");
+    expect(review.ranked[i4].total).toBe(3); expect(review.ranked[i5].total).toBe(3); // the difficulty subtotal added nothing to either total
+    expect([review.ranked[i4].difficulty, review.ranked[i5].difficulty]).toEqual([3, 0]);
+    expect(i4).toBeLessThan(i5); expect(review.ranked[i4].rank).toBeLessThan(review.ranked[i5].rank); expect(review.ranked[i4].tie || review.ranked[i5].tie).toBe(false); // criterion 4 separated them
     expect(review.ranked.every((r, i, all) => i === 0 || all[i - 1].total >= r.total)).toBe(true);
     expect(review.withdrawn.map(w => w.teamId).sort()).toEqual(["R09", "R10"]);
-    const csv = await org.resultsCsv(); expect(csv).toContain("Part A completion ms"); expect(csv).toContain("TIE");
+    expect(review.ties.length).toBeGreaterThan(0); expect(review.unacknowledgedTies).toBe(review.ties.length); // several teams scored nothing: exact tie, shared rank
+    // publication is blocked while an exact tie is unacknowledged
+    await expect(org.publishResults()).rejects.toMatchObject({ status: 409, message: expect.stringContaining("Exact ties must be acknowledged"), extra: { unacknowledgedRanks: expect.any(Array) } });
+    expect(await db.r2Session.findUniqueOrThrow({ where: { id: 1 } })).toMatchObject({ resultsPublishedAt: null });
+    await expect(org.acknowledgeTie({ rank: review.ties[0].rank, reason: "short" })).rejects.toMatchObject({ status: 400 });
+    await expect(org.acknowledgeTie({ rank: 2, reason: "there is no exact tie at rank 2 here" })).rejects.toMatchObject({ status: 409, message: expect.stringContaining("no exact tie") });
+    await auth.logout("admin"); await asTeam("R01"); await expect(org.acknowledgeTie({ rank: review.ties[0].rank, reason: "a team session must not be able to do this" })).rejects.toMatchObject({ status: 401 }); await asAdmin(); // team cookie only: no organizer authority
+    for (const t of review.ties) expect(await org.acknowledgeTie({ rank: t.rank, reason: "Exact tie reviewed; shared rank accepted by the organizer" })).toMatchObject({ rank: t.rank });
+    await expect(org.acknowledgeTie({ rank: review.ties[0].rank, reason: "acknowledging the same tie a second time" })).rejects.toMatchObject({ status: 409, message: expect.stringContaining("already") });
+    expect(await db.r2TieAck.count()).toBe(review.ties.length); expect(await db.r2Audit.count({ where: { action: "acknowledge-tie" } })).toBe(review.ties.length);
+    const after = await org.reviewResults(); expect(after.unacknowledgedTies).toBe(0); expect(after.ranked.map(r => [r.teamId, r.rank])).toEqual(review.ranked.map(r => [r.teamId, r.rank])); // nothing reordered or rescored
+    const csv = await org.resultsCsv(); expect(csv).toContain("Part A completion ms"); expect(csv).toContain("Difficulty subtotal (of 22)"); expect(csv).toContain("TIE"); expect(csv).toContain("shared rank accepted by the organizer");
     expect((await org.publishResults()).already).toBe(false); expect((await org.publishResults()).already).toBe(true);
-    await asTeam("R01"); expect((await (await import("../src/app/api/round2/results/route")).GET()).status).toBe(200);
+    await expect(org.acknowledgeTie({ rank: review.ties[0].rank, reason: "after publication nothing may change" })).rejects.toMatchObject({ status: 409 });
+    await asTeam("R01"); const pub = await (await import("../src/app/api/round2/results/route")).GET(); expect(pub.status).toBe(200);
+    const body = await pub.json(); expect(body.ranking.map((r: { rank: number; name: string }) => [r.rank, r.name])).toEqual(after.ranked.map(r => [r.rank, r.name])); // the published order is the server ranking, byte for byte
+    expect(body.ranking.some((r: { tie: boolean; acknowledged: boolean }) => r.tie && r.acknowledged)).toBe(true);
     expect(await db.r2Audit.count({ where: { action: "publish-results" } })).toBe(1);
   });
   it("Round 1 data is untouched by every Round 2 operation", async () => {

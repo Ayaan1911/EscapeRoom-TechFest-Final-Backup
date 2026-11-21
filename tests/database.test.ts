@@ -94,7 +94,7 @@ describe.runIf(process.env.GHOST_DB_TEST === "1")("Prisma persistence and sessio
     const { validators } = await import("../src/lib/game/validators");
     const registeredTrail = validators[1];
     // Test-only fixture, never a real chapter answer key.
-    validators[1] = { validate: () => ({ correct:true, points:25, tamperDetected:true }), grade: () => catalog[1].flatMap(task => Object.keys(task.criteria).map(key => `${task.id}:${key}`)), hints:["Test hint one","Test hint two"] };
+    validators[1] = { valid: () => true, validate: () => ({ correct:true, points:25, tamperDetected:true }), grade: () => catalog[1].flatMap(task => Object.keys(task.criteria).map(key => `${task.id}:${key}`)), hints:["Test hint one","Test hint two"] };
     expect((await service.mutateTeam("A",1,"hint",null)).hint).toBe("Test hint one");
     expect((await service.mutateTeam("A",1,"hint",null)).hint).toBe("Test hint two");
     expect((await service.mutateTeam("A",1,"hint",null)).error).toBeDefined();
@@ -415,12 +415,12 @@ describe.runIf(process.env.GHOST_DB_TEST === "1")("Prisma persistence and sessio
     const body = { action: "submit", chapter: 3, answer };
     const throttled = await game.POST(request(body)); expect(throttled.status).toBe(429); expect(Number(throttled.headers.get("Retry-After"))).toBeGreaterThan(0); expect(await db.submission.count({ where: { teamId: id, chapter: 3 } })).toBe(attempts);
     for (const extra of [{ teamId: "CONTAIN-B" }, { variant: "A" }, { points: 200 }]) expect((await game.POST(request({ ...body, ...extra }))).status).toBe(400);
-    await age(); expect((await service.mutateTeam(id, 3, "submit", { ...answer, points: 200 })).accepted).toBe(false);
+    await age(); expect(await service.mutateTeam(id, 3, "submit", { ...answer, points: 200 })).toMatchObject({ error: "Invalid answer format. No attempt was used." }); // a forged extra field is malformed: refused for free (best-v1)
     await age(); const r = answer.recoveryOrder, safe = { ...answer, recoveryOrder: [r[1], r[2], r[0], ...r.slice(3)] };
     await Promise.allSettled([service.mutateTeam(id, 3, "submit", safe), service.mutateTeam(id, 3, "submit", safe)]);
     const saved = await service.teamState(id); expect(saved.current).toBe(4); expect(saved.progress.chapters[3].score).toBe(20); expect(saved.score).toBe(variant === "A" ? 87 : variant === "B" ? 82 : 76); expect(saved.progress.bonus).toBe(variant === "A" ? 5 : 0);
     expect(await db.submission.count({ where: { teamId: id, chapter: 3, accepted: true } })).toBe(1); expect((await service.mutateTeam(id, 3, "submit", answer)).error).toMatch(/locked/);
-    expect((await service.mutateTeam(id, 4, "submit", {})).accepted).toBe(false);
+    expect(await service.mutateTeam(id, 4, "submit", {})).toMatchObject({ error: "Invalid answer format. No attempt was used." }); // a malformed payload is refused for free (best-v1)
     await auth.logout(); await auth.login("team", id, code); await db.$disconnect(); expect((await service.teamState((await auth.session("team"))!.teamId!)).score).toBe(saved.score); expect((await get()).status).toBe(200);
     const stored = (await db.insiderAccess.findUnique({ where: { teamId: id } }))!; expect(stored.fragmentA).toBe(pair.fragmentA); expect(stored.fragmentB).toBe(pair.fragmentB);
     expect(JSON.stringify(await db.team.findMany({ where: { id: { not: { startsWith: "CONTAIN-" } } }, select: { id: true, progress: true }, orderBy: { id: "asc" } }))).toBe(preservedTeams);

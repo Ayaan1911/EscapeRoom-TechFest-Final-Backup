@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { availability, INCIDENT_RELEASE_MS, PART_A_MS, r2Clock, ROUND_MS, visible } from "../src/lib/round2/clock";
-import { criterionPoints, partMax, r2Catalog, taskMax, unitMax } from "../src/lib/round2/catalog";
-import { rankR2 } from "../src/lib/round2/ranking";
+import { criterionPoints, DIFFICULT_TASKS, DIFFICULTY_MAX, partMax, r2Catalog, taskMax, unitMax } from "../src/lib/round2/catalog";
+import { rankR2, tieGroups } from "../src/lib/round2/ranking";
 import { answerHash, parseSafeJson, stableStringify, UnsafeJson } from "../src/lib/round2/safe-json";
 import { gradeValidated, taskIdsWithDefs, validateAnswer } from "../src/lib/round2/tasks.server";
 import { units } from "../src/lib/round2/content.server";
@@ -121,7 +121,7 @@ describe("round 2 graders", () => {
 const CONNS = ["C-01", "C-02", "C-03", "C-04", "C-05", "C-06", "C-07", "C-08", "C-09", "C-10"];
 
 describe("round 2 ranking and tiebreakers", () => {
-  const row = (teamId: string, partA: number, partB: number, partAMs: number | null) => ({ teamId, partA, partB, partAMs });
+  const row = (teamId: string, partA: number, partB: number, partAMs: number | null, difficulty = 0) => ({ teamId, partA, partB, partAMs, difficulty });
   it("ranks by total, then Part B, then earlier Part A completion", () => {
     const r = rankR2([row("T1", 40, 20, 900_000), row("T2", 35, 25, 1_000_000), row("T3", 40, 20, 600_000), row("T4", 50, 30, 1_400_000)]);
     expect(r.map(x => x.teamId)).toEqual(["T4", "T2", "T3", "T1"]); // T4 80; T2 60 wins Part B; T3 beats T1 on time
@@ -137,6 +137,38 @@ describe("round 2 ranking and tiebreakers", () => {
   it("two teams with no Part A points and equal totals tie rather than produce NaN ordering", () => {
     const r = rankR2([row("A", 0, 20, null), row("B", 0, 20, null)]);
     expect(r.every(x => x.tie && x.rank === 1)).toBe(true);
+  });
+});
+
+describe("round 2 FINAL ranking: total, Part B, Part A time, difficulty subtotal, then shared rank", () => {
+  const row = (teamId: string, partA: number, partB: number, partAMs: number | null, difficulty = 0) => ({ teamId, partA, partB, partAMs, difficulty });
+  it("the difficult-task list is frozen: exactly these five tasks, worth 3+5+6+2+6 = 22", () => {
+    expect([...DIFFICULT_TASKS]).toEqual(["i1.justify", "i2.evidence", "i3.contradictions", "b1.chain", "b2.eliminate"]);
+    expect(DIFFICULTY_MAX).toBe(22);
+    expect(DIFFICULT_TASKS.map(id => taskMax(r2Catalog.find(t => t.id === id)!))).toEqual([3, 5, 6, 2, 6]);
+    for (const id of DIFFICULT_TASKS) expect(r2Catalog.some(t => t.id === id)).toBe(true);
+  });
+  it("applies the four criteria in exactly this order", () => {
+    // 1 total beats everything
+    expect(rankR2([row("A", 30, 20, 1000, 0), row("B", 40, 20, 9000, 0)])[0].teamId).toBe("B");
+    // 2 equal total: higher Part B wins even with a slower time and lower difficulty
+    expect(rankR2([row("A", 30, 20, 100, 22), row("B", 20, 30, 9000, 0)])[0].teamId).toBe("B");
+    // 3 equal total and Part B: faster Part A wins even when the other has more difficulty points
+    expect(rankR2([row("A", 30, 20, 9000, 22), row("B", 30, 20, 100, 0)])[0].teamId).toBe("B");
+    // 4 equal on the first three: higher difficulty subtotal wins
+    const r = rankR2([row("A", 30, 20, 500, 3), row("B", 30, 20, 500, 14)]);
+    expect(r.map(x => [x.teamId, x.rank, x.tie])).toEqual([["B", 1, false], ["A", 2, false]]);
+  });
+  it("the difficulty subtotal never changes a total: it is not part of partA/partB/total", () => {
+    const r = rankR2([row("A", 30, 20, 500, 22)]); expect(r[0].total).toBe(50);
+  });
+  it("teams exactly equal on all four criteria share the rank and form one tie group", () => {
+    const r = rankR2([row("B", 30, 20, 500, 5), row("A", 30, 20, 500, 5), row("C", 30, 20, 500, 4), row("D", 10, 10, 1, 0)]);
+    expect(r.map(x => [x.teamId, x.rank, x.tie])).toEqual([["A", 1, true], ["B", 1, true], ["C", 3, false], ["D", 4, false]]);
+    expect(tieGroups(r).map(g => [g.rank, g.teams.map(t => t.teamId)])).toEqual([[1, ["A", "B"]]]);
+  });
+  it("two teams with no Part A points and equal everything tie (no NaN ordering)", () => {
+    expect(rankR2([row("A", 0, 20, null, 0), row("B", 0, 20, null, 0)]).every(x => x.tie && x.rank === 1)).toBe(true);
   });
 });
 

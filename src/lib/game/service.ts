@@ -90,6 +90,12 @@ export async function mutateTeam(id: string, chapter: number, action: "submit" |
     const affected = task ? [taskDef!] : catalog[chapter], rowOf = (taskId: string) => stored.find(r => r.taskId === taskId);
     // A pure Tamper Alert probe ({kind:"tamper"}) is not an answer to any task: under best-v1 it consumes no attempt (the one-time bonus rule is unchanged).
     const free = best && !task && typeof answer === "object" && answer !== null && (answer as { kind?: unknown }).kind === "tamper";
+    // best-v1: a malformed payload (wrong shape or types) is refused BEFORE any attempt is spent, in both request formats. A well-formed but wrong answer still costs one.
+    if (best && !free && action === "submit" && !(task ? taskDefs[chapter][task].schema.safeParse(answer).success : validator!.valid(answer))) {
+      const error = "Invalid answer format. No attempt was used.";
+      await tx.submission.create({ data: { teamId: id, chapter, accepted: false, reason: error, answer: recorded } });
+      return { error };
+    }
     const eligible = free ? [] : best ? affected.filter(t => (rowOf(t.id)?.earned ?? 0) < taskMax(t) && (rowOf(t.id)?.attempts ?? 0) < attemptCap(t.id)) : affected;
     if (best && action === "submit" && !free) {
       // best-v1: an identical re-submission is idempotent and free (checked before attempts); otherwise every eligible task consumes one attempt, in BOTH request formats.

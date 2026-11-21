@@ -45,3 +45,10 @@ export const partMax = (part: R2Part) => r2Catalog.filter(t => t.part === part).
 export const unitMax = (part: R2Part, unit: number) => r2Catalog.filter(t => t.part === part && t.unit === unit).reduce((n, t) => n + taskMax(t), 0);
 export const MAX_ATTEMPTS_PER_TASK = 12; // graded attempts; identical re-submissions are free and idempotent
 export const MIN_SUBMIT_GAP_MS = 3000;
+
+/**
+ * FROZEN for this event (organizer-approved): the five difficult investigation tasks whose combined earned points are the FOURTH ranking tiebreaker.
+ * It is a tiebreaker only and never adds to a score. Not configurable at runtime; changing it requires a code change and review.
+ */
+export const DIFFICULT_TASKS = ["i1.justify", "i2.evidence", "i3.contradictions", "b1.chain", "b2.eliminate"] as const;
+export const DIFFICULTY_MAX = DIFFICULT_TASKS.reduce((n, id) => n + (r2TaskById.get(id) ? taskMax(r2TaskById.get(id)!) : 0), 0); // 3 + 5 + 6 + 2 + 6 = 22

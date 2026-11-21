@@ -80,6 +80,7 @@ export const insiderTasks: Record<string, TaskDef> = {
 };
 export const insiderValidator: ChapterValidator = {
   hints: ["Access privileges and badge proximity establish opportunity, not intent. Compare each employee's signed actions, approved scope and timestamps; keep the replayed victim account separate from the person changing controls.", "Compare the pre-export existing-session policy diff with the original maintenance approval, then correlate the journaled instruction's authoring device with console access and independent custody records. A copied approval reference is not an approving signature."],
+  valid: answer => answerSchema.safeParse(answer).success, // well-formed payload? (best-v1: a malformed payload never consumes an attempt)
   grade(answer, variant) {
     const parsed = answerSchema.safeParse(answer);
     return parsed.success ? gradeAll(insiderTasks, parsed.data, variant) : [];

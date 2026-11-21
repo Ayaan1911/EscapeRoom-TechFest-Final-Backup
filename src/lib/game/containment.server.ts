@@ -106,6 +106,7 @@ export const containmentTasks: Record<string, TaskDef> = {
 };
 export const containmentValidator: ChapterValidator = {
   hints: ["Reconstruct the seven events from trusted source timestamps, not card order or IDs. Separate delivered-lure navigation, the retained capture and later token validation; approved archive/maintenance observations belong outside the incident chain.", "Separate the parallel urgent response from ordered recovery. Preserve evidence alongside containment; verify identity and authority before replacing material, close the exploited weakness before the barrier check, and verify the barrier before restoring access."],
+  valid: answer => schema.safeParse(answer).success, // well-formed payload? (best-v1: a malformed payload never consumes an attempt)
   grade(answer, variant) {
     const parsed = schema.safeParse(answer);
     return parsed.success ? gradeAll(containmentTasks, parsed.data, variant) : [];

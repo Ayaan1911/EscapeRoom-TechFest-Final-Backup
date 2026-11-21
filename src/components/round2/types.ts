@@ -19,5 +19,5 @@ export type UnitContent = { part: "A" | "B"; unit: number; title: string; story:
 export type Bundle = { clock: ClockView; brief: string | null; contentVersion: string; units: UnitContent[] };
 export type SubmitOutcome = { duplicate: boolean; accepted: boolean; awarded: number; improved?: boolean; policy?: string; attempts?: Attempts; task: { id: string; earned: number; max: number }; score: { partA: number; partB: number; total: number } };
 export type ServerDraft = { taskId: string; data: Record<string, unknown>; version: number };
-export type ResultsPayload = { publishedAt: string; ranking: { rank: number; tie: boolean; name: string; partA: number; partB: number; total: number }[] };
+export type ResultsPayload = { publishedAt: string; ranking: { rank: number; tie: boolean; acknowledged?: boolean; name: string; partA: number; partB: number; total: number; difficulty: number }[] };
 export const unitKey = (part: "A" | "B", unit: number) => `${part}${unit}`;

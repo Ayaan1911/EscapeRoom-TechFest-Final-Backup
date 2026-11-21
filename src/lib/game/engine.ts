@@ -85,5 +85,7 @@ export interface ChapterValidator {
   validate(answer: unknown, variant: string): { correct: boolean; points: number; tamperDetected?: boolean };
   /** Criterion ids (see scoring.ts) the answer satisfies. Pure and deterministic; never returns client-supplied points. */
   grade(answer: unknown, variant: string): string[];
+  /** Is the payload well-formed for this chapter? Malformed payloads are refused without consuming an attempt (best-v1). */
+  valid(answer: unknown): boolean;
   hints: readonly [string, string];
 }

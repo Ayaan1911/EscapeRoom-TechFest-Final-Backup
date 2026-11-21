@@ -149,3 +149,8 @@ label.r2-check { display: inline-flex; flex-direction: row; align-items: center;
 
 .r2-svgscroll { overflow-x: auto; } @media (max-width: 600px) { .r2-svg { min-width: 600px; } }
 .r2-unit-visual > *, .r2-unit-main > *, .r2-net > * { min-width: 0; max-width: 100%; }
+
+@media (max-width: 1099px) and (min-width: 601px) {
+  .r2-top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 24px; } .r2-top .r2-score { margin-left: auto; }
+}
+@media (max-width: 600px) { .r2-top { display: grid; } }

@@ -91,6 +91,7 @@ export const inboxValidator: ChapterValidator = {
     "Suspicious language and failed mail authentication are leads, not a verdict. Build a chronological chain from a delivered message through a recorded navigation to the first unauthorized database export.",
     "Use the printed QR or /clue/inbox to inspect the captured redirect. Match its campaign and capture ID to a sign-in event, then match that event's session identifier to a database audit record. Check the quarantine and timestamp evidence for alternative suspects.",
   ],
+  valid: answer => answerSchema.safeParse(answer).success, // well-formed payload? (best-v1: a malformed payload never consumes an attempt)
   grade(answer, variant) {
     const parsed = answerSchema.safeParse(answer);
     return parsed.success && parsed.data.kind === "conclusion" ? gradeAll(inboxTasks, parsed.data, variant) : [];

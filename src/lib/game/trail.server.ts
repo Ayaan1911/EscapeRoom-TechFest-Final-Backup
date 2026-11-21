@@ -91,6 +91,7 @@ export const trailValidator: ChapterValidator = {
     "Separate failed attempts and pending MFA from sessions that actually gained access. Source-IP frequency is not evidence of a successful compromise; eliminate denied, revoked and authorized activity using the supporting records.",
     "Start at the unauthorized database export and trace its exact session backwards. Compare the original issuance device and source with the later validation event, then correlate the redirect with the retained Inbox capture. A matching account alone is insufficient.",
   ],
+  valid: answer => answerSchema.safeParse(answer).success, // well-formed payload? (best-v1: a malformed payload never consumes an attempt)
   grade(answer, variant) {
     const parsed = answerSchema.safeParse(answer);
     return parsed.success && parsed.data.kind === "conclusion" ? gradeAll(trailTasks, parsed.data, variant) : [];

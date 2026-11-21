@@ -25,7 +25,8 @@ try {
     const ids = Array.from({ length: 12 }, (_, i) => `P5-${String(i + 1).padStart(2, "0")}`);
     await db.auditLog.create({ data: { actor: "organizer", action: "qualification-confirmed", detail: JSON.stringify({ digest: "seeded-digest-0001", top10: ids.slice(0, 10), standby: ids.slice(10), reason: "seed" }) } });
     await db.r2Finalist.createMany({ data: ids.map((teamId, i) => ({ teamId, status: i < 10 ? "active" : "standby", seed: i + 1, snapshotDigest: "seeded-digest-0001" })) });
-    await db.r2Session.create({ data: { id: 1, startsAt: new Date(Date.now() - 10 * 60_000), contentVersion: "r2-v1" } });
+    const finished = process.env.GHOST_P5_FINISHED === "1"; // fast organizer/results checks: a round that already ended (test clock, never a real round)
+    await db.r2Session.create({ data: { id: 1, startsAt: new Date(Date.now() - (finished ? 60 : 10) * 60_000), contentVersion: "r2-v1", scoringPolicy: "best-v1" } });
   }
   const result = spawnSync(process.execPath, ["node_modules/@playwright/test/cli.js", "test", ...specs, "--workers=1", "--output", "test-results/phase5"], { env, stdio: "inherit", windowsHide: true });
   process.exitCode = result.status ?? 1;

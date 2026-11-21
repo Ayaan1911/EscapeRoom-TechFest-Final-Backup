@@ -161,6 +161,9 @@ test("minute 0: only Incident 1 is released; scoring is partial, honest and idem
   await submit(page, "i1.response").click(); await expect(feedback(page, "i1.response")).toContainText("+1 point");
   await waitReady(page, "i1.response"); await submit(page, "i1.response").click();
   await expect(feedback(page, "i1.response")).toContainText("already sent");
+  await expect(resp.locator(".r2-chip", { hasText: "Attempts 1/3" })).toBeVisible(); // the identical resend consumed no attempt (tier B)
+  await expect(task(page, "i1.classify").locator(".r2-chip", { hasText: "Attempts 0/2" })).toBeVisible(); // tier A
+  await expect(task(page, "i1.justify").locator(".r2-chip", { hasText: "Attempts 0/5" })).toBeVisible(); // tier C
   await expect(page.locator(".r2-score")).toContainText("A 4/60");
   expect(await overflow(page)).toBeLessThanOrEqual(1);
   await ctx.close();
@@ -322,17 +325,50 @@ test("minute 51: finished; own score visible, nothing writable, rankings private
   await ctx.close();
 });
 
-test("organizer: end/publish rules, ties, CSV, confirmed publication, participant ranking", async ({ browser }) => {
+test("organizer: end/publish rules, FINAL tiebreakers, exact-tie acknowledgment gating, CSV, participant ranking", async ({ browser }) => {
+  // Fixture (server-recorded values, written directly to the disposable DB): Finalist 07 and 08 are equal on total (3), Part B (0) and Part A time;
+  // only Finalist 07 earned its points on a frozen difficult task (i1.justify). Criterion 4 must separate them: 07 above 08, different ranks, no tie.
+  const at = new Date(Date.now() - 20 * 60_000);
+  await prisma.r2TaskScore.createMany({ data: [{ teamId: "P5-07", taskId: "i1.justify", part: "A", earned: 3, max: 3, criteria: "[]", firstScoredAt: at, lastAwardAt: at }, { teamId: "P5-08", taskId: "i1.response", part: "A", earned: 3, max: 3, criteria: "[]", firstScoredAt: at, lastAwardAt: at }] });
   const { ctx, page } = await organizer(browser);
   expect((await page.request.post("/api/round2/admin", { data: { action: "end", reason: "nothing is running" }, headers: { origin } })).status()).toBe(409);
   await expect(page.getByRole("heading", { name: /G · Results review/ })).toBeVisible();
-  await expect(page.getByText(/Unresolved ties/)).toBeVisible();
+  await expect(page.getByText(/Tiebreak order: total, then Part B, then Part A completion, then difficulty subtotal/)).toBeVisible();
+  const rows = page.locator("#res-h").locator("xpath=ancestor::section").getByRole("row");
+  const order = (await rows.allInnerTexts()).map(r => r.replace(/\s+/g, " "));
+  const i7 = order.findIndex(r => r.includes("Finalist 07")), i8 = order.findIndex(r => r.includes("Finalist 08"));
+  expect(i7).toBeGreaterThan(0); expect(i7).toBeLessThan(i8); expect(order[i7]).toMatch(/Finalist 07.*\b3\b.*3\/22/); expect(order[i8]).toMatch(/0\/22/); // difficulty shown, total unchanged
+  expect(order[i7]).not.toContain("TIE"); expect(order[i8]).not.toContain("TIE");
+  const csvText = await (await page.request.get("/api/round2/admin?view=results-csv")).text();
+  expect(csvText.indexOf("Finalist 07")).toBeLessThan(csvText.indexOf("Finalist 08")); expect(csvText).toContain("Difficulty subtotal (of 22)"); // same server order in the export
   await expect(page.getByRole("link", { name: "Export CSV" })).toBeVisible();
-  const csv = await page.request.get("/api/round2/admin?view=results-csv"); expect(csv.status()).toBe(200); expect(await csv.text()).toContain("TIE");
+  await expect(page.getByRole("region", { name: "Exact ties" })).toContainText("unacknowledged");
   const t = await team(browser, "P5-01");
   expect((await t.page.request.get("/api/round2/admin?view=solutions")).status()).toBe(401); // participants cannot read organizer data
   expect((await t.page.request.post("/api/round2/admin", { data: { action: "publish" }, headers: { origin } })).status()).toBe(401);
+  expect((await t.page.request.post("/api/round2/admin", { data: { action: "acknowledge-tie", rank: 1, reason: "a participant must not be able to do this" }, headers: { origin } })).status()).toBe(401);
   await shot(page, "organizer-results");
+  // publication is blocked while an exact tie is unacknowledged: in the UI and in the API
+  await expect(page.getByRole("button", { name: "Publish results" })).toBeDisabled(); await expect(page.getByText("Publishing is blocked: acknowledge every exact tie first.")).toBeVisible();
+  const blocked = await page.request.post("/api/round2/admin", { data: { action: "publish" }, headers: { origin } });
+  expect(blocked.status()).toBe(409); expect((await blocked.json()).error).toMatch(/Exact ties must be acknowledged/);
+  // acknowledge: reason required (10-500), confirmation dialog, shared rank preserved
+  const ties = page.getByRole("region", { name: "Exact ties" }), ack = ties.getByRole("button", { name: "Acknowledge exact tie" }).first();
+  await expect(ack).toBeDisabled();
+  await ties.getByLabel(/Reason for acknowledging/).fill("too short"); await expect(ack).toBeDisabled();
+  await ties.getByLabel(/Reason for acknowledging/).fill("Exact tie reviewed; the shared rank is accepted for the final ranking");
+  await ack.click(); await expect(page.getByRole("dialog")).toContainText("cannot select a winner");
+  await page.getByRole("dialog").getByRole("button", { name: "Cancel" }).click();
+  expect((await (await page.request.get("/api/round2/admin?view=results")).json()).unacknowledgedTies).toBeGreaterThan(0); // cancelling recorded nothing
+  while (await ties.getByRole("button", { name: "Acknowledge exact tie" }).count()) {
+    await ties.getByRole("button", { name: "Acknowledge exact tie" }).first().dispatchEvent("click"); // dev-server re-renders can detach the node mid-pointer-click; the handler is what matters
+    await page.getByRole("dialog").getByRole("button", { name: "Acknowledge exact tie" }).dispatchEvent("click"); // the control unmounts as soon as the server confirms, so a pointer click would race its own detachment
+    await expect(page.locator(".r2a-msg.is-ok")).toContainText("acknowledged");
+  }
+  await expect(ties).toContainText("Acknowledged: Exact tie reviewed");
+  const after = (await rows.allInnerTexts()).map(r => r.replace(/\s+/g, " ")); expect(after.length).toBe(order.length); expect(after.findIndex(r => r.includes("Finalist 07"))).toBe(i7); // acknowledgment reorders and rescores nothing
+  expect(await (await page.request.get("/api/round2/admin?view=results-csv")).text()).toContain("shared rank is accepted"); // the CSV carries the recorded acknowledgment
+  // now the normal confirmed publication
   await page.getByRole("button", { name: "Publish results" }).click();
   await expect(page.getByRole("dialog")).toContainText("irreversible");
   await expect(page.getByRole("dialog").getByRole("button", { name: "Publish results" })).toBeDisabled(); // needs the typed word
@@ -343,7 +379,10 @@ test("organizer: end/publish rules, ties, CSV, confirmed publication, participan
   const table = t.page.getByRole("table", { name: "Published results" });
   await expect(table).toBeVisible(); await expect(table.getByRole("row")).toHaveCount(11); // header + 10 active finalists; the withdrawn team is not ranked
   await expect(table).not.toContainText("Finalist 10");
-  await expect(table).toContainText("(tie)");
+  await expect(table).toContainText("shared rank, exact tie acknowledged");
+  const pub = (await table.getByRole("row").allInnerTexts()).map(r => r.replace(/\s+/g, " "));
+  expect(pub.findIndex(r => r.includes("Finalist 07"))).toBeLessThan(pub.findIndex(r => r.includes("Finalist 08"))); // same server order for participants
+  await expect(t.page.getByText(/Tiebreak: difficult tasks/)).toBeVisible();
   await shot(t.page, "published-results");
   await t.ctx.close(); await ctx.close();
 });
@@ -354,7 +393,7 @@ test("Round 2 stylesheet really loads on the participant route and layouts do no
     const { ctx, page } = await team(browser, "P5-06", vp);
     await expect(page.getByRole("navigation", { name: "Incidents and challenges" })).toBeVisible({ timeout: 30_000 });
     const css = await page.evaluate(() => { const top = document.querySelector(".r2-top"), nav = document.querySelector(".r2-nav"); return { top: top ? getComputedStyle(top).display : null, bg: top ? getComputedStyle(top).backgroundColor : null, nav: nav ? getComputedStyle(nav).position : null }; });
-    expect(css.top).toBe("grid"); expect(css.bg).not.toBe("rgba(0, 0, 0, 0)"); expect(css.nav).toBe("sticky");
+    expect(["grid", "flex"]).toContain(css.top); expect(css.bg).not.toBe("rgba(0, 0, 0, 0)"); expect(css.nav).toBe("sticky");
     expect(await overflow(page), `${name} overflow`).toBeLessThanOrEqual(1);
     await open(page, /Incident 2/).click(); await expect(page.getByRole("heading", { name: "Connection map" })).toBeVisible();
     expect(await overflow(page), `${name} incident 2 overflow`).toBeLessThanOrEqual(1);
