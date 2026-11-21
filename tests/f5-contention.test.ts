@@ -2,7 +2,6 @@ import { writeFileSync, mkdirSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { createTempDatabase } from "../scripts/pg-temp.mjs";
 import { initialProgress, score } from "../src/lib/game/engine";
-import { hashPassword } from "../src/lib/password.mjs";
 import { inboxAnswers } from "./fixtures/inbox";
 import { taskAnswer } from "./fixtures/tasks";
 

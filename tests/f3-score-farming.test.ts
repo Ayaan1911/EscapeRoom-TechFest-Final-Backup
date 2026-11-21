@@ -13,7 +13,6 @@ import { containmentEvidence } from "../src/lib/game/containment.server";
 // much of each task a guessing attacker can farm under the CURRENT union policy versus the PROPOSED best-coherent policy, section 3 covers Round 1.
 const points = (taskId: string, answer: unknown) => { const v = validateAnswer(taskId, answer); return v.ok ? new Set(gradeValidated(taskId, v.data)) : null; };
 const earnedOf = (set: Set<string>) => [...set].reduce((n, c) => n + (criterionPoints.get(c) ?? 0), 0);
-const constants = (taskId: string, path: string[], opts: string[]) => opts.map(o => setAt({}, path, o));
 
 describe("F3 section 1: the union policy lets a team farm full credit from incompatible guesses (R2, exact reproduction)", () => {
   const union = (taskId: string, answers: Answer[]) => { const s = new Set<string>(); for (const a of answers) for (const c of points(taskId, a) ?? []) s.add(c); return earnedOf(s); };
