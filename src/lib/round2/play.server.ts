@@ -1,11 +1,12 @@
 import "server-only";
 import { z } from "zod";
-import { db, serializable } from "@/lib/db";
+import { db, teamTx } from "@/lib/db";
 import { clockNow, R2Error } from "./common.server";
 import { availability, visible, type R2Clock } from "./clock";
-import { criterionPoints, CONTENT_VERSION, MAX_ATTEMPTS_PER_TASK, MIN_SUBMIT_GAP_MS, partMax, r2Catalog, r2TaskById, taskMax, unitMax, UNITS } from "./catalog";
+import { criterionPoints, CONTENT_VERSION, MIN_SUBMIT_GAP_MS, partMax, r2Catalog, r2TaskById, taskMax, unitMax, UNITS } from "./catalog";
 import { CASE_BRIEF, units } from "./content.server";
 import { fieldsFor } from "./forms.server";
+import { attemptCap, scoreBest, scoringPolicy } from "./scoring-policy";
 import { gradeValidated, validateAnswer } from "./tasks.server";
 import { answerHash, stableStringify } from "./safe-json";
 
@@ -35,7 +36,7 @@ export async function r2Bundle() {
 
 export type SubmitOutcome = { duplicate: boolean; accepted: boolean; awarded: number; task: { id: string; earned: number; max: number }; score: { partA: number; partB: number; total: number } };
 /**
- * Graded, server-authoritative submission. One serializable transaction: availability is evaluated on the SERVER clock at the moment of
+ * Graded, server-authoritative submission. One per-team locked transaction (READ COMMITTED + advisory lock + FOR SHARE on the round row): availability is evaluated on the SERVER clock at the moment of
  * decision, so a deadline can never be beaten by a slow request. Re-submitting an identical answer is free and awards nothing.
  * Earned criteria are a monotonic union: a worse retry can never remove points, and no criterion pays twice.
  */
@@ -44,8 +45,8 @@ export async function submitTask(teamId: string, taskId: string, rawAnswer: unkn
   if (!task) throw new R2Error(400, "Unknown task");
   const valid = validateAnswer(taskId, rawAnswer);
   if (!valid.ok) throw new R2Error(400, "Invalid answer format");
-  const hash = answerHash(valid.data), json = stableStringify(valid.data);
-  return serializable(async tx => {
+  const hash = answerHash(valid.data), json = stableStringify(valid.data), policy = scoringPolicy();
+  return teamTx(teamId, async tx => {
     const finalist = await tx.r2Finalist.findUnique({ where: { teamId }, select: { status: true } });
     if (finalist?.status !== "active") throw new R2Error(403, "Round 2 is open to confirmed finalists only");
     const { clock, now } = await clockNow(tx);
@@ -64,11 +65,14 @@ export async function submitTask(teamId: string, taskId: string, rawAnswer: unkn
     if ((mine?.earned ?? 0) >= max) throw new R2Error(409, "Task already complete");
     const last = await tx.r2Submission.findFirst({ where: { teamId }, orderBy: { createdAt: "desc" }, select: { createdAt: true } });
     if (last && now - last.createdAt.getTime() < MIN_SUBMIT_GAP_MS) throw new R2Error(429, "Please wait between submissions.", { retryAfter: Math.max(1, Math.ceil((MIN_SUBMIT_GAP_MS - (now - last.createdAt.getTime())) / 1000)) });
-    if (await tx.r2Submission.count({ where: { teamId, taskId } }) >= MAX_ATTEMPTS_PER_TASK) throw new R2Error(429, "Attempt limit reached for this task. Ask an organizer to review it.");
+    if (await tx.r2Submission.count({ where: { teamId, taskId } }) >= attemptCap(taskId, policy)) throw new R2Error(429, "Attempt limit reached for this task. Ask an organizer to review it.");
     const had = new Set<string>(mine ? JSON.parse(mine.criteria) : []);
-    const fresh = gradeValidated(taskId, valid.data).filter(id => !had.has(id));
-    const all = [...had, ...fresh];
-    const earned = all.reduce((n, id) => n + (criterionPoints.get(id) ?? 0), 0);
+    const satisfied = new Set(gradeValidated(taskId, valid.data));
+    // "union" (release default): criteria from any submission accumulate. "best" (dormant, needs organizer approval): only the best single coherent submission counts.
+    const next = policy === "best" ? scoreBest({ earned: mine?.earned ?? 0, criteria: had }, satisfied) : null;
+    const fresh = next ? (next.earned > (mine?.earned ?? 0) ? [...next.criteria] : []) : [...satisfied].filter(id => !had.has(id));
+    const all = next ? [...next.criteria] : [...had, ...fresh];
+    const earned = next ? next.earned : all.reduce((n, id) => n + (criterionPoints.get(id) ?? 0), 0);
     const awarded = earned - (mine?.earned ?? 0);
     if (fresh.length) {
       const at = new Date(now);
@@ -76,7 +80,7 @@ export async function submitTask(teamId: string, taskId: string, rawAnswer: unkn
     }
     await tx.r2Submission.create({ data: { teamId, taskId, awarded, taskEarned: earned, criteria: JSON.stringify(fresh), answerHash: hash, answer: json, contentVersion: CONTENT_VERSION, createdAt: new Date(now) } });
     return { duplicate: false, accepted: earned >= max, awarded, task: { id: taskId, earned, max }, score: summarize(earned, taskId) };
-  });
+  }, "R2Session");
 }
 
 // ---------- drafts ----------

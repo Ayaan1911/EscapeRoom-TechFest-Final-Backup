@@ -13,6 +13,7 @@ vi.mock("next/headers", () => ({ cookies: async () => ({ get: (key: string) => j
 describe.skipIf(!process.env.GHOST_DB_TEST)("PostgreSQL concurrency and recovery", { timeout: 90_000 }, () => {
   let temp: Awaited<ReturnType<typeof createTempDatabase>>;
   let db: typeof import("../src/lib/db").db;
+  let txStats: typeof import("../src/lib/db").txStats;
   let auth: typeof import("../src/lib/auth");
   let service: typeof import("../src/lib/game/service");
   const code = "temporary-test-access-only";
@@ -21,7 +22,7 @@ describe.skipIf(!process.env.GHOST_DB_TEST)("PostgreSQL concurrency and recovery
     temp = await createTempDatabase("pgtest");
     process.env.DATABASE_URL = temp.url; process.env.DIRECT_URL = temp.url;
     process.env.ADMIN_ACCESS_HASH = hashPassword(code); process.env.APP_ORIGIN = "http://127.0.0.1:3000";
-    ({ db } = await import("../src/lib/db")); auth = await import("../src/lib/auth"); service = await import("../src/lib/game/service");
+    ({ db, txStats } = await import("../src/lib/db")); auth = await import("../src/lib/auth"); service = await import("../src/lib/game/service");
     await db.gameSession.create({ data: { id: 1, startsAt: new Date(), deadline: new Date(Date.now() + 3_600_000) } });
   });
   afterAll(async () => { await db?.$disconnect(); await temp?.drop(); });
@@ -45,6 +46,38 @@ describe.skipIf(!process.env.GHOST_DB_TEST)("PostgreSQL concurrency and recovery
     expect(rows).toHaveLength(50);
     for (const row of rows) expect(score(JSON.parse(row.progress))).toBe(15);
     expect(await db.submission.count({ where: { teamId: { startsWith: "PAR-" }, accepted: true } })).toBe(50);
+  });
+
+  it("F5 regression: independent teams never conflict (zero retries, zero failed requests) and every team is credited exactly once", async () => {
+    const ids = Array.from({ length: 50 }, (_, i) => `IND-${String(i + 1).padStart(2, "0")}`);
+    for (const id of ids) await team(id);
+    const before = { retries: txStats.retries, exhausted: txStats.exhausted };
+    const results = await Promise.allSettled(ids.map(id => service.mutateTeam(id, 0, "submit", inboxAnswers.A)));
+    expect(results.every(r => r.status === "fulfilled" && (r.value as { accepted?: boolean }).accepted)).toBe(true);
+    expect(txStats.retries - before.retries).toBe(0); expect(txStats.exhausted - before.exhausted).toBe(0); // serializable mode needed ~150 retries here
+    for (const id of ids) expect(await db.submission.aggregate({ where: { teamId: id }, _sum: { awarded: true } }).then(a => a._sum.awarded)).toBe(15);
+  });
+
+  it("an organizer stop racing submissions is atomic: nothing is scored after it, and no points are lost or doubled", async () => {
+    const ids = Array.from({ length: 20 }, (_, i) => `STP-${String(i + 1).padStart(2, "0")}`);
+    for (const id of ids) await team(id);
+    await db.gameSession.update({ where: { id: 1 }, data: { startsAt: new Date(), deadline: new Date(Date.now() + 3_600_000), endedAt: null } });
+    const racing = Promise.allSettled([...ids.map(id => service.mutateTeam(id, 0, "submit", inboxAnswers.A)), new Promise<void>(r => setTimeout(r, 20)).then(() => service.control("stop"))]);
+    await racing;
+    const after = await Promise.all(ids.map(async id => { await db.submission.updateMany({ where: { teamId: id }, data: { createdAt: new Date(0) } }); return service.mutateTeam(id, 1, "submit", inboxAnswers.A); }));
+    expect(after.every(r => (r as { error?: string }).error === "Round is not active")).toBe(true);
+    for (const id of ids) { const row = await db.team.findUniqueOrThrow({ where: { id } }); const sum = await db.submission.aggregate({ where: { teamId: id }, _sum: { awarded: true } }); expect(score(JSON.parse(row.progress))).toBe(sum._sum.awarded ?? 0); }
+    await db.gameSession.update({ where: { id: 1 }, data: { endedAt: null } });
+  });
+
+  it("an organizer override racing a team's own submissions never loses either change", async () => {
+    await team("OVR-1");
+    await service.mutateTeam("OVR-1", 0, "submit", { ...inboxAnswers.A, databaseId: "nope", sessionId: "nope" }); // partial raw, chapter 0 unfinished
+    await db.submission.updateMany({ where: { teamId: "OVR-1" }, data: { createdAt: new Date(0) } });
+    const [a, b] = await Promise.allSettled([service.mutateTeam("OVR-1", 0, "submit", inboxAnswers.A), service.control("unlock", "OVR-1", "test override")]);
+    expect(a.status === "fulfilled" || b.status === "fulfilled").toBe(true);
+    const p = JSON.parse((await db.team.findUniqueOrThrow({ where: { id: "OVR-1" } })).progress);
+    expect(p.chapters[0].score).toBe(15); // the submission's points survive the override's write
   });
 
   it("releases hints once per step under a race and never below the cap", async () => {

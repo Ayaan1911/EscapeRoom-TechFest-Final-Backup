@@ -1,4 +1,4 @@
-import { db, serializable } from "../db";
+import { db, lockTeam, serializable, teamTx } from "../db";
 import { applyRaw, bonus, current, hints, overrideChapter, permit, points, progressSchema, ranking, score, start, status, unlockThresholds, unlocked, useHint } from "./engine";
 import { catalog, criterionPoints, gradeTask, MAX_SCORED_ATTEMPTS, taskIds, taskMax } from "./scoring";
 import { taskDefs, validators } from "./validators";
@@ -27,7 +27,7 @@ export async function recentAudit() {
   return db.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: 100 });
 }
 export async function mutateTeam(id: string, chapter: number, action: "submit" | "hint" | "unlock", answer: unknown, task?: string) {
-  return serializable(async tx => {
+  return teamTx(id, async tx => {
     const team = await tx.team.findUniqueOrThrow({ where: { id }, include: { insiderAccess: { select: { unlockedAt: true } } } });
     const round = await tx.gameSession.findUniqueOrThrow({ where: { id: 1 } });
     const p = progressSchema.parse(JSON.parse(team.progress));
@@ -132,6 +132,7 @@ export async function control(action: "start" | "stop" | "unlock", teamId?: stri
     }
     if (action === "unlock") {
       if (!teamId || !reason?.trim()) throw new Error("Team and override reason are required");
+      await lockTeam(tx, teamId); // same per-team lock as mutateTeam in lock mode
       const t = await tx.team.findUniqueOrThrow({ where: { id: teamId } });
       const p = progressSchema.parse(JSON.parse(t.progress));
       if (status(round) !== "active") throw new Error("Round is not active");
