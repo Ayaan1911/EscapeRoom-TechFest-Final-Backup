@@ -89,16 +89,12 @@ test("organizer enters demo from the dashboard; the whole walkthrough makes no A
   await chain.getByRole("button", { name: "Submit task" }).click(); await expect(chain.getByText(demoNote)).toBeVisible();
   await page.getByRole("link", { name: "Back to Investigation Dashboard" }).click(); await expect(page).toHaveURL(/\/admin\/demo\/round1$/); // navigation stays inside the preview
 
-  // Round 2: all eight units, no clock, no enrollment
-  for (const unit of ["A1", "A2", "A3", "A4", "B1", "B2", "B3", "B4"]) {
-    await page.goto(`/admin/demo/round2?unit=${unit}`); await expect(page.locator(`.r2-unit[data-unit="${unit}"]`)).toBeVisible();
-    await expect(page.getByRole("timer")).toHaveCount(0);
+  // Round 2 (paper edition): all four chapters open, no clock, no enrollment, nothing to submit
+  const TITLES = ["Alert at 2:14 AM", "Kill Switch", "Audit the AI", "The Three Calls"];
+  for (const [i, title] of TITLES.entries()) {
+    await page.goto(`/admin/demo/round2?unit=${i + 1}`); await expect(page.locator(".rp-head h1")).toHaveText(title);
+    await expect(page.getByRole("timer")).toHaveCount(0); await expect(page.locator("main form, main textarea, main input, main select")).toHaveCount(0);
   }
-  await page.goto("/admin/demo/round2?unit=A2");
-  const id = page.locator('[data-task="i2.identify"]'); await id.locator("input[type=checkbox]").nth(0).check(); await id.locator("input[type=checkbox]").nth(2).check();
-  await id.getByRole("button", { name: "Submit task" }).click(); await expect(id.getByText(demoNote)).toBeVisible();
-  await page.goto("/admin/demo/round2?unit=B2"); await expect(page.getByText("Compare two records")).toBeVisible(); // open by default in Part B
-  await page.getByLabel("Record A").selectOption({ index: 1 }); await page.getByLabel("Record B").selectOption({ index: 2 }); await expect(page.getByRole("status").filter({ hasText: /sources?/i }).first()).toBeVisible();
 
   // Exit returns to the organizer dashboard
   await page.getByRole("link", { name: "Exit demo" }).click(); await expect(page).toHaveURL(/\/admin$/); await expect(page.getByRole("heading", { name: "Event operations" })).toBeVisible();
