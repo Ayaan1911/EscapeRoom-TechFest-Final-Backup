@@ -115,7 +115,7 @@ export function DeskFrame({ chapter, title, objective, caseId, state, remaining,
       <header className="pg-head">
         <div className="pg-title"><span className="k-eyebrow">CHAPTER {String(chapter + 1).padStart(2, "0")}{caseId ? ` · ${caseId}` : ""}</span><h1>{title}</h1><p>{objective}</p></div>
         <dl className="pg-stats">
-          <div><dt>Time left</dt><dd role="timer" aria-label="Round time remaining" className={urgent ? "is-urgent" : ""}>{state.status === "active" ? formatClock(remaining) : state.status.toUpperCase()}</dd></div>
+          <div><dt>Time left</dt><dd><span role="timer" aria-label="Round time remaining" className={urgent ? "is-urgent" : ""}>{state.status === "active" ? formatClock(remaining) : state.status.toUpperCase()}</span></dd></div>
           <div><dt>Total</dt><dd><b>{state.score}</b> / 105<span className="k-sr">Saved score: {state.score} / 105</span></dd></div>
           <div><dt>This chapter</dt><dd><b>{raw}</b> / {max} <small>({left} open)</small></dd></div>
           <div><dt>Hints</dt><dd>{mine.hints} / 2</dd></div>
@@ -206,7 +206,7 @@ export function HintBox({ chapter, state, editable, busy, onHint }: { chapter: C
 export type ChainNode = { id: string; label: string; value?: string; note?: string };
 /** Relationship diagram: nodes in order, connectors between them. Text list underneath semantics; works without colour or pointer. */
 export function ChainDiagram({ nodes, label }: { nodes: ChainNode[]; label: string }) {
-  return <ol className="pg-chain" aria-label={label}>
+  return <ol className="pg-chain" aria-label={label} tabIndex={0}>
     {nodes.map((n, i) => <li key={n.id} className={n.value ? "is-set" : ""}>
       <span className="pg-chain-label">{n.label}</span>
       <span className="pg-chain-value k-mono">{n.value || "not selected"}</span>

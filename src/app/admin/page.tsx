@@ -72,7 +72,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         </div>
       </div>
 
-      <div><Card eyebrow="AUDIT TRAIL" title="Recent audit events" id="audit"><div className="k-tablescroll"><table className="k-table"><thead><tr><th>Time (UTC)</th><th>Actor</th><th>Action</th><th>Detail</th></tr></thead><tbody>{logs.map(log => <tr key={log.id}><td className="k-mono">{log.createdAt.toISOString()}</td><td>{log.actor}</td><td>{log.action}</td><td className="k-mono">{log.detail}</td></tr>)}</tbody></table>{logs.length === 0 && <p className="k-empty k-pad">No audit events yet.</p>}</div></Card></div>
+      <div><Card eyebrow="AUDIT TRAIL" title="Recent audit events" id="audit"><div className="k-tablescroll" tabIndex={0} role="region" aria-label="Audit events, scrollable"><table className="k-table"><thead><tr><th>Time (UTC)</th><th>Actor</th><th>Action</th><th>Detail</th></tr></thead><tbody>{logs.map(log => <tr key={log.id}><td className="k-mono">{log.createdAt.toISOString()}</td><td>{log.actor}</td><td>{log.action}</td><td className="k-mono">{log.detail}</td></tr>)}</tbody></table>{logs.length === 0 && <p className="k-empty k-pad">No audit events yet.</p>}</div></Card></div>
     </div></main>
   </div>;
 }

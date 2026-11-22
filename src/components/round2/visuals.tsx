@@ -28,7 +28,7 @@ export function NetworkMap({ records, malicious, blocked, disabled, onMark, onBl
   return <section className="r2-panel r2-net" aria-label="Network connections">
     <h3>Connection map <span className="r2-count">{conns.length} connections</span></h3>
     <p className="r2-meta">Internal systems on the left, external endpoints on the right. Line weight follows bytes transferred. The table below has every detail and the same controls.</p>
-    <div className="r2-svgscroll"><svg viewBox={`0 0 760 ${H}`} className="r2-svg" aria-hidden="true" focusable="false">
+    <div className="r2-svgscroll" tabIndex={0} role="region" aria-label="Connection map, scrollable"><svg viewBox={`0 0 760 ${H}`} className="r2-svg" aria-hidden="true" focusable="false">
       <defs><marker id="r2arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L8 4L0 8z" fill="currentColor" /></marker></defs>
       <text x="160" y="14" className="r2-svg-h" textAnchor="middle">INTERNAL</text><text x="600" y="14" className="r2-svg-h" textAnchor="middle">EXTERNAL</text>
       {conns.map(c => { const a = pos(c.src), b = pos(c.dst), w = 1.5 + Math.min(4.5, Math.log10(Math.max(c.bytes, 1e3)) - 3) , mid = (a.x + b.x) / 2;

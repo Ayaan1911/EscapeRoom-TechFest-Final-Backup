@@ -9,6 +9,7 @@ import type { InboxArtifact, InboxEvidence } from "@/types/inbox";
 
 const KIND_LABEL = { gateway: "Gateway", authentication: "Sign-in", database: "Export" } as const;
 const KIND_TASK = { gateway: ["inbox.entry", "deliveryId"], authentication: ["inbox.identity", "authenticationId"], database: ["inbox.impact", "databaseId"] } as const;
+const GROUP = { gateway: "Delivery trail", authentication: "Identity logs", database: "Data exports" } as const;
 const time = (iso: string) => iso.slice(11, 16);
 
 function AuthBadges({ value }: { value: string }) {
@@ -75,17 +76,17 @@ export function InboxDesk({ evidence, initialState, initialDrafts }: { evidence:
       <aside className="k-rail pg-rail" aria-label="Case file">
         <div className="pg-qr"><strong>QR forensic snapshot</strong><span>Printed card → capture ID.</span><a className="k-btn k-btn-primary k-btn-sm" href="/clue/inbox" target="_blank" rel="noopener">Open QR forensic snapshot ↗</a></div>
         <h2 className="pg-rail-h">Records <span className="pg-chip">{evidence.artifacts.length}</span></h2>
-        <div className="k-artifacts">{evidence.artifacts.map(a => { const [task, key] = KIND_TASK[a.kind], pinned = f.str(task, key) === a.id, expanded = open === a.id;
+        <div className="k-artifacts">{(["gateway", "authentication", "database"] as const).map(kind => <section key={kind} className="pg-kind" aria-label={`${GROUP[kind]} (${evidence.artifacts.filter(a => a.kind === kind).length})`}><h3 className="pg-kindh">{GROUP[kind]}</h3>{evidence.artifacts.filter(a => a.kind === kind).map(a => { const [task, key] = KIND_TASK[a.kind], pinned = f.str(task, key) === a.id, expanded = open === a.id;
           return <article key={a.id} className={`k-artifact ${pinned ? "is-pinned" : ""}`}>
             <header><button type="button" className="k-artifact-toggle" aria-expanded={expanded} onClick={() => setOpen(expanded ? null : a.id)}><span className="k-mono">{a.id}</span><strong>{a.title}</strong><Badge tone="info">{KIND_LABEL[a.kind]}</Badge></button>
               <button type="button" className="k-pin" aria-pressed={pinned} aria-label={`${pinned ? "Unpin" : "Use"} ${a.id} as ${KIND_LABEL[a.kind]} evidence`} disabled={!editable} onClick={() => f.set(task, key, pinned ? "" : a.id)}>{pinned ? "★" : "☆"}</button></header>
             {expanded && <dl className="k-facts">{Object.entries(a.facts).map(([k, v]) => <div key={k}><dt>{k}</dt><dd className="k-mono">{v}</dd></div>)}</dl>}
-          </article>; })}</div>
+          </article>; })}</section>)}</div>
       </aside>
     </div>
 
     <section className="pg-tasks" aria-label="Scored tasks">
-      <h2 className="pg-h">Tasks <small>Submit each one when ready. Points are saved per task.</small></h2>
+      <h2 className="pg-h">Tasks <small>Scored one by one</small></h2>
       <TaskPanel step={1} task={taskOf(state, 0, "inbox.entry")} editable={editable} busy={busy} retrySeconds={retrySeconds} result={result} ready={!!(marked && f.str("inbox.entry", "deliveryId") && f.str("inbox.entry", "snapshotId").trim())} why="Mark the breach email, pick the delivery record, enter the capture ID." onSubmit={() => void submit("inbox.entry", ["emailId", "deliveryId", "snapshotId"])}>
         <div className="pg-fields"><label>Breach email<input readOnly value={marked ? `${marked}` : ""} placeholder="Mark one in the mailbox" /></label>
           {select3("inbox.entry", "deliveryId", "Delivery / navigation record", art("gateway"))}

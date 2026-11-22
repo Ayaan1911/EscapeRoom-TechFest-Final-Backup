@@ -140,3 +140,10 @@
 .ds-cats li.is-on { border-left-color: var(--evidence); } .ds-cats b { font: 700 20px var(--font-mono); } .ds-cats small { grid-column: 1 / -1; color: var(--muted); }
 .ds-dots { display: inline-flex; gap: 3px; margin-left: auto; margin-right: var(--s2); } .ds-dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
 .ds-dots .ok { background: var(--ok); } .ds-dots .bad { background: var(--alert); } .ds-dots .mid { background: var(--amber); }
+
+/* Final polish: contrast, inbox workstation, tabs */
+.k-badge-alert { color: #ff9aa2; }
+.k-viewer h2 { font-size: clamp(18px, 1.8vw, 22px); }
+.k-viewer [role="tablist"] { flex-wrap: wrap; overflow: visible; }
+.pg-rail .k-artifacts { max-height: none; overflow: visible; }
+.pg-kind { display: grid; gap: var(--s2); } .pg-kindh { margin: var(--s3) 0 0; font: 700 11px var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--evidence); }

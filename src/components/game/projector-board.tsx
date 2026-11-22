@@ -33,7 +33,7 @@ export function ProjectorBoard() {
     <ol className="pj-list" style={{ height: shown.length * ROW }} aria-label="Team standings">
       {shown.map((t, i) => <li key={t.id} className={`pj-row ${t.rank <= 3 ? `is-top${t.rank}` : ""}`} style={{ top: i * ROW, height: ROW - 8 }}>
         <span className="pj-rank">{t.tied ? "=" : ""}{t.rank}</span><span className="pj-name">{t.name}</span>
-        <span className="pj-prog" aria-label={`${t.chaptersDone} of 5 chapters complete`}>{Array.from({ length: 5 }, (_, k) => <i key={k} className={k < t.chaptersDone ? "on" : ""} />)}</span>
+        <span className="pj-prog" role="img" aria-label={`${t.chaptersDone} of 5 chapters complete`}>{Array.from({ length: 5 }, (_, k) => <i key={k} className={k < t.chaptersDone ? "on" : ""} />)}</span>
         <span className="pj-score"><b>{t.score}</b><small>/ 105</small></span></li>)}
     </ol>
     {more > 0 && <p className="pj-note">+ {more} more teams</p>}

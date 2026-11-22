@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useChapter, type ChapterState } from "./use-chapter";
 import { useDrafts, type ServerDraft } from "./use-drafts";
 import { CaseClosed } from "./case-closed";
-import { ConnectionBanner, DeskFrame, HintBox, ResultStrip, StateBanner, TaskPanel, fieldApi, isEditable, taskOf } from "./workspace";
+import { ChainDiagram, ConnectionBanner, DeskFrame, HintBox, ResultStrip, StateBanner, TaskPanel, fieldApi, isEditable, taskOf } from "./workspace";
 import { Badge } from "@/components/ui/kit";
 import { CategoryBar } from "./case-visuals";
 import { verdictRoles, type VerdictEvidence, type VerdictRole } from "@/types/verdict";
@@ -56,6 +56,10 @@ export function VerdictDesk({ evidence, initialState, initialDrafts, team }: { e
     <details className="pg-hints"><summary>Case file <span className="pg-chip">read first</span></summary>{evidence.summary.map(text => <p key={text}>{text}</p>)}
       <div className="pg-actions">{["inbox", "trail", "insider", "containment"].map((c, i) => state.unlocked[i] ? <a key={c} className="k-btn k-btn-sm" href={`/play/${c}`}>Review {c}</a> : null)}</div></details>
 
+    {!closed && <ChainDiagram label="Case reconstruction so far" nodes={[
+      { id: "lure", label: "Lure", value: f.str("verdict.entry", "emailId") }, { id: "cap", label: "Capture", value: f.str("verdict.entry", "captureId") }, { id: "ses", label: "Session", value: f.str("verdict.session", "sessionId") },
+      { id: "exp", label: "Export", value: f.str("verdict.session", "exportId") }, { id: "ins", label: "Insider", value: f.str("verdict.insider", "insiderId") },
+      { id: "ev", label: "Evidence roles", value: verdictRoles.some(r => mapped[r].length) ? `${verdictRoles.filter(r => mapped[r].length).length}/5` : "" }, { id: "hyp", label: "Best hypothesis", value: f.str("verdict.reasoning", "hypothesisId") }]}/>}
     <CategoryBar label="Evidence you linked, by chapter" cats={["Inbox", "Trail", "Insider", "Containment"].map(name => ({ name, used: pinnedIds.filter(id => evidence.records.find(r => r.id === id)?.chapter === name).length, total: evidence.records.filter(r => r.chapter === name).length }))} />
     <nav className="pg-causal" aria-label="Causal chain: choose a step">
       <ol>{TASKS.map((t, i) => { const row = taskOf(state, 4, t.id), done = row.earned >= row.max;

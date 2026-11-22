@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useChapter, type ChapterState } from "./use-chapter";
 import { useDrafts, type ServerDraft } from "./use-drafts";
 import { ContainmentCctv } from "./containment-cctv";
-import { ChainDiagram, ConnectionBanner, DeskFrame, HintBox, ResultStrip, StateBanner, TaskNav, TaskPanel, fieldApi, isEditable, taskOf } from "./workspace";
+import { ConnectionBanner, DeskFrame, HintBox, ResultStrip, StateBanner, TaskNav, TaskPanel, fieldApi, isEditable, taskOf } from "./workspace";
 import { Badge } from "@/components/ui/kit";
 import { StageRail, type Stage } from "./case-visuals";
 import type { ContainmentCctv as Snapshot, ContainmentEvidence } from "@/types/containment";
@@ -54,15 +54,12 @@ export function ContainmentDesk({ evidence, initialCctv, initialState, initialDr
       <Badge tone="alert">Data already exfiltrated</Badge><Badge tone="info">{evidence.checkpoint} UTC</Badge><Badge>{evidence.account}</Badge><Badge className="k-mono">{evidence.sessionId}</Badge>
       <p>Treat the session as usable until revocation is verified. Keep support and approved archive/maintenance jobs running.</p>
     </section>
-    <ChainDiagram label="Response stages" nodes={[
-      { id: "t", label: "1 · Reconstruct", value: "7 events", note: "order below" }, { id: "i", label: "2 · Immediate (parallel)", value: immediate.length ? `${immediate.length} chosen` : "", note: "no order needed" },
-      { id: "r", label: "3 · Recovery (ordered)", value: recovery.length ? `${recovery.length} steps` : "", note: "dependencies matter" }, { id: "e", label: "Evidence kept", value: support.length ? `${support.length} pinned` : "", note: "need 5" }]} />
     <StageRail label="Incident response workflow" stages={(["Reconstruct", "Identify", "Contain", "Recover and verify", "Preserve"] as const).map((label, i): Stage => { const row = taskOf(state, 3, Object.values(DRAFT)[i]), filled = [true, !!(f.str(DRAFT.identity, "account") && f.str(DRAFT.identity, "sessionId")), immediate.length > 0, recovery.length > 0, support.length >= 5][i];
       return { id: row.id, label, sub: `${row.earned}/${row.max}`, state: row.earned >= row.max ? "done" : row.earned > 0 ? "partial" : filled && i > 0 ? "filled" : "open", href: `#task-${i + 1}` }; })} />
     {cctv && <ContainmentCctv snapshot={cctv} />}
 
     <section className="pg-tasks" aria-label="Scored tasks">
-      <h2 className="pg-h">Tasks <small>Submit each one when ready. Points are saved per task.</small></h2>
+      <h2 className="pg-h">Tasks <small>Scored one by one</small></h2>
       <TaskNav tasks={state.tasks[3]} />
 
       <TaskPanel phoneCollapsed step={1} task={taskOf(state, 3, DRAFT.timeline)} editable={editable} busy={busy} retrySeconds={retrySeconds} result={result} ready onSubmit={() => void submit(DRAFT.timeline)}>

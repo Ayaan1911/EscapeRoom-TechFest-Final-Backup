@@ -75,7 +75,7 @@ export function InsiderDesk({ initialDossier, initialState, initialDrafts }: { i
         <ActivityTimeline label="Dossier timeline" items={records.map(r => ({ id: r.id, at: r.timestamp, lane: KIND[r.kind].label, tone: KIND[r.kind].tone }))} selectedId={record?.id} marked={pinned} linked={pinned}
           highlight={suspect ? records.filter(r => r.employees.includes(suspect)).map(r => r.id) : []} onSelect={setSelected} note="Colour = record type. Ringed = pinned. The line joins only the records you pinned." />
         <div className="k-insider-grid">
-          <div className="k-reclist" role="region" aria-label="Dossier records">{records.map(item => <button type="button" className={`k-rec k-rec-${item.kind}`} key={item.id} aria-pressed={record?.id === item.id} onClick={() => setSelected(item.id)}>
+          <div className="k-reclist" role="region" aria-label="Dossier records" tabIndex={0}>{records.map(item => <button type="button" className={`k-rec k-rec-${item.kind}`} key={item.id} aria-pressed={record?.id === item.id} onClick={() => setSelected(item.id)}>
             <span className="k-rec-icon" aria-hidden="true">{KIND[item.kind].icon}</span>
             <span className="k-rec-main"><span className="k-mono k-muted">{item.id}</span><strong>{item.title}</strong><span className="k-rec-meta"><Badge tone={KIND[item.kind].tone}>{KIND[item.kind].label}</Badge><time dateTime={item.timestamp}>{item.timestamp.slice(11, 19)}</time>{pinned.includes(item.id) && <Badge tone="amber">★ pinned</Badge>}</span></span></button>)}
             {records.length === 0 && <p className="k-empty k-pad">No matching records.</p>}</div>
@@ -92,7 +92,7 @@ export function InsiderDesk({ initialDossier, initialState, initialDrafts }: { i
       </section>
 
       <section className="pg-tasks" aria-label="Scored tasks">
-        <h2 className="pg-h">Tasks <small>Submit each one when ready. Points are saved per task.</small></h2>
+        <h2 className="pg-h">Tasks <small>Scored one by one</small></h2>
         <TaskPanel step={1} task={taskOf(state, 2, "insider.suspect")} editable={editable} busy={busy} retrySeconds={retrySeconds} result={result} ready={!!f.str("insider.suspect", "employeeId")} why="Choose the employee." onSubmit={() => void submit("insider.suspect")}>
           <div className="pg-fields"><label>Insider employee<select disabled={!editable} value={f.str("insider.suspect", "employeeId")} onChange={e => f.set("insider.suspect", "employeeId", e.target.value)}><option value="">Select…</option>{dossier.suspects.map(item => <option value={item.id} key={item.id}>{item.id} · {item.name}</option>)}</select></label></div></TaskPanel>
         <TaskPanel step={2} task={taskOf(state, 2, "insider.action")} editable={editable} busy={busy} retrySeconds={retrySeconds} result={result} ready={!!f.str("insider.action", "actionId")} why="Choose the policy command." onSubmit={() => void submit("insider.action")}>

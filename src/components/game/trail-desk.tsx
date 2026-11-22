@@ -65,7 +65,7 @@ export function TrailDesk({ evidence, initialState, initialDrafts }: { evidence:
         {filterField("Session", <input aria-label="Filter by session" value={filters.sessionId} onChange={e => updateFilters({ sessionId: e.target.value })} placeholder="Exact session ID" />)}
       </div>
       <div className="pg-console-grid">
-        <div className="k-tablecard" role="region" aria-label="Authentication events"><div className="k-tablescroll"><table className="k-table pg-table"><caption className="k-sr">Authentication events. Select a row to inspect it.</caption>
+        <div className="k-tablecard" role="region" aria-label="Authentication events"><div className="k-tablescroll" tabIndex={0} aria-label="Event table, scrollable"><table className="k-table pg-table"><caption className="k-sr">Authentication events. Select a row to inspect it.</caption>
           <thead><tr><th scope="col">Event</th><th scope="col">Account</th><th scope="col">Source</th><th scope="col">Outcome</th><th scope="col">Session</th></tr></thead>
           <tbody>{visible.map(row => { const o = OUTCOME[row.result]; return <tr key={row.id} className={selectedId === row.id ? "is-selected" : pinned.includes(row.id) ? "is-pinned" : ""} aria-selected={selectedId === row.id}>
             <td><button type="button" className="pg-rowbtn k-mono" onClick={() => setSelectedId(row.id)} aria-label={`Inspect ${row.id}`}>{row.id}</button><time dateTime={row.timestamp}>{row.timestamp.slice(11, 19)}</time></td>
@@ -96,7 +96,7 @@ export function TrailDesk({ evidence, initialState, initialDrafts }: { evidence:
         <div className="k-actions"><button type="button" className="k-btn k-btn-sm" aria-label={`${pinned.includes(a.id) ? "Unpin" : "Pin"} ${a.id}`} disabled={!editable || pinned.length >= 3 && !pinned.includes(a.id)} onClick={() => f.toggle("trail.corroboration", "supportingEvidenceIds", a.id, 3)}>{pinned.includes(a.id) ? "★ Pinned" : "☆ Pin"}</button><button type="button" className="k-btn k-btn-sm" onClick={() => void copy(a.id)}>Copy ID</button></div></article>)}</div></details>
 
     <section className="pg-tasks" aria-label="Scored tasks">
-      <h2 className="pg-h">Tasks <small>Submit each one when ready. Points are saved per task.</small></h2>
+      <h2 className="pg-h">Tasks <small>Scored one by one</small></h2>
       <datalist id="trail-accounts">{choices("account").map(v => <option key={v} value={v} />)}</datalist><datalist id="trail-ips">{choices("sourceIp").map(v => <option key={v} value={v} />)}</datalist>
       <TaskPanel step={1} task={taskOf(state, 1, "trail.source")} editable={editable} busy={busy} retrySeconds={retrySeconds} result={result} ready={!!(f.str("trail.source", "account").trim() && f.str("trail.source", "sourceIp").trim())} why="Enter the compromised account and the attacker’s source IP." onSubmit={() => void submit("trail.source", ["account", "sourceIp"])}>
         <div className="pg-fields">{input("trail.source", "account", "Compromised account", "email", "trail-accounts")}{input("trail.source", "sourceIp", "Attacker source IP", "text", "trail-ips")}</div></TaskPanel>
