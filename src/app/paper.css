@@ -79,3 +79,9 @@
 .pp-table { width: 100%; border-collapse: collapse; } .pp-table th, .pp-table td { border: 1px solid #333; padding: 6px 8px; text-align: left; vertical-align: top; } .pp-table th { background: #eee; } .pp-tall { height: 54px; } .pp-sum td { font-weight: 700; background: #f4f4f4; } .pp-total { font-size: 18px; text-align: right; }
 .pp-noprint { font-size: 13px; } .pp-hint { background: none; border: 0; color: #555; }
 @media print { .pp-noprint { display: none; } .pp { padding: 0; max-width: none; } .pp-page { page-break-after: always; } body, .site-shell { background: #fff !important; } .pp-wide { zoom: .9; } }
+
+/* Small screens: wide tables keep a readable width and scroll inside their own panel instead of being crushed */
+.rp-tablewrap { max-width: 100%; }
+.rp-conns { min-width: 780px; } .rp-evid .rp-table { min-width: 460px; }
+@media (max-width: 560px) { .rp-top b { font-size: 15px; } .rp-clocks { gap: 16px; } .rp-clocks b { font-size: 22px; } .rp-table td, .rp-table th { padding: 7px 8px; } }
+.rp-conns td, .rp-conns th { white-space: nowrap; } .rp-conns td:nth-child(7) { white-space: normal; min-width: 150px; }
