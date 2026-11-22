@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { randomBytes } from "node:crypto";
 import { db, serializable } from "./db";
 import { digest, verifyPasswordAsync } from "./password.mjs";
-import { authorized } from "./auth-policy";
+import { authorized, cookieSecure } from "./auth-policy";
 
 type Role = "team" | "admin";
 // Independent per-role cookies: signing in/out as one role never touches the other.
@@ -39,7 +39,7 @@ export async function login(role: Role, id: string, code: string) {
     await tx.teamSession.create({ data: { tokenHash: digest(raw), role, teamId: team?.id ?? null, expiresAt: new Date(Date.now() + 12 * 60 * 60_000) } });
   });
   jar.delete(legacyCookie);
-  jar.set(cookieNames[role], raw, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "strict", path: "/", maxAge: 12 * 60 * 60 });
+  jar.set(cookieNames[role], raw, { httpOnly: true, secure: cookieSecure(), sameSite: "strict", path: "/", maxAge: 12 * 60 * 60 });
   return true;
 }
 /** Ends the given role's session only; with no role, ends every session this browser holds. */

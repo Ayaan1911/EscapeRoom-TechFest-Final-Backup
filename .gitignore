@@ -19,3 +19,5 @@ test-results/
 # local-only helper scripts and database snapshots
 /scripts/.phase6-preservation.mjs
 /prisma/backups/
+!.env.lab.example
+/.lab/
