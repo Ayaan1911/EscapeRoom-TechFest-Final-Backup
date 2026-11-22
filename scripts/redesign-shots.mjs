@@ -24,12 +24,13 @@ try {
   server = spawn(process.platform === "win32" ? "npx.cmd" : "npx", ["next", "dev", "--hostname", "127.0.0.1"], { env, stdio: "ignore", shell: process.platform === "win32" });
   for (let i = 0; i < 120; i++) { try { if ((await fetch(ORIGIN + "/login")).ok) break; } catch { /* starting */ } await new Promise(r => setTimeout(r, 1000)); }
   const browser = await chromium.launch();
-  const sizes = { desktop: [1440, 900], mobile: [390, 844] };
-  const pages = [["login", "/login", null], ["new-dashboard", "/play", "SHOT-NEW"], ["mid-dashboard", "/play", "SHOT-MID"], ["inbox", "/play/inbox", "SHOT-MID"], ["trail", "/play/trail", "SHOT-MID"], ["insider", "/play/insider", "SHOT-MID"], ["admin", "/admin", "ADMIN"]];
+  const sizes = { desktop: [1440, 900], tablet: [768, 1024], mobile: [390, 844], wide: [1920, 1080] }; // wide = projector/large display, used only for the projector page
+  const pages = [["login", "/login", null], ["new-dashboard", "/play", "SHOT-NEW"], ["mid-dashboard", "/play", "SHOT-MID"], ["inbox", "/play/inbox", "SHOT-MID"], ["trail", "/play/trail", "SHOT-MID"], ["insider", "/play/insider", "SHOT-MID"], ["admin", "/admin", "ADMIN"], ["projector", "/admin/projector", "ADMIN"]];
   for (const [sz, [w, h]] of Object.entries(sizes)) {
     const ctxs = new Map(); // one login per identity and size (the login throttle counts repeated sign-ins)
     for (const [name, path, who] of pages) {
       if (only.length && !only.includes(name)) continue;
+      if (sz === "wide" && name !== "projector") continue;
       let ctx = ctxs.get(who ?? "anon");
       if (!ctx) {
         ctx = await browser.newContext({ viewport: { width: w, height: h } }); ctxs.set(who ?? "anon", ctx);
