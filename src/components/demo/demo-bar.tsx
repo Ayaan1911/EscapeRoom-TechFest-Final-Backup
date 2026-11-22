@@ -16,8 +16,8 @@ export function DemoBar() {
       <a className="k-btn k-btn-sm" href="/admin/demo">Demo home</a>
       <Link className="k-btn k-btn-sm" href="/admin/demo/round1">Round 1</Link>
       <a className="k-btn k-btn-sm" href="/admin/demo/round2?unit=A1">Round 2</a>
-      {prev ? <a className="k-btn k-btn-sm" href={prev.href} aria-label={`Previous: ${prev.label}`}>← Prev</a> : <span className="k-btn k-btn-sm is-off" aria-hidden="true">← Prev</span>}
-      {next ? <a className="k-btn k-btn-sm" href={next.href} aria-label={`Next: ${next.label}`}>Next →</a> : <span className="k-btn k-btn-sm is-off" aria-hidden="true">Next →</span>}
+      {prev ? <a className="k-btn k-btn-sm" href={prev.href} aria-label={`Previous: ${prev.label}`}>← Prev</a> : <button type="button" className="k-btn k-btn-sm" disabled>← Prev</button>}
+      {next ? <a className="k-btn k-btn-sm" href={next.href} aria-label={`Next: ${next.label}`}>Next →</a> : <button type="button" className="k-btn k-btn-sm" disabled>Next →</button>}
       <label className="dm-jump"><span className="k-sr">Jump to</span>
         <select value={i >= 0 ? DEMO_STOPS[i].href : ""} onChange={e => { window.location.assign(e.target.value); }}>
           {i < 0 && <option value="">Jump to…</option>}

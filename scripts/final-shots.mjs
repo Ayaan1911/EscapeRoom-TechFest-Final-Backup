@@ -88,6 +88,10 @@ try {
   await setR2(60, true); await shot("18-r2-finished", "/round2", "F-01", ["phone", "desktop"]);
   // --- Organizer + projector
   await shot("19-organizer", "/admin", "ADMIN"); await shot("20-organizer-r2", "/admin/round2", "ADMIN"); await shot("21-projector", "/admin/projector", "ADMIN", ["desktop", "wide"]);
+  // --- Organizer demo mode (preview of every screen without starting anything)
+  await shot("22-demo-home", "/admin/demo", "ADMIN", ["phone", "desktop"]); await shot("23-demo-r1", "/admin/demo/round1", "ADMIN", ["phone", "desktop"]);
+  for (const c of ["inbox", "trail", "insider", "containment", "verdict"]) await shot(`24-demo-${c}`, `/admin/demo/round1/${c}`, "ADMIN", ["phone", "desktop"]);
+  for (const u of ["A1", "A2", "A3", "A4", "B1", "B2", "B3", "B4"]) await shot(`25-demo-r2-${u}`, `/admin/demo/round2?unit=${u}`, "ADMIN", ["phone", "desktop"]);
   await browser.close();
   writeFileSync(`${out}/report.txt`, report.join("\n"));
 } finally { stop(); await db.$disconnect(); await temp.drop(); }

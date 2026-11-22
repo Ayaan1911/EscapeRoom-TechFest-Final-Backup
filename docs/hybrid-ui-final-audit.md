@@ -43,3 +43,18 @@ Not shortened (rules and clues): attempt/best-score notes, cooldown text, hints 
 
 ## Verification run (disposable local database)
 `tsc`, `eslint .`, `npm run build` clean. Vitest 417 passed / 1 skipped. Round 1 chain 10+7+6+1+6+1+5+2 = 38 passed; journey 1; unlock/continue 3; Round 2 + organizer + visual 23 passed (41 skipped by design); Phase 2 19 passed; best-v1 attempt caps 3; organizer ties 1 (with `GHOST_P5_SEED=1`). Full-state harness (`HYD=1 node scripts/final-shots.mjs v4`): all 21 states at 375/768/1366 px: no horizontal overflow, axe WCAG2 A/AA none on every screen, no hydration warnings.
+
+## Sprint 4: visual system v2 and Organizer Demo Mode (2026-11-22)
+- **Organizer Demo Mode**: see `docs/demo-mode.md`. `tests/demo-mode.spec.ts` (3 tests): access control, full walkthrough with zero `/api` requests and byte-identical competition tables, normal play unaffected.
+- **Visual system v2** (`src/app/ghost.css`, loaded last): midnight-blue palette (`#071521` / `#102638` / `#173448`), cyan for actions and evidence, mint for verified, amber for mission branding only, coral for urgency; layered panels with hairline highlights; desktop command rail replacing the top bar (brand mark + log out); dashboard rebuilt as mission operations (hero with clock and score ring, vertical case path with chapter glyphs, sticky side panel with next action and mission brief); chapter header banner with per-chapter glyph and accent; console captions on Inbox/Trail/Insider; coral real "Start round" button so it is never confused with the cyan demo button; restyled login aside, Round 2 mission bar and docket, organizer command center, projector.
+- **Regression found by the test run and fixed**: the rail's log-out button sat where the Next dev-overlay badge floats, so Playwright clicks were intercepted (5 Round 1 tests failed in dev mode); the button now sits under the brand mark. Another failure was a demo spec that clicked an already-open Compare panel shut; the spec was corrected (the panel is open by default in Part B).
+- **Axe**: found `.r2-sev` contrast (coral badge, white text) and a scrollable `.r2-rail`; fixed (dark text, `tabIndex`).
+
+### Results
+`tsc` and `eslint .` clean; `npm run build` passes; Vitest 417 passed / 1 skipped; Round 1 chain 38 passed; journey 1; unlock + projector + demo specs 8 passed; Round 2 + organizer + visual 23 passed; Phase 2 19 passed; best-v1 attempt caps 3; organizer ties 1 (with `GHOST_P5_SEED=1`).
+
+### Not done (be exact)
+- Per-chapter interiors keep their earlier layouts apart from the new frame/captions: Containment has no new decision-flow workspace, Verdict has no new competing-explanation comparison surface, Part A/B have no additional layouts beyond the timeline and compare panel.
+- Copy reduction remains the small pass listed above plus a shorter dashboard; no full rewrite.
+- No before/after screenshot pair was captured; old screenshots exist in `D:\Ghost404-TestWorkspace\shots\base` (previous release) and new ones in `shots\v5`.
+- Demo mode has no persisted state and no locked/partial/complete switcher beyond an illustrative strip.

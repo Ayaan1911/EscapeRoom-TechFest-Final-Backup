@@ -5,14 +5,15 @@ import type { ChapterState, SubmitResult, TaskRow } from "./use-chapter";
 import type { useDrafts } from "./use-drafts";
 import { formatClock } from "@/components/ui/kit";
 import { nextChapterView } from "@/lib/game/unlock-ui";
+import { ChapterGlyph } from "@/components/ui/design";
 import { useDemo, useHref, DEMO_NOTE } from "@/components/demo/demo-context";
 
 export const CHAPTER_META = [
-  { n: 1, name: "Inbox", max: 15, href: "/play/inbox", unlocksNext: "Trail" },
-  { n: 2, name: "Trail", max: 25, href: "/play/trail", unlocksNext: "Insider" },
-  { n: 3, name: "Insider", max: 25, href: "/play/insider", unlocksNext: "Containment" },
-  { n: 4, name: "Containment", max: 20, href: "/play/containment", unlocksNext: "Final Verdict" },
-  { n: 5, name: "Final Verdict", max: 15, href: "/play/verdict", unlocksNext: "" },
+  { n: 1, name: "Inbox", max: 15, href: "/play/inbox", unlocksNext: "Trail", concept: "Digital forensics mail console" },
+  { n: 2, name: "Trail", max: 25, href: "/play/trail", unlocksNext: "Insider", concept: "Event reconstruction lab" },
+  { n: 3, name: "Insider", max: 25, href: "/play/insider", unlocksNext: "Containment", concept: "Evidence correlation board" },
+  { n: 4, name: "Containment", max: 20, href: "/play/containment", unlocksNext: "Final Verdict", concept: "Incident response operations" },
+  { n: 5, name: "Final Verdict", max: 15, href: "/play/verdict", unlocksNext: "", concept: "Case reconstruction chamber" },
 ] as const;
 type Drafts = ReturnType<typeof useDrafts>;
 export type ChapterIndex = 0 | 1 | 2 | 3 | 4;
@@ -116,7 +117,8 @@ export function DeskFrame({ chapter, title, objective, caseId, state, remaining,
     <InvestigationMap state={state} chapter={chapter} go={nav.go} />
     <div className="pg-main">
       <header className="pg-head">
-        <div className="pg-title"><span className="k-eyebrow">CHAPTER {String(chapter + 1).padStart(2, "0")}{caseId ? ` · ${caseId}` : ""}</span><h1>{title}</h1><p>{objective}</p></div>
+        <span className="pg-glyph"><ChapterGlyph n={chapter + 1} /></span>
+        <div className="pg-title"><span className="pg-concept"><i aria-hidden="true" />{CHAPTER_META[chapter].concept}</span><span className="k-eyebrow">CHAPTER {String(chapter + 1).padStart(2, "0")}{caseId ? ` · ${caseId}` : ""}</span><h1>{title}</h1><p>{objective}</p></div>
         <dl className="pg-stats">
           <div><dt>Time left</dt><dd><span role="timer" aria-label="Round time remaining" className={urgent ? "is-urgent" : ""}>{demo ? "DEMO" : state.status === "active" ? formatClock(remaining) : state.status.toUpperCase()}</span></dd></div>
           <div><dt>Total</dt><dd><b>{demo ? "—" : state.score}</b> / 105<span className="k-sr">Saved score: {state.score} / 105</span></dd></div>

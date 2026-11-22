@@ -33,7 +33,7 @@ export function ComparePanel({ records }: { records: R2Record[] }) {
   const opt = (v: string, set: (s: string) => void, label: string) => <label>{label}<select value={v} onChange={e => set(e.target.value)}><option value="">Choose a record…</option>{records.map(r => <option key={r.id} value={r.id}>{r.id} · {r.title}</option>)}</select></label>;
   const col = (r: R2Record | undefined, other: R2Record | undefined) => r ? <article className="r2-cmp-col"><span className="r2-tag">{r.source}</span><b className="r2-id">{r.id}</b><h4>{r.title}</h4>
     <p className="r2-mono">{r.time === "n/a" ? "no timestamp" : r.time}</p><p>{r.detail}</p>{other && other.source === r.source && <small>same source as the other record</small>}</article> : <article className="r2-cmp-col is-empty"><p>Pick a record.</p></article>;
-  return <details className="r2-panel r2-cmp"><summary><h3>Compare two records</h3></summary>
+  return <details className="r2-panel r2-cmp" open><summary><h3>Compare two records</h3></summary>
     <div className="r2-cmp-pick">{opt(a, setA, "Record A")}{opt(b, setB, "Record B")}</div>
     <div className="r2-cmp-grid">{col(ra, rb)}{col(rb, ra)}</div>
     {ra && rb && <p className="r2-cmp-facts" role="status">{ra.source === rb.source ? "Same source." : `Different sources: ${ra.source} and ${rb.source}.`} {ta !== null && tb !== null ? `Time gap ${gap(ta, tb)}.` : "At least one record has no clock time."}</p>}

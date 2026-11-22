@@ -97,7 +97,7 @@ test("organizer enters demo from the dashboard; the whole walkthrough makes no A
   await page.goto("/admin/demo/round2?unit=A2");
   const id = page.locator('[data-task="i2.identify"]'); await id.locator("input[type=checkbox]").nth(0).check(); await id.locator("input[type=checkbox]").nth(2).check();
   await id.getByRole("button", { name: "Submit task" }).click(); await expect(id.getByText(demoNote)).toBeVisible();
-  await page.goto("/admin/demo/round2?unit=B2"); await page.getByText("Compare two records").click();
+  await page.goto("/admin/demo/round2?unit=B2"); await expect(page.getByText("Compare two records")).toBeVisible(); // open by default in Part B
   await page.getByLabel("Record A").selectOption({ index: 1 }); await page.getByLabel("Record B").selectOption({ index: 2 }); await expect(page.getByRole("status").filter({ hasText: /sources?/i }).first()).toBeVisible();
 
   // Exit returns to the organizer dashboard

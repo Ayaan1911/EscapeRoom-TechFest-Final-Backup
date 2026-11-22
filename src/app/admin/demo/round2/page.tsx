@@ -1,3 +1,4 @@
+import "../../../round2.css";
 import { Round2Shell } from "@/components/round2/shell";
 import { demoRound2, requireDemoAdmin } from "@/lib/demo/demo.server";
 

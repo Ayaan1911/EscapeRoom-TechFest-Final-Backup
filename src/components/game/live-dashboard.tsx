@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { titles, type Progress } from "@/lib/game/engine";
 import { CaseClosed } from "./case-closed";
 import { CHAPTERS, formatClock } from "@/components/ui/kit";
-import { Meter, PulseState, ScoreRing, StatusPill } from "@/components/ui/design";
+import { ChapterGlyph, Meter, PulseState, ScoreRing, StatusPill } from "@/components/ui/design";
 
 type Snapshot = { id: string; name: string; variant: string; participants: string[]; progress: Progress; score: number; hints: number; current: number; unlocked: boolean[]; unlockThresholds: number[]; tasks: { id: string; earned: number; max: number }[][]; status: string; serverNow: number; round: { deadline: string | null } };
 const ROUTES = ["/play/inbox", "/play/trail", "/play/insider", "/play/containment", "/play/verdict"];
@@ -54,11 +54,15 @@ export function LiveDashboard() {
     {error && <p role="alert" className="k-banner k-banner-warn">{error} <a href="/login">Sign in</a></p>}
     {closed && <CaseClosed teamId={data.id} teamName={data.name} progress={data.progress} />}
     {waiting && <PulseState eyebrow="ROUND 1 · STANDING BY" title="Awaiting organizer start"><p>Keep this page open. Chapters open the moment the round starts. Check your team name above and have your printed envelope ready for Chapter 3.</p></PulseState>}
+    <div className="gd-body"><aside className="gd-side" aria-label="Mission">
     {!waiting && !closed && <section className="gd-next" aria-labelledby="next-h">
       <div><span className="k-eyebrow">Next action</span><h2 id="next-h">Chapter {here + 1} — {titles[here]}</h2>
         <p>{hereNeed !== undefined && !nextOpen ? `${hereRaw}/${hereNeed} points to unlock Chapter ${here + 2}.` : nextOpen ? `Chapter ${here + 2} is unlocked. Keep improving scores or move on.` : `${hereRaw}/${CHAPTERS[here].max} points saved.`}</p></div>
       <a className="k-btn k-btn-primary k-btn-lg" href={ROUTES[here]}>{hereRaw > 0 ? "Resume" : "Start"} Chapter {here + 1} →</a>
     </section>}
+    <section className="gd-brief" aria-labelledby="brief-h"><h2 id="brief-h">Mission brief</h2><ul><li>Each chapter scores task by task.</li><li>Half the points here open the next chapter.</li><li>Open chapters stay open until the clock ends.</li></ul></section>
+    </aside>
+    <div className="gd-col">
 
     <section aria-labelledby="map-heading">
       <div className="k-section-head"><h2 id="map-heading">Investigation map</h2><span className="gd-pts">{data.unlocked.filter(Boolean).length} / 5 open</span></div>
@@ -68,7 +72,7 @@ export function LiveDashboard() {
         const label = { complete: "Complete", locked: waiting ? "Waiting" : "Locked", progress: "In progress", available: "Available" }[kind];
         const tasksDone = data.tasks[i].filter(t => t.earned >= t.max).length;
         return <li key={title} data-n={i + 1} className={`gd-stage ${isOpen || done(i) ? "is-open" : ""} ${done(i) ? "is-complete" : ""} ${i === here && !waiting && !closed ? "is-here" : ""}`} aria-current={i === here && !waiting && !closed ? "step" : undefined}>
-          <span className="gd-node" aria-hidden="true">{done(i) ? "✓" : isOpen ? i + 1 : "🔒"}</span>
+          <span className="gd-node" aria-hidden="true">{done(i) ? "✓" : isOpen ? <ChapterGlyph n={i + 1} className="gd-glyph" /> : "🔒"}</span>
           <h3>{title}</h3><p className="gd-focus">{FOCUS[i]}</p>
           <StatusPill kind={kind}>{label}</StatusPill>
           <Meter value={raw} max={max} gate={need} label={`${raw} of ${max} points${need !== undefined ? `, unlock gate at ${need}` : ""}`} tone={done(i) ? "ok" : "accent"} />
@@ -78,6 +82,6 @@ export function LiveDashboard() {
         </li>;
       })}</ol></nav>
     </section>
-    <p className="k-note">Unlocked chapters stay open: improve any score until time runs out. Progress and drafts are saved on the server.</p>
+    </div></div>
   </div>;
 }

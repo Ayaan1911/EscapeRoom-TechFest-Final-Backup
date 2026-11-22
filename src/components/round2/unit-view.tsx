@@ -15,7 +15,7 @@ const timeKey = (t: string) => { const m = /^(\d\d):(\d\d)(?::(\d\d))?/.exec(t);
 function AlertHeader({ records }: { records: R2Record[] }) {
   const timed = records.filter(r => timeKey(r.time) !== null).sort((a, b) => timeKey(a.time)! - timeKey(b.time)!);
   return <section className="r2-alert" aria-label="Alert"><div className="r2-alert-head"><span className="r2-sev" role="img" aria-label="Severity high">HIGH</span><div><b>02:14 · Finance laptop outbound anomaly</b><p className="r2-meta">Host FIN-LT-07 · user p.okafor · plus an &quot;impossible travel&quot; identity alert</p></div></div>
-    <ol className="r2-rail" aria-label="Records with UTC times, earliest first">{timed.map(r => <li key={r.id}><time className="r2-mono">{r.time.slice(0, 5)}</time><span className={`r2-dot src-${r.source}`} aria-hidden="true" /><span><b className="r2-id">{r.id}</b> {r.title}</span></li>)}</ol></section>;
+    <ol className="r2-rail" tabIndex={0} aria-label="Records with UTC times, earliest first">{timed.map(r => <li key={r.id}><time className="r2-mono">{r.time.slice(0, 5)}</time><span className={`r2-dot src-${r.source}`} aria-hidden="true" /><span><b className="r2-id">{r.id}</b> {r.title}</span></li>)}</ol></section>;
 }
 
 export function UnitView({ unit, bundle, status, clock, now, onScored, onNeedRefresh }: { unit: UnitContent; bundle: Bundle; status: StatusPayload; clock: ClockView; now: number; onScored: (taskId: string, o: SubmitOutcome) => void; onNeedRefresh: () => void }) {
