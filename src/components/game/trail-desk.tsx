@@ -5,6 +5,7 @@ import { useDrafts, type ServerDraft } from "./use-drafts";
 import { ChainDiagram, ConnectionBanner, DeskFrame, HintBox, ResultStrip, StateBanner, TaskPanel, fieldApi, isEditable, taskOf } from "./workspace";
 import { Badge } from "@/components/ui/kit";
 import { ActivityTimeline } from "./case-visuals";
+import { useDemo } from "@/components/demo/demo-context";
 import { emptyTrailFilters, filterTrailRows } from "@/lib/game/trail-view";
 import type { TrailEvidence, TrailEvent } from "@/types/trail";
 
@@ -22,7 +23,7 @@ function SessionPath({ rows, sessionId }: { rows: TrailEvent[]; sessionId: strin
 
 export function TrailDesk({ evidence, initialState, initialDrafts }: { evidence: TrailEvidence; initialState: ChapterState; initialDrafts: ServerDraft[] }) {
   const { state, busy, feedback, result, connection, send, submitTask, remaining, retrySeconds } = useChapter(1, initialState);
-  const editable = isEditable(state, 1);
+  const editable = isEditable(state, 1), demo = useDemo();
   const drafts = useDrafts(1, initialDrafts, editable), f = fieldApi(drafts);
   const [filters, setFilters] = useState(emptyTrailFilters), [page, setPage] = useState(0), [selectedId, setSelectedId] = useState(evidence.rows[0].id), [copied, setCopied] = useState("");
   const [tamper, setTamper] = useState({ eventId: "", field: "", technique: "" });
@@ -54,7 +55,7 @@ export function TrailDesk({ evidence, initialState, initialDrafts }: { evidence:
         highlight={sameSession} linked={sameSession} onSelect={setSelectedId} note="Lines join events of the selected event's session. Ringed = pinned. The table below is the keyboard view." />
       <div className="pg-console-top">
         <div className="pg-outcomes" role="status" aria-label="Matching events by outcome"><b>{filtered.length}</b> of {evidence.rows.length} events{(["success", "failure", "challenge"] as const).map(k => <Badge key={k} tone={OUTCOME[k].tone}>{OUTCOME[k].mark} {counts[k]} {OUTCOME[k].text.toLowerCase()}</Badge>)}{active > 0 && <Badge tone="amber">{active} filter{active > 1 ? "s" : ""}</Badge>}</div>
-        <a className="k-btn k-btn-sm" href="/api/game/trail/csv">Download CSV</a>
+        {!demo && <a className="k-btn k-btn-sm" href="/api/game/trail/csv">Download CSV</a>}
       </div>
       <div className="k-filterbar">
         {filterField("Search", <input aria-label="Search records" value={filters.search} onChange={e => updateFilters({ search: e.target.value })} placeholder="ID, session, device, text" />)}

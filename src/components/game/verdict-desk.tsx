@@ -6,6 +6,7 @@ import { CaseClosed } from "./case-closed";
 import { ChainDiagram, ConnectionBanner, DeskFrame, HintBox, ResultStrip, StateBanner, TaskPanel, fieldApi, isEditable, taskOf } from "./workspace";
 import { Badge } from "@/components/ui/kit";
 import { CategoryBar } from "./case-visuals";
+import { useHref } from "@/components/demo/demo-context";
 import { verdictRoles, type VerdictEvidence, type VerdictRole } from "@/types/verdict";
 
 const ROLE_LABEL: Record<VerdictRole, string> = { entry: "Entry", session: "Session abuse", impact: "Data impact", assistance: "Insider help", response: "Response" };
@@ -17,7 +18,7 @@ const ROLE_KEYS = verdictRoles as readonly string[];
 
 export function VerdictDesk({ evidence, initialState, initialDrafts, team }: { evidence: VerdictEvidence; initialState: ChapterState; initialDrafts: ServerDraft[]; team: { id: string; name: string } }) {
   const { state, busy, feedback, result, connection, send, submitTask, remaining, retrySeconds } = useChapter(4, initialState);
-  const editable = isEditable(state, 4);
+  const editable = isEditable(state, 4), href = useHref();
   const drafts = useDrafts(4, initialDrafts, editable), f = fieldApi(drafts);
   const [active, setActive] = useState<(typeof TASKS)[number]["id"]>("verdict.entry");
   const [search, setSearch] = useState(""), [chapter, setChapter] = useState("");
@@ -54,7 +55,7 @@ export function VerdictDesk({ evidence, initialState, initialDrafts, team }: { e
     {closed && <CaseClosed teamId={team.id} teamName={team.name} progress={state.progress} />}
 
     <details className="pg-hints"><summary>Case file <span className="pg-chip">read first</span></summary>{evidence.summary.map(text => <p key={text}>{text}</p>)}
-      <div className="pg-actions">{["inbox", "trail", "insider", "containment"].map((c, i) => state.unlocked[i] ? <a key={c} className="k-btn k-btn-sm" href={`/play/${c}`}>Review {c}</a> : null)}</div></details>
+      <div className="pg-actions">{["inbox", "trail", "insider", "containment"].map((c, i) => state.unlocked[i] ? <a key={c} className="k-btn k-btn-sm" href={href(`/play/${c}`)}>Review {c}</a> : null)}</div></details>
 
     {!closed && <ChainDiagram label="Case reconstruction so far" nodes={[
       { id: "lure", label: "Lure", value: f.str("verdict.entry", "emailId") }, { id: "cap", label: "Capture", value: f.str("verdict.entry", "captureId") }, { id: "ses", label: "Session", value: f.str("verdict.session", "sessionId") },

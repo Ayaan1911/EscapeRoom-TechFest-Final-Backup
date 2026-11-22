@@ -5,6 +5,7 @@ import { useDrafts, type ServerDraft } from "./use-drafts";
 import { ChainDiagram, ConnectionBanner, DeskFrame, HintBox, ResultStrip, StateBanner, TaskPanel, fieldApi, isEditable, taskOf } from "./workspace";
 import { Badge, Tabs } from "@/components/ui/kit";
 import { AuthDots } from "./case-visuals";
+import { useDemo } from "@/components/demo/demo-context";
 import type { InboxArtifact, InboxEvidence } from "@/types/inbox";
 
 const KIND_LABEL = { gateway: "Gateway", authentication: "Sign-in", database: "Export" } as const;
@@ -18,7 +19,7 @@ function AuthBadges({ value }: { value: string }) {
 
 export function InboxDesk({ evidence, initialState, initialDrafts }: { evidence: Omit<InboxEvidence, "snapshot">; initialState: ChapterState; initialDrafts: ServerDraft[] }) {
   const { state, busy, feedback, result, connection, send, submitTask, remaining, retrySeconds } = useChapter(0, initialState);
-  const editable = isEditable(state, 0);
+  const editable = isEditable(state, 0), demo = useDemo();
   const drafts = useDrafts(0, initialDrafts, editable), f = fieldApi(drafts);
   const [selectedId, setSelectedId] = useState(evidence.emails[0].id);
   const [read, setRead] = useState([evidence.emails[0].id]);
@@ -74,7 +75,7 @@ export function InboxDesk({ evidence, initialState, initialDrafts }: { evidence:
       </article>
 
       <aside className="k-rail pg-rail" aria-label="Case file">
-        <div className="pg-qr"><strong>QR forensic snapshot</strong><span>Printed card → capture ID.</span><a className="k-btn k-btn-primary k-btn-sm" href="/clue/inbox" target="_blank" rel="noopener">Open QR forensic snapshot ↗</a></div>
+        <div className="pg-qr"><strong>QR forensic snapshot</strong><span>Printed card → capture ID.</span>{demo ? <a className="k-btn k-btn-primary k-btn-sm" href="/admin/inbox-kit" target="_blank" rel="noopener">Open the printed card kit ↗</a> : <a className="k-btn k-btn-primary k-btn-sm" href="/clue/inbox" target="_blank" rel="noopener">Open QR forensic snapshot ↗</a>}</div>
         <h2 className="pg-rail-h">Records <span className="pg-chip">{evidence.artifacts.length}</span></h2>
         <div className="k-artifacts">{(["gateway", "authentication", "database"] as const).map(kind => <section key={kind} className="pg-kind" aria-label={`${GROUP[kind]} (${evidence.artifacts.filter(a => a.kind === kind).length})`}><h3 className="pg-kindh">{GROUP[kind]}</h3>{evidence.artifacts.filter(a => a.kind === kind).map(a => { const [task, key] = KIND_TASK[a.kind], pinned = f.str(task, key) === a.id, expanded = open === a.id;
           return <article key={a.id} className={`k-artifact ${pinned ? "is-pinned" : ""}`}>

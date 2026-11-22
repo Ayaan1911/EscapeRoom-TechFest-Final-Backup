@@ -5,6 +5,7 @@ import type { ChapterState, SubmitResult, TaskRow } from "./use-chapter";
 import type { useDrafts } from "./use-drafts";
 import { formatClock } from "@/components/ui/kit";
 import { nextChapterView } from "@/lib/game/unlock-ui";
+import { useDemo, useHref, DEMO_NOTE } from "@/components/demo/demo-context";
 
 export const CHAPTER_META = [
   { n: 1, name: "Inbox", max: 15, href: "/play/inbox", unlocksNext: "Trail" },
@@ -46,6 +47,7 @@ export function useSafeNavigate(drafts: Drafts) {
 type Go = ReturnType<typeof useSafeNavigate>["go"];
 
 export function InvestigationMap({ state, chapter, go }: { state: ChapterState; chapter: number; go: Go }) {
+  const href = useHref();
   return <nav className="pg-map" aria-label="Investigation map">
     <ol>
       {CHAPTER_META.map((meta, i) => {
@@ -55,7 +57,7 @@ export function InvestigationMap({ state, chapter, go }: { state: ChapterState; 
           <span className="pg-map-pts"><b>{raw}</b>/{meta.max}</span></>;
         return <li key={meta.n} className={`is-${s} ${here ? "is-here" : ""}`}>
           {s === "locked" ? <span className="pg-map-link" aria-disabled="true">{inner}<span className="k-sr"> — locked until {state.unlockThresholds[i - 1]} points in {CHAPTER_META[i - 1].name}</span></span>
-            : <a className="pg-map-link" href={meta.href} aria-current={here ? "page" : undefined} onClick={go(meta.href)}>{inner}</a>}
+            : <a className="pg-map-link" href={href(meta.href)} aria-current={here ? "page" : undefined} onClick={go(href(meta.href))}>{inner}</a>}
           {need !== undefined && <div className="pg-gate" title={`${need} raw points in ${meta.name} unlock ${meta.unlocksNext}`}>
             <span className="pg-gate-bar" role="img" aria-label={`${Math.min(raw, need)} of ${need} points toward unlocking ${meta.unlocksNext}`}><i style={{ width: `${Math.min(100, (raw / need) * 100)}%` }} /></span>
             <small>{raw >= need || state.unlocked[i + 1] ? `${meta.unlocksNext} unlocked` : `${raw}/${need} to unlock ${meta.unlocksNext}`}</small></div>}
@@ -66,6 +68,7 @@ export function InvestigationMap({ state, chapter, go }: { state: ChapterState; 
 }
 
 export function DraftBar({ drafts, state }: { drafts: Drafts; state: ChapterState }) {
+  if (useDemo()) return <div className="pg-draft" data-status="demo"><p className="pg-draft-line"><span aria-hidden="true">◇</span> Demo: edits stay on this screen</p></div>;
   const label = { idle: "Draft: nothing to save", saving: "Saving draft…", saved: "Draft saved", unsaved: "Unsaved changes", offline: "Offline. Changes kept on screen, retrying", conflict: "Conflict: changed on another device", error: "Draft not saved", readonly: "Read-only" }[drafts.status];
   const icon = { idle: "○", saving: "◔", saved: "✓", unsaved: "●", offline: "⚠", conflict: "⚠", error: "✕", readonly: "🔒" }[drafts.status];
   const titles = new Map(state.tasks.flat().map(t => [t.id, t.title]));
@@ -80,8 +83,8 @@ export function DraftBar({ drafts, state }: { drafts: Drafts; state: ChapterStat
 
 /** Server-confirmed unlock announcement. Not a modal: it never blocks the investigation, and "Keep investigating" simply hides it. */
 export function UnlockNotice({ state, chapter, confirmed, go }: { state: ChapterState; chapter: number; confirmed: readonly number[]; go: Go }) {
-  const [hidden, setHidden] = useState(false), v = nextChapterView(state, chapter, confirmed);
-  if (!v.hasNext || !v.unlocked || hidden || v.nextStarted || state.progress.chapters[chapter].completedAt !== null) return null; // a completed chapter already shows its own banner
+  const [hidden, setHidden] = useState(false), v = nextChapterView(state, chapter, confirmed), demo = useDemo();
+  if (demo || !v.hasNext || !v.unlocked || hidden || v.nextStarted || state.progress.chapters[chapter].completedAt !== null) return null; // a completed chapter already shows its own banner
   const meta = CHAPTER_META[v.next];
   return <section className="pg-unlock" role="status" aria-live="polite" aria-labelledby={`unlock-${chapter}`}>
     <span className="pg-unlock-icon" aria-hidden="true">✓</span>
@@ -95,18 +98,18 @@ export function UnlockNotice({ state, chapter, confirmed, go }: { state: Chapter
 
 /** Always present at the bottom of a chapter: what is next, how far away it is, and the way back. No scrolling to the top needed. */
 export function NextChapterFooter({ state, chapter, confirmed, connection, go }: { state: ChapterState; chapter: number; confirmed: readonly number[]; connection: string; go: Go }) {
-  const v = nextChapterView(state, chapter, confirmed);
-  const back = <a className="k-btn k-btn-ghost" href="/play" onClick={go("/play")}>Back to Investigation Dashboard</a>;
+  const v = nextChapterView(state, chapter, confirmed), href = useHref();
+  const back = <a className="k-btn k-btn-ghost" href={href("/play")} onClick={go(href("/play"))}>Back to Investigation Dashboard</a>;
   if (!v.hasNext) return <nav className="pg-foot" aria-label="Chapter navigation"><p>Final chapter. Your saved work is kept; the dashboard shows the case status.</p>{back}</nav>;
   const meta = CHAPTER_META[v.next];
   if (v.unlocked) return <nav className="pg-foot is-open" aria-label="Chapter navigation"><p><strong>Chapter {meta.n} — {meta.name} is unlocked.</strong> Work saved here stays saved.</p>
-    <a className="k-btn k-btn-primary" href={meta.href} onClick={go(meta.href)}>Continue to Chapter {meta.n} — {meta.name} →</a>{back}</nav>;
+    <a className="k-btn k-btn-primary" href={href(meta.href)} onClick={go(href(meta.href))}>Continue to Chapter {meta.n} — {meta.name} →</a>{back}</nav>;
   return <nav className="pg-foot" aria-label="Chapter navigation"><p><strong>{v.remaining} more point{v.remaining === 1 ? "" : "s"}</strong> in this chapter unlock Chapter {meta.n} — {meta.name} ({v.raw}/{v.need}).
     {connection ? " Connection interrupted: the unlock will show here as soon as the server confirms it." : ""}</p>{back}</nav>;
 }
 
 export function DeskFrame({ chapter, title, objective, caseId, state, remaining, drafts, banner, result, connection = "", children }: { chapter: ChapterIndex; title: string; objective: string; caseId?: string; state: ChapterState; remaining: number; drafts: Drafts; banner?: ReactNode; result?: (SubmitResult & { at: number }) | null; connection?: string; children: ReactNode }) {
-  const nav = useSafeNavigate(drafts), confirmed = result?.unlocked ?? [];
+  const nav = useSafeNavigate(drafts), confirmed = result?.unlocked ?? [], demo = useDemo();
   const mine = state.progress.chapters[chapter], urgent = state.status === "active" && remaining <= 300;
   const raw = mine.score, max = CHAPTER_META[chapter].max, left = max - raw;
   return <div className="pg" data-chapter={chapter + 1}>
@@ -115,8 +118,8 @@ export function DeskFrame({ chapter, title, objective, caseId, state, remaining,
       <header className="pg-head">
         <div className="pg-title"><span className="k-eyebrow">CHAPTER {String(chapter + 1).padStart(2, "0")}{caseId ? ` · ${caseId}` : ""}</span><h1>{title}</h1><p>{objective}</p></div>
         <dl className="pg-stats">
-          <div><dt>Time left</dt><dd><span role="timer" aria-label="Round time remaining" className={urgent ? "is-urgent" : ""}>{state.status === "active" ? formatClock(remaining) : state.status.toUpperCase()}</span></dd></div>
-          <div><dt>Total</dt><dd><b>{state.score}</b> / 105<span className="k-sr">Saved score: {state.score} / 105</span></dd></div>
+          <div><dt>Time left</dt><dd><span role="timer" aria-label="Round time remaining" className={urgent ? "is-urgent" : ""}>{demo ? "DEMO" : state.status === "active" ? formatClock(remaining) : state.status.toUpperCase()}</span></dd></div>
+          <div><dt>Total</dt><dd><b>{demo ? "—" : state.score}</b> / 105<span className="k-sr">Saved score: {state.score} / 105</span></dd></div>
           <div><dt>This chapter</dt><dd><b>{raw}</b> / {max} <small>({left} open)</small></dd></div>
           <div><dt>Hints</dt><dd>{mine.hints} / 2</dd></div>
         </dl>
@@ -134,9 +137,10 @@ export function DeskFrame({ chapter, title, objective, caseId, state, remaining,
 export function ConnectionBanner({ text, next }: { text: string; next: string }) { return text ? <p className="k-banner k-banner-warn" role="alert">{text} <a href={`/login?next=${next}`}>Sign in</a></p> : null; }
 
 export function StateBanner({ state, chapter }: { state: ChapterState; chapter: ChapterIndex }) {
+  const href = useHref();
   if (state.progress.chapters[chapter].completedAt !== null) {
     const next = CHAPTER_META[chapter + 1], open = next && state.unlocked[chapter + 1];
-    return <div className="k-banner k-banner-ok" role="status"><div><strong>Chapter {chapter + 1} completed.{open ? ` Chapter ${chapter + 2} unlocked.` : ""}</strong><span>Saved. This chapter is now read-only.</span></div>{open && <a className="k-btn k-btn-primary" href={next.href}>Open Chapter {chapter + 2} →</a>}</div>;
+    return <div className="k-banner k-banner-ok" role="status"><div><strong>Chapter {chapter + 1} completed.{open ? ` Chapter ${chapter + 2} unlocked.` : ""}</strong><span>Saved. This chapter is now read-only.</span></div>{open && <a className="k-btn k-btn-primary" href={href(next.href)}>Open Chapter {chapter + 2} →</a>}</div>;
   }
   if (state.status !== "active") return <p className="k-banner k-banner-warn" role="status">Round {state.status}. Evidence stays readable; submissions and hints are closed.</p>;
   return null;
@@ -145,6 +149,7 @@ export function StateBanner({ state, chapter }: { state: ChapterState; chapter: 
 /** One scored task: meter, status, fields, submit. A task is submitted and scored on its own. */
 /** Participant-facing outcome text. best-v1 wording never implies that correct parts of different answers add up. */
 export function taskNote(mine: SubmitResult & { at: number }, task: TaskRow) {
+  if (mine.demo) return `Demo input recorded. ${DEMO_NOTE}`;
   const used = mine.tasks?.find(t => t.id === task.id)?.attempts ?? task.attempts;
   if (!used) return mine.awarded > 0 ? `+${mine.awarded} points. Task ${mine.taskEarned}/${mine.taskMax}${(mine.taskEarned ?? 0) < (mine.taskMax ?? 0) ? ". Not fully supported yet; revise and resubmit." : "."}` : "No new points. Revise using the evidence and resubmit.";
   const out = used.remaining === 0 && (mine.taskEarned ?? 0) < (mine.taskMax ?? 0) ? " No attempts remaining. Your highest score has been saved." : "";
@@ -218,6 +223,7 @@ export function ChainDiagram({ nodes, label }: { nodes: ChainNode[]; label: stri
 
 export function ResultStrip({ result }: { result: (SubmitResult & { at: number }) | null }) {
   if (!result) return null;
+  if (result.demo) return <div className="pg-result is-demo" role="status"><strong>Demo submission</strong><span>{DEMO_NOTE}</span></div>;
   const opened = result.unlocked.map(i => CHAPTER_META[i]);
   return <div className="pg-result" role="status">
     <strong>{result.duplicate ? "Already submitted" : result.awarded > 0 ? (result.tasks?.some(t => t.attempts) ? `New personal best: +${result.awarded} points` : `+${result.awarded} points`) : (result.tasks?.some(t => t.attempts) ? "No improvement" : "No new points")}</strong>

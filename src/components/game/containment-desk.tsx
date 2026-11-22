@@ -6,6 +6,7 @@ import { ContainmentCctv } from "./containment-cctv";
 import { ConnectionBanner, DeskFrame, HintBox, ResultStrip, StateBanner, TaskNav, TaskPanel, fieldApi, isEditable, taskOf } from "./workspace";
 import { Badge } from "@/components/ui/kit";
 import { StageRail, type Stage } from "./case-visuals";
+import { useDemo } from "@/components/demo/demo-context";
 import type { ContainmentCctv as Snapshot, ContainmentEvidence } from "@/types/containment";
 
 type Option = { id: string; title: string; detail: string };
@@ -13,7 +14,7 @@ const DRAFT = { timeline: "containment.timeline", identity: "containment.identit
 
 export function ContainmentDesk({ evidence, initialCctv, initialState, initialDrafts }: { evidence: ContainmentEvidence; initialCctv: Snapshot | null; initialState: ChapterState; initialDrafts: ServerDraft[] }) {
   const { state, busy, feedback, result, connection, send, submitTask, remaining, retrySeconds } = useChapter(3, initialState);
-  const editable = isEditable(state, 3);
+  const editable = isEditable(state, 3), demo = useDemo();
   const drafts = useDrafts(3, initialDrafts, editable), f = fieldApi(drafts);
   const [movement, setMovement] = useState(""), [dragging, setDragging] = useState<string | null>(null), [cctv, setCctv] = useState(initialCctv), [copyStatus, setCopyStatus] = useState("");
   const knownEvents = new Set(evidence.events.map(e => e.id));
@@ -42,6 +43,7 @@ export function ContainmentDesk({ evidence, initialCctv, initialState, initialDr
     await submitTask(task, answer);
   }
   async function checkCopy() {
+    if (demo) { setCopyStatus("Demo: the accessible copy is shown above. Nothing is requested."); return; }
     setCopyStatus("Checking…");
     try { const response = await fetch("/api/game/containment", { cache: "no-store" }); if (!response.ok) throw new Error(); const data = await response.json(); setCctv(data.fallbackCctv); setCopyStatus(data.fallbackCctv ? "Accessible copy loaded. No hint charge." : "No accessible copy granted. Ask the organizer."); }
     catch { setCopyStatus("Unable to check. Retry; nothing changed."); }

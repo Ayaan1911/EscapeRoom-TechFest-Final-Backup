@@ -29,9 +29,11 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           <dl className="k-stats"><div><dt>Round</dt><dd><Badge tone={TONE[state as keyof typeof TONE] ?? "neutral"}>{state.toUpperCase()}</Badge></dd></div><div><dt>Teams</dt><dd>{report.rows.length} registered</dd></div><div><dt>Finished</dt><dd>{complete} complete · {report.rows.length - complete} in progress</dd></div></dl></div>
       </header>
       {params.error && <p role="alert" className="k-banner k-banner-warn">{params.error}</p>}
+      <section className="dm-entry" aria-label="Demo mode"><div><span className="k-eyebrow">SAFE PREVIEW</span><h2>Showing the game to someone?</h2><p>Demo mode opens every chapter and both rounds with no timers and no real scores. It starts nothing and changes no team.</p></div>
+        <a className="k-btn k-btn-primary k-btn-lg" href="/admin/demo">ENTER DEMO MODE</a></section>
 
       <div className="k-admin-grid">
-        <Card eyebrow="ROUTINE" title="Round control" id="round-control">
+        <Card eyebrow="REAL COMPETITION" title="Round control" id="round-control">
           <p>Starting fixes the single 60-minute deadline for every team. It cannot be restarted or extended from here.</p>
           <ConfirmForm action={administer} title="Start the 60-minute round?" confirmLabel="Confirm start" details={<><p>All teams will be able to begin Chapter 1 immediately and the shared 60-minute clock starts now.</p><p>This cannot be undone or restarted.</p></>}>
             <input type="hidden" name="action" value="start" />

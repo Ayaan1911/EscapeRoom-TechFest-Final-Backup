@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, fetchBundle, fetchStatus } from "./api";
 import { clockOffset, refreshDelay } from "@/lib/round2/client-clock";
+import { useDemo } from "@/components/demo/demo-context";
 import type { Bundle, StatusPayload } from "./types";
 
 export type Connection = "ok" | "offline" | "unauthorized";
@@ -12,9 +13,10 @@ export type Connection = "ok" | "offline" | "unauthorized";
  *   and whenever the tab becomes visible or the network returns. All of that is GET-only.
  * - Evidence is fetched only for units the server has released; nothing is preloaded.
  */
-export function useRound2(initial: StatusPayload) {
+export function useRound2(initial: StatusPayload, initialBundle: Bundle | null = null) {
+  const demo = useDemo(); // preview: the status and bundle are handed in; there is no polling and no fetching
   const [status, setStatus] = useState(initial);
-  const [bundle, setBundle] = useState<Bundle | null>(null);
+  const [bundle, setBundle] = useState<Bundle | null>(initialBundle);
   const [connection, setConnection] = useState<Connection>("ok");
   const [tick, setTick] = useState(0);
   const offset = useRef<number | null>(null); // lazily seeded from the server-rendered clock, then calibrated on every refresh
@@ -25,7 +27,7 @@ export function useRound2(initial: StatusPayload) {
   const now = useCallback(() => { if (offset.current === null) offset.current = initial.clock.serverNow - Date.now(); return Date.now() + offset.current; }, [initial.clock.serverNow]);
 
   const refresh = useCallback(async () => {
-    if (inflight.current) return;
+    if (demo || inflight.current) return;
     inflight.current = true;
     const sent = Date.now();
     try {
@@ -42,22 +44,23 @@ export function useRound2(initial: StatusPayload) {
       }
     } catch (e) { setConnection(e instanceof ApiError && (e.status === 401 || e.status === 403) ? "unauthorized" : "offline"); }
     finally { inflight.current = false; }
-  }, []);
+  }, [demo]);
 
   useEffect(() => { const id = setTimeout(() => void refresh(), 0); return () => clearTimeout(id); }, [refresh]);
-  useEffect(() => { const id = setInterval(() => setTick(t => t + 1), 1000); return () => clearInterval(id); }, []);
+  useEffect(() => { if (demo) return; const id = setInterval(() => setTick(t => t + 1), 1000); return () => clearInterval(id); }, [demo]);
   useEffect(() => { // scheduled boundary
     const delay = refreshDelay(status.clock.nextEvent?.at ?? null, now());
-    if (delay === null) return;
+    if (demo || delay === null) return;
     const id = setTimeout(() => void refresh(), delay);
     return () => clearTimeout(id);
-  }, [status, now, refresh]);
+  }, [demo, status, now, refresh]);
   useEffect(() => { // periodic + reconnect
+    if (demo) return;
     const poll = setInterval(() => { if (document.visibilityState === "visible" && status.clock.phase !== "finished") void refresh(); }, 20_000);
     const wake = () => { if (document.visibilityState === "visible") void refresh(); };
     window.addEventListener("online", wake); document.addEventListener("visibilitychange", wake);
     return () => { clearInterval(poll); window.removeEventListener("online", wake); document.removeEventListener("visibilitychange", wake); };
-  }, [status.clock.phase, refresh]);
+  }, [demo, status.clock.phase, refresh]);
 
   /** Apply a score already confirmed by the server (a submit response) without waiting for the next poll. */
   const applyScore = useCallback((taskId: string, earned: number, score: { partA: number; partB: number; total: number }, attempts?: { used: number; cap: number; remaining: number }) => {

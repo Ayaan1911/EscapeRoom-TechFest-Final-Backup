@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useDemo } from "@/components/demo/demo-context";
 
 export type DraftValue = string | number | boolean | null | (string | number | boolean | null)[];
 export type DraftData = Record<string, DraftValue>;
@@ -16,6 +17,7 @@ const DEBOUNCE_MS = 700, SYNC_MS = 12_000, MAX_BACKOFF_MS = 30_000;
  * - `flush()` is awaited before in-app navigation, and a keepalive request is attempted on page hide.
  */
 export function useDrafts(chapter: number, initial: ServerDraft[], writable: boolean) {
+  const demo = useDemo(); // preview: edits live in memory only, nothing is sent
   const [entries] = useState(() => new Map<string, Entry>(initial.map(d => [d.taskId, { data: d.data, version: d.version, dirty: false, inflight: false, conflict: null, error: "" } as Entry])));
   const saveRef = useRef<(taskId: string) => Promise<void>>(async () => {});
   const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
@@ -39,7 +41,7 @@ export function useDrafts(chapter: number, initial: ServerDraft[], writable: boo
 
   const save = useCallback(async (taskId: string, keepalive = false): Promise<void> => {
     const entry = entries.get(taskId);
-    if (!entry || !entry.dirty || entry.inflight || entry.conflict || !writable) return;
+    if (demo || !entry || !entry.dirty || entry.inflight || entry.conflict || !writable) return;
     entry.inflight = true; const sent = JSON.stringify(entry.data), sentData = entry.data; recompute();
     try {
       const response = await fetch("/api/game/drafts", { method: "PUT", keepalive, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chapter, taskId, data: sentData, baseVersion: entry.version }) });
@@ -60,7 +62,7 @@ export function useDrafts(chapter: number, initial: ServerDraft[], writable: boo
       const wait = failures.current ? Math.min(MAX_BACKOFF_MS, 1500 * 2 ** failures.current) : DEBOUNCE_MS;
       clearTimeout(timers.current.get(taskId)); timers.current.set(taskId, setTimeout(() => void saveRef.current(taskId), wait));
     }
-  }, [chapter, entries, recompute, writable]);
+  }, [chapter, demo, entries, recompute, writable]);
 
   useEffect(() => { saveRef.current = save; }, [entries, save]);
 
@@ -95,7 +97,7 @@ export function useDrafts(chapter: number, initial: ServerDraft[], writable: boo
     const warn = (event: BeforeUnloadEvent) => { if ([...entries.values()].some(e => e.dirty && (failures.current > 0 || e.conflict || e.error))) event.preventDefault(); };
     const online = () => { failures.current = 0; void flush(); };
     document.addEventListener("visibilitychange", hide); window.addEventListener("beforeunload", warn); window.addEventListener("online", online);
-    const sync = setInterval(async () => { // adopt newer drafts from other devices when this one has nothing unsaved
+    const sync = demo ? undefined : setInterval(async () => { // adopt newer drafts from other devices when this one has nothing unsaved
       try {
         const response = await fetch(`/api/game/drafts?chapter=${chapter}`, { cache: "no-store" }); if (!response.ok) return;
         const { drafts } = await response.json() as { drafts: ServerDraft[] };
@@ -104,12 +106,12 @@ export function useDrafts(chapter: number, initial: ServerDraft[], writable: boo
       } catch { /* offline: the next poll retries */ }
     }, SYNC_MS);
     const pending = timers.current;
-    return () => { document.removeEventListener("visibilitychange", hide); window.removeEventListener("beforeunload", warn); window.removeEventListener("online", online); clearInterval(sync); for (const t of pending.values()) clearTimeout(t); };
-  }, [chapter, entries, flush, recompute, save]);
+    return () => { document.removeEventListener("visibilitychange", hide); window.removeEventListener("beforeunload", warn); window.removeEventListener("online", online); if (sync) clearInterval(sync); for (const t of pending.values()) clearTimeout(t); };
+  }, [chapter, demo, entries, flush, recompute, save]);
 
   const get = (taskId: string): DraftData => entries.get(taskId)?.data ?? {};
   const conflicts = [...entries.entries()].filter(([, e]) => e.conflict).map(([id]) => id);
   const errors = [...entries.values()].map(e => e.error).filter(Boolean);
-  const hasUnsaved = () => [...entries.values()].some(e => e.dirty || e.conflict);
+  const hasUnsaved = () => !demo && [...entries.values()].some(e => e.dirty || e.conflict);
   return { hasUnsaved, status, message: errors[0] || message, savedAt, get, update, flush, resolve, conflicts, conflictOf: (taskId: string) => entries.get(taskId)?.conflict ?? null };
 }

@@ -2,6 +2,7 @@
 import { useId, useState } from "react";
 import { useCooldown } from "./cooldown";
 import { ApiError, postSubmit } from "./api";
+import { useDemo, DEMO_NOTE } from "@/components/demo/demo-context";
 import { TaskFields } from "./fields";
 import { useDrafts, type DraftStatus } from "./use-draft-store";
 import { buildAnswer, missingFields } from "@/lib/round2/form-types";
@@ -29,7 +30,7 @@ export function describeError(e: unknown): Feedback {
 }
 
 export function TaskCard({ task, status, editable, closedReason, onScored, onNeedRefresh, index }: { task: TaskDef; status: TaskStatus; editable: boolean; closedReason: string; onScored: (taskId: string, o: SubmitOutcome) => void; onNeedRefresh: () => void; index: number }) {
-  const store = useDrafts(), entry = store.entry(task.id), id = useId();
+  const store = useDrafts(), entry = store.entry(task.id), id = useId(), demo = useDemo();
   const [busy, setBusy] = useState(false), [feedback, setFeedback] = useState<Feedback | null>(null);
   const { remaining: wait, start: cooldown } = useCooldown();
   const done = status.earned >= status.max, partial = status.earned > 0 && !done;
@@ -38,6 +39,7 @@ export function TaskCard({ task, status, editable, closedReason, onScored, onNee
   const canSubmit = editable && !busy && wait === 0 && !done && !outOfAttempts && missing.length === 0 && entry.status !== "conflict";
 
   async function submit() {
+    if (demo) { setFeedback({ tone: "info", text: `Demo selection recorded on this screen. ${DEMO_NOTE}` }); return; }
     setBusy(true); setFeedback(null);
     try {
       await store.flush(); // save the draft first; a failed draft save never blocks submitting

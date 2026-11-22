@@ -1,6 +1,7 @@
 "use client";
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, type ReactNode } from "react";
 import { ApiError, putDraft } from "./api";
+import { useDemo } from "@/components/demo/demo-context";
 import { draftBytes, DRAFT_LIMIT_BYTES, draftOf, setAt, type Answer, type Field } from "@/lib/round2/form-types";
 import type { ServerDraft } from "./types";
 
@@ -32,6 +33,7 @@ export const useDrafts = () => { const v = useContext(Ctx); if (!v) throw new Er
  */
 export function DraftProvider({ initial, children }: { initial: ServerDraft[]; children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, undefined, () => Object.fromEntries(initial.map(d => [d.taskId, { ...blank, working: d.data as Answer, version: d.version, status: "saved" as const, savedAt: null, payload: d.data as Answer }])));
+  const demo = useDemo(); // preview: nothing is ever saved
   const ref = useRef(state); // kept current by patch(); never assigned during render
   const saveRef = useRef<(id: string) => Promise<void>>(async () => undefined);
   const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
@@ -39,6 +41,7 @@ export function DraftProvider({ initial, children }: { initial: ServerDraft[]; c
   const patch = useCallback((id: string, p: Partial<DraftEntry>) => { ref.current = { ...ref.current, [id]: { ...(ref.current[id] ?? blank), ...p } }; dispatch({ type: "patch", id, patch: p }); }, []);
 
   const save = useCallback(async (id: string): Promise<void> => {
+    if (demo) return;
     const running = inflight.current.get(id);
     if (running) { await running; }
     const e = ref.current[id] ?? blank;
@@ -61,7 +64,7 @@ export function DraftProvider({ initial, children }: { initial: ServerDraft[]; c
     await job; inflight.current.delete(id);
     const after = ref.current[id];
     if (after?.status === "dirty") await saveRef.current(id); // edits made while the request was in flight
-  }, [patch]);
+  }, [demo, patch]);
 
   useEffect(() => { saveRef.current = save; }, [save]);
   const schedule = useCallback((id: string) => {
