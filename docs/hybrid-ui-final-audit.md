@@ -17,9 +17,10 @@ Evidence: `scripts/final-shots.mjs <label>` builds a disposable local database w
 ## Accessibility fixes from the axe run
 `definition-list` (timer `role` on `dd`) on every chapter; `scrollable-region-focusable` (tables, dossier list, evidence list, chain, Round 2 map); `color-contrast` (alert badge on selected row); `aria-prohibited-attr` (projector progress dots).
 
-## Known limits (not done)
-- No new Round 2 evidence-comparison or incident-timeline components: the existing layouts (connection map, brief preview, evidence browser, incident navigator) were inspected and left as they are.
-- Copy reduction is limited to the repeated "Tasks" sub-heading and removing the duplicate Containment chain; task rules (attempts, best score), clues and evidence text are untouched.
+## Known limits (current)
+- Round 2: Part A/B keep their existing per-incident visuals (connection map, dependency chain, hypothesis matrix, intel board, brief preview); this sprint added the whole-round timeline and the tribunal record comparison only.
+- Copy reduction is a modest pass (see the before/after table), not a rewrite; rules, attempt notes and clues were kept.
+- Phone: the six Evidence Wall profile cards are tall; the chapter map is sticky only in the page flow.
 - No 20-team concurrency claim.
 
 ## Sprint 3 additions (2026-11-22)
