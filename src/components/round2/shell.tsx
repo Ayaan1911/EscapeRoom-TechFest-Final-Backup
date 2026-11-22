@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { UnitView } from "./unit-view";
+import { RoundTimeline, type TLNode } from "./briefing";
 import { CooldownProvider } from "./cooldown";
 import { FinishedPanel, WaitingRoom } from "./states";
 import { DraftProvider, NOTES, useDrafts } from "./use-draft-store";
@@ -42,6 +43,9 @@ function Inner({ teamName, initial }: { teamName: string; initial: StatusPayload
   const item = navItems.find(n => n.key === current)!, unit = bundle?.units.find(u => `${u.part}${u.unit}` === current);
   async function choose(key: string) { await store.flush(); setPicked(key); }
 
+  const timeline: TLNode[] = [...navItems.filter(n => n.part === "A").map(n => ({ key: n.key, label: `I${n.unit}`, title: `Incident ${n.unit}`, atMs: INCIDENT_RELEASE_MS[n.unit - 1], state: n.state, earned: n.earned, max: n.max, etaMs: n.state === "not released" ? msUntil(releaseAt("A", n.unit), nowMs) : null })),
+    (() => { const b = navItems.filter(n => n.part === "B"), earned = b.reduce((s, n) => s + n.earned, 0), max = b.reduce((s, n) => s + n.max, 0), open = clock.partBReleased;
+      return { key: "B", label: "Part B", title: "Part B tribunal", atMs: 25 * 60_000, state: !open ? "not released" : earned >= max ? "completed" : clock.phase === "finished" ? "closed" : earned > 0 ? "partially scored" : "available", earned, max, etaMs: open ? null : msUntil(releaseAt("B", 1), nowMs) }; })()];
   const next = clock.nextEvent, toNext = next ? msUntil(next.at, nowMs) : null;
   const clockLabel = clock.phase === "part_a" ? "Part A closes in" : clock.phase === "part_b" ? "Round ends in" : "";
   const target = clock.phase === "part_a" ? msUntil(clock.partAClosesAt, nowMs) : clock.phase === "part_b" ? msUntil(clock.endsAt, nowMs) : null;
@@ -54,6 +58,7 @@ function Inner({ teamName, initial }: { teamName: string; initial: StatusPayload
     {announce && <p className="r2-banner" role="presentation">{announce} <button type="button" className="k-btn k-btn-sm" onClick={clearAnnounce}>Dismiss</button></p>}
     {connection === "offline" && <p className="r2-banner is-warn" role="alert">Connection to the server lost. Times shown are estimates; nothing is submitted or saved until the connection returns. Retrying automatically.</p>}
     {connection === "unauthorized" && <p className="r2-banner is-error" role="alert">Your session ended. <a href="/login?next=/round2">Sign in again</a>: your saved drafts are kept on the server.</p>}
+    <RoundTimeline phase={clock.phase} elapsedMs={startMs === null ? 0 : Math.max(0, nowMs - startMs)} nextText={next ? `Next: ${EVENT_TEXT[next.event] ?? next.event} in ${formatClock(toNext)}` : "No further scheduled events."} nodes={timeline} />
     <div className="r2-layout">
       <nav className="r2-nav" aria-label="Incidents and challenges">
         {(["A", "B"] as const).map(part => <div key={part}><h2>{part === "A" ? "PART A · LIVE RESPONSE" : "PART B · DIGITAL TRIBUNAL"}</h2>

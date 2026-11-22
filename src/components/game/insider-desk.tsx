@@ -60,7 +60,7 @@ export function InsiderDesk({ initialDossier, initialState, initialDrafts }: { i
         { id: "act", label: "Policy action", value: f.str("insider.action", "actionId") }, { id: "ev", label: "Evidence pinned", value: pinned.length ? `${pinned.length}` : "", note: "need 3+" }]} />
 
       <section className="pg-board" aria-label="Staff profiles">
-        <h2 className="pg-h">The Evidence Wall</h2><p className="pg-hint-line">Staff profiles. Selecting one only filters records; it is not a verdict.</p>
+        <h2 className="pg-h">The Evidence Wall</h2><p className="pg-hint-line">Selecting a profile only filters records. It is not a verdict.</p>
         <ul className="k-suspects">{dossier.suspects.map(item => <li key={item.id}><button type="button" className="k-suspect" aria-pressed={suspect === item.id} aria-label={`Filter to ${item.name}`} onClick={() => setSuspect(suspect === item.id ? "" : item.id)}>
           <span className="k-avatar" aria-hidden="true">{initials(item.name)}</span><strong>{item.name}</strong><span className="k-muted">{item.role}</span><Badge>{countFor(item.id)} records</Badge></button></li>)}</ul>
         {person && <dl className="pg-profile suspect-profile"><div><dt>ID</dt><dd className="k-mono">{person.id}</dd></div><div><dt>Role</dt><dd>{person.role}</dd></div><div><dt>Privileges</dt><dd>{person.privileges}</dd></div><div><dt>Responsibilities</dt><dd>{person.responsibilities}</dd></div><div><dt>Device</dt><dd className="k-mono">{person.device}</dd></div></dl>}

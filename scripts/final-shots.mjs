@@ -53,7 +53,8 @@ try {
     if (only.length && !only.some(o => state.startsWith(o))) return;
     for (const sz of szs) {
       const ctx = await ctxFor(sz, who), page = await ctx.newPage(), errs = [];
-      page.on("console", m => { if (m.type() === "error" && !/hydrat|caret|favicon/i.test(m.text())) errs.push(m.text().slice(0, 140)); });
+      page.on("console", m => { if (m.type() === "error" && (process.env.HYD || !/hydrat|caret|favicon/i.test(m.text()))) errs.push(m.text().slice(0, process.env.HYD ? 1800 : 140).split(String.fromCharCode(10)).join(" ~ ")); });
+      page.on("response", r => { if (r.status() >= 400) errs.push(`HTTP ${r.status()} ${r.request().method()} ${r.url().replace(ORIGIN, "")}`); });
       await page.goto(ORIGIN + path, { waitUntil: "networkidle", timeout: 90_000 }).catch(() => {}); await page.waitForTimeout(700);
       if (act) await act(page);
       await page.screenshot({ path: `${out}/${state}-${sz}.png`, fullPage: true });

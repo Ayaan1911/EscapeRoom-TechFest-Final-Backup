@@ -1,6 +1,7 @@
 "use client";
 import { useMemo } from "react";
 import { EvidenceBrowser } from "./evidence";
+import { ComparePanel } from "./briefing";
 import { EvidenceProvider } from "./fields";
 import { TaskCard } from "./task-card";
 import { AiReportPanel, DependencyChain, ForensicLanes, HypothesisMatrix, IntelBoard, NetworkMap, ReportPreview } from "./visuals";
@@ -45,9 +46,9 @@ export function UnitView({ unit, bundle, status, clock, now, onScored, onNeedRef
     <div className="r2-unit" data-unit={key}>
       <header className="r2-unit-head"><span className="r2-eyebrow">{unit.part === "A" ? `PART A · INCIDENT ${unit.unit}` : `PART B · CHALLENGE ${unit.unit}`}</span><h2>{unit.title}</h2><p className="r2-story">{unit.story}</p></header>
       <div className={`r2-unit-grid ${key === "A3" ? "is-split" : ""} ${key === "A2" ? "is-stacked" : ""}`}>
-        <div className="r2-unit-visual">{visual}{key !== "A3" && browser}</div>
+        <div className="r2-unit-visual">{visual}{unit.part === "B" && <ComparePanel records={[...otherRecs, ...referenced]} />}{key !== "A3" && browser}</div>
         <div className="r2-unit-main">{key === "A3" && browser}
-          <section className="r2-tasks" aria-label={`Tasks for ${unit.title}`}><h3 className="r2-h">Tasks <small>Submit each one when ready. Points are saved per task.</small></h3>
+          <section className="r2-tasks" aria-label={`Tasks for ${unit.title}`}><h3 className="r2-h">Tasks <small>Scored one by one</small></h3>
             {unit.tasks.map((t, i) => { const st = status.tasks.find(x => x.id === t.id)!, a = avail(t.id);
               return <TaskCard key={t.id} index={i + 1} task={t} status={st} editable={a === "open"} closedReason={a === "not_released" ? "Not released yet" : "Closed: read-only"} onScored={onScored} onNeedRefresh={onNeedRefresh} />; })}</section></div></div></div>
   </EvidenceProvider>;
