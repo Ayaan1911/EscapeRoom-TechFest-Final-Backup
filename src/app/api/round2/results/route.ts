@@ -1,6 +1,6 @@
-import { guarded, json } from "@/lib/round2/http.server";
-import { requireFinalist } from "@/lib/round2/common.server";
-import { publishedResults } from "@/lib/round2/organizer.server";
+import { json } from "@/lib/round2/http.server";
 
-// Teams see results only after an organizer explicitly publishes them.
-export const GET = () => guarded(async () => { await requireFinalist(); const r = await publishedResults(); return r ? json(r) : json({ error: "Results have not been published" }, 404); });
+// Retired: GHOST RETURNS is answered on paper. Nothing is submitted, drafted, scored or published online (legacy 8-unit implementation kept in git history and lib/round2/*.server.ts only).
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const retired = (_request?: Request) => json({ error: "Round 2 is paper-based. Nothing is submitted online." }, 410);
+export const GET = retired, POST = retired, PUT = retired;

@@ -1,11 +1,6 @@
-import { NextRequest } from "next/server";
-import { guarded, json, readBody } from "@/lib/round2/http.server";
-import { requireFinalist } from "@/lib/round2/common.server";
-import { DRAFT_MAX_BYTES, listR2Drafts, saveR2Draft } from "@/lib/round2/play.server";
+import { json } from "@/lib/round2/http.server";
 
-export const GET = () => guarded(async () => json({ drafts: await listR2Drafts(await requireFinalist()) }));
-export const PUT = (req: NextRequest) => guarded(async () => {
-  const teamId = await requireFinalist();
-  const result = await saveR2Draft(teamId, await readBody(req, DRAFT_MAX_BYTES * 2));
-  return result.ok ? json(result.draft) : json({ error: result.error, ...(result.current !== undefined ? { current: result.current } : {}) }, result.status);
-});
+// Retired: GHOST RETURNS is answered on paper. Nothing is submitted, drafted, scored or published online (legacy 8-unit implementation kept in git history and lib/round2/*.server.ts only).
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const retired = (_request?: Request) => json({ error: "Round 2 is paper-based. Nothing is submitted online." }, 410);
+export const GET = retired, POST = retired, PUT = retired;

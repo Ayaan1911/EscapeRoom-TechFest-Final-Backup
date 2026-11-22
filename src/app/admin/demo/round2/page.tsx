@@ -1,11 +1,16 @@
 import "../../../round2.css";
-import { Round2Shell } from "@/components/round2/shell";
-import { demoRound2, requireDemoAdmin } from "@/lib/demo/demo.server";
+import "../../../paper.css";
+import { PaperShell } from "@/components/round2/paper/paper-shell";
+import { CHAPTERS } from "@/lib/round2/paper/clock";
+import { chapterContent } from "@/lib/round2/paper/content.server";
+import { requireDemoAdmin } from "@/lib/demo/demo.server";
+import type { ChapterView } from "@/lib/round2/paper/types";
 
-const UNITS = ["A1", "A2", "A3", "A4", "B1", "B2", "B3", "B4"];
-/** Organizer preview of Round 2: all eight units released and open, no clock, no enrollment, no network writes. */
+/** Organizer preview of GHOST RETURNS: all four chapters open, no clock, no enrollment, no polling, no API calls, nothing recorded. */
 export default async function DemoRound2Page({ searchParams }: { searchParams: Promise<{ unit?: string }> }) {
   await requireDemoAdmin();
-  const unit = (await searchParams).unit, { status, bundle } = demoRound2();
-  return <main className="dashboard-main"><Round2Shell teamName="Demonstration team" initialStatus={status} initialDrafts={[]} demo={{ bundle, unit: UNITS.includes(unit ?? "") ? unit : "A1" }} /></main>;
+  const n = Number((await searchParams).unit), start = n >= 1 && n <= 4 ? n : 1;
+  const chapters: ChapterView[] = CHAPTERS.map(c => ({ n: c.n, title: c.title, endsAt: "", content: chapterContent(c.n) }));
+  const initial = { serverNow: new Date(0).toISOString(), phase: "running" as const, endsAt: null, chapter: null, rail: [] };
+  return <main className="dashboard-main"><PaperShell teamName="Organizer preview" initial={initial} demo={{ chapters, start }} /></main>;
 }

@@ -1,5 +1,6 @@
 import { guarded, json } from "@/lib/round2/http.server";
 import { requireFinalist } from "@/lib/round2/common.server";
-import { r2Status } from "@/lib/round2/play.server";
+import { paperStatus } from "@/lib/round2/paper/service.server";
 
-export const GET = () => guarded(async () => json(await r2Status(await requireFinalist())));
+// GHOST RETURNS (paper edition). Returns ONLY the chapter the server clock has currently open; never a past or future chapter.
+export const GET = () => guarded(async () => { await requireFinalist(); return json(await paperStatus()); });
