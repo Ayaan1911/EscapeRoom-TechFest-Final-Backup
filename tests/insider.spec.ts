@@ -102,7 +102,7 @@ for (const [index, variant] of (["A", "B", "C"] as const).entries()) test(`Insid
   await expect(page.getByRole("button", { name: /^Unpin / })).toHaveCount(3);
   if (variant === "B") { // wrong insider earns nothing for that task; direct rapid submissions are throttled
     await page.getByRole("combobox", { name: "Insider employee", exact: true }).selectOption(`EMP-${variant}-01`);
-    await submitTask(page, "Insider identified", /No new points/);
+    await submitTask(page, "Insider identified", /No points yet/);
     expect((await post("submit", answer)).status()).toBe(429);
   }
   if (variant === "A") {
