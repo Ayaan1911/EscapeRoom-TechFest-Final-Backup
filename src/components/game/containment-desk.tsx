@@ -5,6 +5,7 @@ import { useDrafts, type ServerDraft } from "./use-drafts";
 import { ContainmentCctv } from "./containment-cctv";
 import { ChainDiagram, ConnectionBanner, DeskFrame, HintBox, ResultStrip, StateBanner, TaskNav, TaskPanel, fieldApi, isEditable, taskOf } from "./workspace";
 import { Badge } from "@/components/ui/kit";
+import { StageRail, type Stage } from "./case-visuals";
 import type { ContainmentCctv as Snapshot, ContainmentEvidence } from "@/types/containment";
 
 type Option = { id: string; title: string; detail: string };
@@ -56,6 +57,8 @@ export function ContainmentDesk({ evidence, initialCctv, initialState, initialDr
     <ChainDiagram label="Response stages" nodes={[
       { id: "t", label: "1 · Reconstruct", value: "7 events", note: "order below" }, { id: "i", label: "2 · Immediate (parallel)", value: immediate.length ? `${immediate.length} chosen` : "", note: "no order needed" },
       { id: "r", label: "3 · Recovery (ordered)", value: recovery.length ? `${recovery.length} steps` : "", note: "dependencies matter" }, { id: "e", label: "Evidence kept", value: support.length ? `${support.length} pinned` : "", note: "need 5" }]} />
+    <StageRail label="Incident response workflow" stages={(["Reconstruct", "Identify", "Contain", "Recover and verify", "Preserve"] as const).map((label, i): Stage => { const row = taskOf(state, 3, Object.values(DRAFT)[i]), filled = [true, !!(f.str(DRAFT.identity, "account") && f.str(DRAFT.identity, "sessionId")), immediate.length > 0, recovery.length > 0, support.length >= 5][i];
+      return { id: row.id, label, sub: `${row.earned}/${row.max}`, state: row.earned >= row.max ? "done" : row.earned > 0 ? "partial" : filled && i > 0 ? "filled" : "open", href: `#task-${i + 1}` }; })} />
     {cctv && <ContainmentCctv snapshot={cctv} />}
 
     <section className="pg-tasks" aria-label="Scored tasks">

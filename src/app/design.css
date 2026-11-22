@@ -106,3 +106,37 @@
 .r2-timer.is-urgent::after { content: "▲ closing soon"; font: 700 11px var(--font-mono); color: var(--alert); letter-spacing: .06em; }
 @keyframes ds-urgent { 50% { opacity: .55; } }
 @media (prefers-reduced-motion: reduce) { .r2-timer.is-urgent b { animation: none; } }
+
+/* Evidence timeline (Trail, Insider) */
+.ds-tl { margin: 0 0 var(--s4); padding: var(--s3) var(--s4); border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.ds-tl-body { display: grid; grid-template-columns: minmax(70px, 120px) minmax(0, 1fr); gap: var(--s3); }
+.ds-tl-lanes { display: grid; grid-auto-rows: 36px; align-items: center; font: 600 11px var(--font-mono); color: var(--muted); text-transform: uppercase; letter-spacing: .04em; overflow: hidden; }
+.ds-tl-lanes span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ds-tl-track { position: relative; margin: 0 9px; }
+.ds-tl-lane { position: absolute; left: -9px; right: -9px; border-top: 1px dashed var(--line); }
+.ds-tl-link { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.ds-tl-link polyline { fill: none; stroke: var(--evidence); stroke-width: 2; vector-effect: non-scaling-stroke; opacity: .85; }
+.ds-tl-dot { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; padding: 0; border-radius: 50%; border: 2px solid var(--muted); background: var(--bg); cursor: pointer; opacity: .75; }
+.ds-tl-dot.is-ok { border-color: var(--ok); } .ds-tl-dot.is-alert { border-color: var(--alert); } .ds-tl-dot.is-amber { border-color: var(--amber); } .ds-tl-dot.is-info { border-color: var(--evidence); }
+.ds-tl-dot.is-hl { background: var(--evidence); opacity: 1; } .ds-tl-dot.is-marked { box-shadow: 0 0 0 3px var(--amber); opacity: 1; }
+.ds-tl-dot.is-selected { width: 18px; height: 18px; margin: -9px 0 0 -9px; background: var(--text); opacity: 1; z-index: 2; }
+.ds-tl-dot:hover, .ds-tl-dot:focus-visible { opacity: 1; z-index: 3; outline: 2px solid var(--text); outline-offset: 2px; }
+.ds-tl figcaption { display: flex; justify-content: space-between; gap: var(--s3); margin-top: var(--s2); color: var(--muted); font-size: 12px; }
+.ds-tl figcaption span:nth-child(2) { text-align: center; flex: 1; }
+@media (max-width: 640px) { .ds-tl-body { grid-template-columns: 56px minmax(0, 1fr); } .ds-tl figcaption span:nth-child(2) { display: none; } }
+
+/* Workflow rail (Containment) */
+.ds-rail { list-style: none; margin: 0 0 var(--s4); padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--s2); }
+.ds-rail li { position: relative; } .ds-rail li + li::before { content: ""; position: absolute; top: 20px; left: -50%; width: 100%; height: 2px; background: var(--line); z-index: 0; }
+.ds-rail a, .ds-rail div { position: relative; z-index: 1; display: grid; justify-items: center; gap: 2px; padding: var(--s2); text-align: center; text-decoration: none; color: var(--muted); font-size: 13px; }
+.ds-rail b { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--line); background: var(--bg); font: 700 14px var(--font-mono); }
+.ds-rail span { font-weight: 600; color: var(--text); } .ds-rail small { font: 12px var(--font-mono); }
+.ds-rail .is-partial b, .ds-rail .is-filled b { border-color: var(--amber); color: var(--amber); } .ds-rail .is-done b { background: var(--ok); border-color: var(--ok); color: #0c0e11; }
+@media (max-width: 640px) { .ds-rail span { font-size: 11px; } .ds-rail small { display: none; } }
+
+/* Evidence categories (Verdict) and auth dots (Inbox) */
+.ds-cats { list-style: none; margin: 0 0 var(--s4); padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: var(--s3); }
+.ds-cats li { display: grid; grid-template-columns: 1fr auto; gap: 0 var(--s2); padding: var(--s3); border: 1px solid var(--line); border-left: 3px solid var(--line); border-radius: 8px; background: var(--surface); }
+.ds-cats li.is-on { border-left-color: var(--evidence); } .ds-cats b { font: 700 20px var(--font-mono); } .ds-cats small { grid-column: 1 / -1; color: var(--muted); }
+.ds-dots { display: inline-flex; gap: 3px; margin-left: auto; margin-right: var(--s2); } .ds-dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.ds-dots .ok { background: var(--ok); } .ds-dots .bad { background: var(--alert); } .ds-dots .mid { background: var(--amber); }

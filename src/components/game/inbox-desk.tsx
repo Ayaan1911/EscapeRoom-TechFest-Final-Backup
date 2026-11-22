@@ -4,6 +4,7 @@ import { useChapter, type ChapterState } from "./use-chapter";
 import { useDrafts, type ServerDraft } from "./use-drafts";
 import { ChainDiagram, ConnectionBanner, DeskFrame, HintBox, ResultStrip, StateBanner, TaskPanel, fieldApi, isEditable, taskOf } from "./workspace";
 import { Badge, Tabs } from "@/components/ui/kit";
+import { AuthDots } from "./case-visuals";
 import type { InboxArtifact, InboxEvidence } from "@/types/inbox";
 
 const KIND_LABEL = { gateway: "Gateway", authentication: "Sign-in", database: "Export" } as const;
@@ -53,7 +54,7 @@ export function InboxDesk({ evidence, initialState, initialDrafts }: { evidence:
       <aside className="k-mail-list" aria-label="Recovered emails" ref={list} onKeyDown={moveSelection}>
         <div className="k-pane-head"><span className="k-eyebrow">MAILBOX · {evidence.emails.length}</span><small>{evidence.recipient}</small></div>
         {evidence.emails.map(item => <button key={item.id} type="button" className={`k-mail-item ${read.includes(item.id) ? "is-read" : "is-unread"}`} aria-pressed={selectedId === item.id} onClick={() => select(item.id)}>
-          <span className="k-mail-top"><span className="k-mono">{item.id}</span><time dateTime={item.timestamp}>{time(item.timestamp)} UTC</time></span>
+          <span className="k-mail-top"><span className="k-mono">{item.id}</span><AuthDots value={item.headers["Authentication-Results"] ?? ""} /><time dateTime={item.timestamp}>{time(item.timestamp)} UTC</time></span>
           <strong>{item.sender}</strong><span className="k-mail-subject">{item.subject}</span>
           <span className="k-mail-flags">{marked === item.id && <Badge tone="amber">★ Breach email</Badge>}{item.attachments.length > 0 && <Badge>📎 {item.attachments.length}</Badge>}{!read.includes(item.id) && <Badge tone="info">Unread</Badge>}</span>
         </button>)}

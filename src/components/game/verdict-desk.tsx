@@ -5,6 +5,7 @@ import { useDrafts, type ServerDraft } from "./use-drafts";
 import { CaseClosed } from "./case-closed";
 import { ConnectionBanner, DeskFrame, HintBox, ResultStrip, StateBanner, TaskPanel, fieldApi, isEditable, taskOf } from "./workspace";
 import { Badge } from "@/components/ui/kit";
+import { CategoryBar } from "./case-visuals";
 import { verdictRoles, type VerdictEvidence, type VerdictRole } from "@/types/verdict";
 
 const ROLE_LABEL: Record<VerdictRole, string> = { entry: "Entry", session: "Session abuse", impact: "Data impact", assistance: "Insider help", response: "Response" };
@@ -55,6 +56,7 @@ export function VerdictDesk({ evidence, initialState, initialDrafts, team }: { e
     <details className="pg-hints"><summary>Case file <span className="pg-chip">read first</span></summary>{evidence.summary.map(text => <p key={text}>{text}</p>)}
       <div className="pg-actions">{["inbox", "trail", "insider", "containment"].map((c, i) => state.unlocked[i] ? <a key={c} className="k-btn k-btn-sm" href={`/play/${c}`}>Review {c}</a> : null)}</div></details>
 
+    <CategoryBar label="Evidence you linked, by chapter" cats={["Inbox", "Trail", "Insider", "Containment"].map(name => ({ name, used: pinnedIds.filter(id => evidence.records.find(r => r.id === id)?.chapter === name).length, total: evidence.records.filter(r => r.chapter === name).length }))} />
     <nav className="pg-causal" aria-label="Causal chain: choose a step">
       <ol>{TASKS.map((t, i) => { const row = taskOf(state, 4, t.id), done = row.earned >= row.max;
         return <li key={t.id}><button type="button" aria-pressed={active === t.id} className={`${done ? "is-done" : row.earned > 0 ? "is-partial" : filled(t.id) ? "is-filled" : ""}`} onClick={() => setActive(t.id)}>

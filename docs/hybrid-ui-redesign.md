@@ -60,3 +60,12 @@ To see the 50% unlock by hand: start a disposable DB + `npm run dev` with an act
 
 Pre-existing failure found and not caused by this work: Insider B's wrong-answer note assertion (see above) also failed at 0b4b172; its expectation was updated to the shipped wording and the whole insider batch now passes.
 Not run: 20-team concurrency (still an infrastructure constraint), automated axe scan, hosted checks of any kind.
+
+## Round 2 of the redesign: evidence visuals (additive)
+`src/components/game/case-visuals.tsx` adds four presentation-only pieces, shown above existing UI (no existing control removed):
+- **Trail**: `ActivityTimeline`, events plotted by real timestamp in lanes per event type, outcome-coloured; selecting a marker selects the event; a line joins only events of the *selected* event's session; pinned events ringed. The table remains the keyboard view.
+- **Insider**: the same timeline over dossier records (lanes = record type); the line joins only records the team pinned; selected suspect's records highlighted.
+- **Inbox**: authentication pass/fail dots on each mailbox row (decorative; the headers/badges stay in the viewer).
+- **Containment**: `StageRail` (Reconstruct, Identify, Contain, Recover and verify, Preserve) driven by the team's own saved scores/drafts; it does not reveal the event order or any answer.
+- **Verdict**: `CategoryBar` showing how many records the team linked from each earlier chapter.
+Not done: Round 2 evidence-comparison layouts, copy shortening, containment/verdict screenshots.

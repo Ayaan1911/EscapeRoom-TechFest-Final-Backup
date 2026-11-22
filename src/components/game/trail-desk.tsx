@@ -4,6 +4,7 @@ import { useChapter, type ChapterState } from "./use-chapter";
 import { useDrafts, type ServerDraft } from "./use-drafts";
 import { ChainDiagram, ConnectionBanner, DeskFrame, HintBox, ResultStrip, StateBanner, TaskPanel, fieldApi, isEditable, taskOf } from "./workspace";
 import { Badge } from "@/components/ui/kit";
+import { ActivityTimeline } from "./case-visuals";
 import { emptyTrailFilters, filterTrailRows } from "@/lib/game/trail-view";
 import type { TrailEvidence, TrailEvent } from "@/types/trail";
 
@@ -31,6 +32,7 @@ export function TrailDesk({ evidence, initialState, initialDrafts }: { evidence:
   const pinned = f.arr("trail.corroboration", "supportingEvidenceIds");
   const active = Object.entries(filters).filter(([k, v]) => k !== "descending" && v).length;
   const choices = (key: "account" | "sourceIp" | "eventType") => [...new Set(evidence.rows.map(row => row[key]))].sort();
+  const sameSession = selected.sessionId === "none" ? [] : filtered.filter(r => r.sessionId === selected.sessionId).map(r => r.id);
   const counts = { success: 0, failure: 0, challenge: 0 }; for (const r of filtered) counts[r.result]++;
   function updateFilters(update: Partial<typeof emptyTrailFilters>) { setFilters(old => ({ ...old, ...update })); setPage(0); }
   async function copy(id: string) { try { await navigator.clipboard.writeText(id); setCopied(`Copied ${id}`); } catch { setCopied(`Select and copy ${id}`); } }
@@ -48,6 +50,8 @@ export function TrailDesk({ evidence, initialState, initialDrafts }: { evidence:
       { id: "ev", label: "Replay event", value: f.str("trail.session", "eventId") }, { id: "ip", label: "Source", value: f.str("trail.source", "sourceIp") }, { id: "pin", label: "Evidence pinned", value: pinned.length ? `${pinned.length}/3` : "" }]} />
 
     <section className="pg-console" aria-label="Log console">
+      <ActivityTimeline label="Activity timeline" items={filtered.map(r => ({ id: r.id, at: r.timestamp, lane: r.eventType, tone: OUTCOME[r.result].tone, hint: OUTCOME[r.result].text }))} selectedId={selectedId} marked={pinned}
+        highlight={sameSession} linked={sameSession} onSelect={setSelectedId} note="Lines join events of the selected event's session. Ringed = pinned. The table below is the keyboard view." />
       <div className="pg-console-top">
         <div className="pg-outcomes" role="status" aria-label="Matching events by outcome"><b>{filtered.length}</b> of {evidence.rows.length} events{(["success", "failure", "challenge"] as const).map(k => <Badge key={k} tone={OUTCOME[k].tone}>{OUTCOME[k].mark} {counts[k]} {OUTCOME[k].text.toLowerCase()}</Badge>)}{active > 0 && <Badge tone="amber">{active} filter{active > 1 ? "s" : ""}</Badge>}</div>
         <a className="k-btn k-btn-sm" href="/api/game/trail/csv">Download CSV</a>

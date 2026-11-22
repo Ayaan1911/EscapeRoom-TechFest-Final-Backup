@@ -4,6 +4,7 @@ import { useChapter, type ChapterState } from "./use-chapter";
 import { useDrafts, type ServerDraft } from "./use-drafts";
 import { ChainDiagram, ConnectionBanner, DeskFrame, HintBox, ResultStrip, StateBanner, TaskPanel, fieldApi, isEditable, taskOf } from "./workspace";
 import { Badge } from "@/components/ui/kit";
+import { ActivityTimeline } from "./case-visuals";
 import type { InsiderDossier, InsiderRecord } from "@/types/insider";
 
 const KIND: Record<InsiderRecord["kind"], { label: string; icon: string; tone: "info" | "amber" | "alert" | "ok" | "neutral" }> = {
@@ -71,6 +72,8 @@ export function InsiderDesk({ initialDossier, initialState, initialDrafts }: { i
           <label className="k-filter">Suspect profile<select value={suspect} onChange={e => setSuspect(e.target.value)}><option value="">All</option>{dossier.suspects.map(item => <option value={item.id} key={item.id}>{item.id} · {item.name}</option>)}</select></label>
           <label className="k-filter">Record type<select value={kind} onChange={e => setKind(e.target.value)}><option value="">All</option>{Object.keys(KIND).map(value => <option key={value}>{value}</option>)}</select></label></div>
         <div className="k-toolbar"><strong role="status">{records.length} of {dossier.records.length} records</strong><span className="k-spacer" /><button type="button" className="k-btn k-btn-sm" onClick={() => { setSearch(""); setKind(""); setSuspect(""); }}>Reset dossier filters</button></div>
+        <ActivityTimeline label="Dossier timeline" items={records.map(r => ({ id: r.id, at: r.timestamp, lane: KIND[r.kind].label, tone: KIND[r.kind].tone }))} selectedId={record?.id} marked={pinned} linked={pinned}
+          highlight={suspect ? records.filter(r => r.employees.includes(suspect)).map(r => r.id) : []} onSelect={setSelected} note="Colour = record type. Ringed = pinned. The line joins only the records you pinned." />
         <div className="k-insider-grid">
           <div className="k-reclist" role="region" aria-label="Dossier records">{records.map(item => <button type="button" className={`k-rec k-rec-${item.kind}`} key={item.id} aria-pressed={record?.id === item.id} onClick={() => setSelected(item.id)}>
             <span className="k-rec-icon" aria-hidden="true">{KIND[item.kind].icon}</span>
