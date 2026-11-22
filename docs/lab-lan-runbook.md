@@ -97,6 +97,8 @@ On the **development laptop** (Windows x64):
 1. `npm ci --include=dev ; npm run build` then `powershell -ExecutionPolicy Bypass -File scripts\lab\package-lab.ps1` → `ghost404-lab-<sha>.zip` (source + production build + `node_modules` incl. the Windows Prisma engine and Next SWC binaries; no secrets). Note the SHA256 it prints.
 2. Download the **Windows x64 portable Node zip** (nodejs.org, version 24 LTS or 22.18+) and a **portable PostgreSQL 15/16 Windows x64 binaries zip** (EnterpriseDB "binaries"). Put the three zips on a USB drive.
 
+Expect a **~650 MB zip** (32k files) and **~15 minutes** to build on a laptop with antivirus; extraction took 20 s. Verified: the zip contains no `.env*`, `private\`, `backups\` or `.git`; extracted into a clean folder, the copy reached the database (`lab-tool.mjs db-check`) and served `/api/health?db=1` = up. That was on the same laptop, so it does **not** prove it runs on a different PC.
+
 On the **lab PC** (must be **Windows x64** — the bundled native engines are x64-only; also needs the Microsoft Visual C++ 2015–2022 runtime, normally preinstalled):
 ```powershell
 Get-FileHash .\ghost404-lab-<sha>.zip -Algorithm SHA256        # compare with the laptop
