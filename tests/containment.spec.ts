@@ -80,7 +80,7 @@ for (const variant of ["A", "B", "C"] as const) test(`Containment ${variant}: ke
   await expect(page.getByText("Chapter 4 completed. Chapter 5 unlocked.", { exact: true })).toBeVisible();
   const score = variant === "A" ? 87 : variant === "B" ? 82 : 76; await expect(page.getByText(`Saved score: ${score} / 105`, { exact: true })).toBeVisible();
   await page.reload(); await expect(page.locator(".pg-hints ol li")).toHaveCount(variant === "C" ? 2 : 1); await expect(page.getByLabel("Affected account", { exact: true })).toBeDisabled();
-  await logout(page); await login(page, id); await expect(page.locator(".k-map-card[aria-current=step]").getByRole("heading", { name: "Final Verdict", exact: true })).toBeVisible();
+  await logout(page); await login(page, id); await expect(page.locator(".gd-stage[aria-current=step]").getByRole("heading", { name: "Final Verdict", exact: true })).toBeVisible();
   const saved = await (await page.request.get("/api/game")).json(); expect(saved.current).toBe(4); expect(saved.score).toBe(score); expect(saved.progress.chapters[3].score).toBe(20); expect(saved.progress.bonus).toBe(variant === "A" ? 5 : 0);
   await page.goto("/play/containment"); await expect(page.getByText("Chapter 4 completed. Chapter 5 unlocked.", { exact: true })).toBeVisible(); expect(external).toEqual([]);
   await page.getByRole("link", { name: /^Open Chapter 5/ }).first().click(); await expect(page.getByRole("heading", { name: "Final Verdict", exact: true })).toBeVisible(); expect((await page.request.get("/api/game/verdict")).status()).toBe(200);

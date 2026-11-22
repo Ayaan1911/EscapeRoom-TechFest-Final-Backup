@@ -97,3 +97,12 @@
 .pj-foot { display: flex; justify-content: space-between; align-items: center; gap: var(--s4); color: var(--muted); font: 13px var(--font-mono); flex-wrap: wrap; }
 @media (max-width: 640px) { .pj-row { grid-template-columns: 3.5ch minmax(0, 1fr) 6ch; } .pj-prog { display: none; } }
 @media (prefers-reduced-motion: reduce) { .pj-row { transition: none; } }
+
+/* Round 2 identity: Part A = live, operational (amber/red when urgent); Part B = analytical tribunal (cyan evidence accent). Under five minutes the timer turns red and gains a text-visible marker. */
+.r2-wrap[data-phase="part_b"] { --amber: var(--evidence); }
+.r2-wrap[data-phase="part_b"] .r2-top { border-top: 3px solid var(--evidence); }
+.r2-wrap[data-phase="part_a"] .r2-top { border-top: 3px solid var(--amber); }
+.r2-timer.is-urgent b { color: var(--alert); animation: ds-urgent 1.2s ease-in-out infinite; }
+.r2-timer.is-urgent::after { content: "▲ closing soon"; font: 700 11px var(--font-mono); color: var(--alert); letter-spacing: .06em; }
+@keyframes ds-urgent { 50% { opacity: .55; } }
+@media (prefers-reduced-motion: reduce) { .r2-timer.is-urgent b { animation: none; } }

@@ -47,9 +47,9 @@ function Inner({ teamName, initial }: { teamName: string; initial: StatusPayload
   const target = clock.phase === "part_a" ? msUntil(clock.partAClosesAt, nowMs) : clock.phase === "part_b" ? msUntil(clock.endsAt, nowMs) : null;
   const locked = (clock.phase === "part_a" && target !== null && target <= 0);
 
-  if (clock.phase === "not_started") return <div className="r2-wrap"><TopBar teamName={teamName} status={status} label="" value="" connection={connection} /><WaitingRoom teamName={teamName} /></div>;
-  return <div className="r2-wrap">
-    <TopBar teamName={teamName} status={status} label={clockLabel} value={formatClock(target)} connection={connection} />
+  if (clock.phase === "not_started") return <div className="r2-wrap" data-phase={clock.phase}><TopBar teamName={teamName} status={status} label="" value="" connection={connection} /><WaitingRoom teamName={teamName} /></div>;
+  return <div className="r2-wrap" data-phase={clock.phase}>
+    <TopBar teamName={teamName} status={status} label={clockLabel} value={formatClock(target)} connection={connection} urgent={target !== null && target > 0 && target <= 300_000} />
     <p className="r2-sr" role="status" aria-live="polite">{announce}</p>
     {announce && <p className="r2-banner" role="presentation">{announce} <button type="button" className="k-btn k-btn-sm" onClick={clearAnnounce}>Dismiss</button></p>}
     {connection === "offline" && <p className="r2-banner is-warn" role="alert">Connection to the server lost. Times shown are estimates; nothing is submitted or saved until the connection returns. Retrying automatically.</p>}
@@ -75,12 +75,12 @@ function Inner({ teamName, initial }: { teamName: string; initial: StatusPayload
       </main>
     </div></div>;
 }
-function TopBar({ teamName, status, label, value, connection }: { teamName: string; status: StatusPayload; label: string; value: string; connection: string }) {
+function TopBar({ teamName, status, label, value, connection, urgent = false }: { teamName: string; status: StatusPayload; label: string; value: string; connection: string; urgent?: boolean }) {
   const s = status.score, c = status.clock;
   return <header className="r2-top"><div className="r2-brand"><span className="r2-eyebrow">OPERATION GHOST_404</span><strong>GHOST RETURNS</strong></div>
     <div className="r2-team"><span className="r2-meta">Team</span><b>{teamName}</b></div>
     <div className="r2-phase"><span className={`r2-chip is-${c.phase}`}>{PHASE_TEXT[c.phase]}</span>{connection === "offline" && <span className="r2-chip is-warn">offline</span>}</div>
-    {label && <div className="r2-timer" role="timer" aria-label={`${label} ${value}`}><span className="r2-meta">{label}</span><b className="r2-mono">{value}</b></div>}
+    {label && <div className={`r2-timer ${urgent ? "is-urgent" : ""}`} role="timer" aria-label={`${label} ${value}`}><span className="r2-meta">{label}</span><b className="r2-mono">{value}{urgent ? <span className="r2-sr"> — under five minutes</span> : null}</b></div>}
     <div className="r2-score" aria-label={`Score ${s.total} of ${s.max}`}><b>{s.total}</b><span>/{s.max}</span><small>A {s.partA}/{s.partAMax} · B {s.partB}/{s.partBMax}</small></div></header>;
 }
 

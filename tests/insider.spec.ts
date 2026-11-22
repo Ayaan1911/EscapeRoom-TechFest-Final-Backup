@@ -116,7 +116,7 @@ for (const [index, variant] of (["A", "B", "C"] as const).entries()) test(`Insid
   await page.reload(); await expect(page.getByRole("combobox", { name: "Insider employee", exact: true })).toBeDisabled();
   await logout(page); await insiderLogin(page, id);
   const state = await (await page.request.get("/api/game")).json(); expect(state.current).toBe(3); expect(state.insiderUnlocked).toBe(true); expect(state.score).toBe(score); expect(state.progress.chapters[2].score).toBe(25); expect(state.progress.bonus).toBe(variant === "A" ? 5 : 0);
-  await expect(page.locator(".k-map-card[aria-current=step]").getByRole("heading", { name: "Containment", exact: true })).toBeVisible();
+  await expect(page.locator(".gd-stage[aria-current=step]").getByRole("heading", { name: "Containment", exact: true })).toBeVisible();
   for (const route of ["inbox", "trail"]) { await page.goto(`/play/${route}`); expect((await page.request.get("/api/game/insider")).status()).toBe(200); await expect(page.getByRole("heading", { name: route === "inbox" ? "The Inbox" : "Trail", exact: true })).toBeVisible(); }
   await page.goto("/play/containment"); await expect(page.getByRole("heading", { name: "Containment", exact: true })).toBeVisible(); expect((await page.request.get("/api/game/containment")).status()).toBe(200);
 });
