@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { session } from "@/lib/auth";
-import { AnswerKey, AnswerSheet, RubricA, RubricB, ScoreSheet, Script } from "@/components/round2/paper/print-docs";
+import { AnswerKey, AnswerSheet, RubricA, RubricB, ScoreSheet, Script } from "../docs";
 import "../../../../paper.css";
 
 export const dynamic = "force-dynamic";

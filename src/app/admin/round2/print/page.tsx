@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { session } from "@/lib/auth";
-import { DOCS } from "@/components/round2/paper/print-docs";
+import { DOCS } from "./docs";
 import "../../../paper.css";
 
 export const dynamic = "force-dynamic";

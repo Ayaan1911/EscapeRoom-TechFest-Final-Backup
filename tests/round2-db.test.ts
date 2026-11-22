@@ -11,7 +11,9 @@ const jar = vi.hoisted(() => new Map<string, string>());
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: (key: string) => jar.has(key) ? { value: jar.get(key) } : undefined, set: (key: string, value: string) => jar.set(key, value), delete: (key: string) => jar.delete(key) }) }));
 
 const min = (m: number) => m * 60_000;
-describe.skipIf(process.env.GHOST_DB_TEST !== "1")("Round 2 backend (PostgreSQL)", { timeout: 180_000 }, () => {
+// LEGACY (8-unit, online-scored Round 2). Retired by the paper edition: its submit/draft/evidence/results routes now answer 410 and start/end use the 40-minute paper clock.
+// Kept for history and scoped explicitly: it runs only with GHOST_R2_LEGACY=1. Replaced by tests/paper-db.test.ts.
+describe.skipIf(process.env.GHOST_DB_TEST !== "1" || process.env.GHOST_R2_LEGACY !== "1")("Round 2 backend (PostgreSQL)", { timeout: 180_000 }, () => {
   let temp: Awaited<ReturnType<typeof createTempDatabase>>;
   let db: typeof import("../src/lib/db").db;
   let auth: typeof import("../src/lib/auth");
