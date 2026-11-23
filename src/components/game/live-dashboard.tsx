@@ -66,6 +66,8 @@ export function LiveDashboard() {
 
     <section aria-labelledby="map-heading">
       <div className="k-section-head"><h2 id="map-heading">Investigation map</h2><span className="gd-pts">{data.unlocked.filter(Boolean).length} / 5 open</span></div>
+      <ol className="gd-path" aria-hidden="true">{titles.map((title, i) => { const state = done(i) ? "done" : i === here && !waiting && !closed ? "here" : open(i) ? "open" : "locked";
+        return <li key={title} className={`is-${state}`}><span className="gd-path-node">{state === "done" ? "✓" : i + 1}</span><b>{title}</b><small>{data.progress.chapters[i].score}/{CHAPTERS[i].max}</small></li>; })}</ol>
       <nav aria-label="Investigation chapters"><ol className="gd-map">{titles.map((title, i) => {
         const raw = data.progress.chapters[i].score, max = CHAPTERS[i].max, need = data.unlockThresholds[i], isOpen = open(i);
         const kind = done(i) ? "complete" : !isOpen ? "locked" : raw > 0 ? "progress" : "available";
