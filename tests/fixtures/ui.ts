@@ -96,8 +96,9 @@ export async function solveVerdict(page: Page, variant: V) {
   await step("Entry"); await page.getByLabel("Initial compromise email").selectOption(a.chain.emailId); await page.getByLabel("Captured redirect").selectOption(a.chain.captureId); await submitTask(page, "Entry chain");
   await step("Session"); await page.getByLabel("Victim account").selectOption(a.chain.victimAccount); await page.getByLabel("Replayed session").selectOption(a.chain.sessionId); await page.getByRole("combobox", { name: "Unauthorized export", exact: true }).selectOption(a.chain.exportId); await submitTask(page, "Session and impact chain");
   await step("Insider"); await page.getByLabel("Internal accomplice").selectOption(a.chain.insiderId); await page.getByLabel("Policy modification").selectOption(a.chain.policyId); await submitTask(page, "Internal assistance chain");
-  await step("Evidence map");
+  await step("Evidence map"); await openTool(page, "board");
   for (const [role, ids] of Object.entries(a.evidenceMap)) for (const id of ids) await page.getByLabel(`Evidence role for ${id}`, { exact: true }).selectOption(role);
+  await closeAllTools(page);
   await submitTask(page, "Evidence map");
   await step("Verdict");
   await page.getByLabel("Best-supported").selectOption(a.hypothesisId); await page.getByRole("combobox", { name: "Reject", exact: true }).selectOption(a.rejected.hypothesisId); await page.getByRole("combobox", { name: "Contradiction", exact: true }).selectOption(a.rejected.contradiction);

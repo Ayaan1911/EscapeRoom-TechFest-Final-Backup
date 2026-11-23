@@ -7,6 +7,8 @@ import { ChainDiagram, ConnectionBanner, DeskFrame, HintBox, ResultStrip, StateB
 import { Badge } from "@/components/ui/kit";
 import { CategoryBar } from "./case-visuals";
 import { useHref } from "@/components/demo/demo-context";
+import { OsDesktop, ToolWindow, useOs } from "@/components/os/os-windows";
+import { FileText, FolderSearch } from "lucide-react";
 import { verdictRoles, type VerdictEvidence, type VerdictRole } from "@/types/verdict";
 
 const ROLE_LABEL: Record<VerdictRole, string> = { entry: "Entry", session: "Session abuse", impact: "Data impact", assistance: "Insider help", response: "Response" };
@@ -16,9 +18,9 @@ const TASKS = [
 ] as const;
 const ROLE_KEYS = verdictRoles as readonly string[];
 
-export function VerdictDesk({ evidence, initialState, initialDrafts, team }: { evidence: VerdictEvidence; initialState: ChapterState; initialDrafts: ServerDraft[]; team: { id: string; name: string } }) {
+function VerdictWorkspace({ evidence, initialState, initialDrafts, team }: { evidence: VerdictEvidence; initialState: ChapterState; initialDrafts: ServerDraft[]; team: { id: string; name: string } }) {
   const { state, busy, feedback, result, connection, send, submitTask, remaining, retrySeconds } = useChapter(4, initialState);
-  const editable = isEditable(state, 4), href = useHref();
+  const editable = isEditable(state, 4), href = useHref(), os = useOs();
   const drafts = useDrafts(4, initialDrafts, editable), f = fieldApi(drafts);
   const [active, setActive] = useState<(typeof TASKS)[number]["id"]>("verdict.entry");
   const [search, setSearch] = useState(""), [chapter, setChapter] = useState("");
@@ -54,8 +56,17 @@ export function VerdictDesk({ evidence, initialState, initialDrafts, team }: { e
   return <DeskFrame chapter={4} title="Final Verdict" caseId={evidence.caseId} state={state} remaining={remaining} drafts={drafts} result={result} connection={connection} objective="One causal chain, independent sources, one rejected alternative." banner={<><StateBanner state={state} chapter={4} /><ConnectionBanner text={connection} next="/play/verdict" /></>}>
     {closed && <CaseClosed teamId={team.id} teamName={team.name} progress={state.progress} />}
 
-    <details className="pg-hints"><summary>Case file <span className="pg-chip">read first</span></summary>{evidence.summary.map(text => <p key={text}>{text}</p>)}
-      <div className="pg-actions">{["inbox", "trail", "insider", "containment"].map((c, i) => state.unlocked[i] ? <a key={c} className="k-btn k-btn-sm" href={href(`/play/${c}`)}>Review {c}</a> : null)}</div></details>
+
+    <ToolWindow id="casefile" title="Case file" icon={FileText} side="right" size={{ w: 460, h: 460 }}>
+      <div>{evidence.summary.map(text => <p key={text}>{text}</p>)}
+      <div className="pg-actions">{["inbox", "trail", "insider", "containment"].map((c, i) => state.unlocked[i] ? <a key={c} className="k-btn k-btn-sm" href={href(`/play/${c}`)}>Review {c}</a> : null)}</div></div>
+    </ToolWindow>
+    <ToolWindow id="board" title="Evidence board" icon={FolderSearch} size={{ w: 900, h: 600 }}>
+    <div className="pg-fields"><label>Search records<input value={search} onChange={e => setSearch(e.target.value)} /></label><label>Chapter<select value={chapter} onChange={e => setChapter(e.target.value)}><option value="">All</option>{["Inbox", "Trail", "Insider", "Containment"].map(v => <option key={v}>{v}</option>)}</select></label></div>
+    <div className="pg-recgrid">{records.map(item => <article key={item.id} className={`pg-rec ${role(item.id) ? "is-linked" : ""}`}><span className="k-mono k-muted">{item.chapter} / {item.id}</span><h4>{item.title}</h4>
+      <details><summary>Inspect {item.id}</summary><p className="k-meta">Source: {item.source}</p><dl className="k-facts">{Object.entries(item.facts).map(([k, v]) => <div key={k}><dt>{k}</dt><dd className="k-mono">{v}</dd></div>)}</dl></details>
+      <label>Role<select aria-label={`Evidence role for ${item.id}`} disabled={!editable} value={role(item.id) ?? ""} onChange={e => assign(item.id, e.target.value as VerdictRole | "")}><option value="">Not linked</option>{verdictRoles.map(r => <option value={r} key={r}>{ROLE_LABEL[r]}</option>)}</select></label></article>)}</div>
+    </ToolWindow>
 
     {!closed && <ChainDiagram label="Case reconstruction so far" nodes={[
       { id: "lure", label: "Lure", value: f.str("verdict.entry", "emailId") }, { id: "cap", label: "Capture", value: f.str("verdict.entry", "captureId") }, { id: "ses", label: "Session", value: f.str("verdict.session", "sessionId") },
@@ -84,11 +95,8 @@ export function VerdictDesk({ evidence, initialState, initialDrafts, team }: { e
 
         {active === "verdict.evidence" && panel("verdict.evidence", filled("verdict.evidence"), "Give every role at least one record.", <>
           <div className="pg-rolemap" role="group" aria-label="Evidence map">{verdictRoles.map(r => <div key={r} className={mapped[r].length ? "is-set" : ""}><b>{ROLE_LABEL[r]}</b><span>{mapped[r].length ? mapped[r].map(id => <code key={id} className="k-mono">{id}</code>) : <em>none yet</em>}</span></div>)}</div>
-          <div className="pg-fields"><label>Search records<input value={search} onChange={e => setSearch(e.target.value)} /></label><label>Chapter<select value={chapter} onChange={e => setChapter(e.target.value)}><option value="">All</option>{["Inbox", "Trail", "Insider", "Containment"].map(v => <option key={v}>{v}</option>)}</select></label></div>
           <p role="status" className="pg-live">{records.length} records · {pinnedIds.length} linked</p>
-          <div className="pg-recgrid">{records.map(item => <article key={item.id} className={`pg-rec ${role(item.id) ? "is-linked" : ""}`}><span className="k-mono k-muted">{item.chapter} / {item.id}</span><h4>{item.title}</h4>
-            <details><summary>Inspect {item.id}</summary><p className="k-meta">Source: {item.source}</p><dl className="k-facts">{Object.entries(item.facts).map(([k, v]) => <div key={k}><dt>{k}</dt><dd className="k-mono">{v}</dd></div>)}</dl></details>
-            <label>Role<select aria-label={`Evidence role for ${item.id}`} disabled={!editable} value={role(item.id) ?? ""} onChange={e => assign(item.id, e.target.value as VerdictRole | "")}><option value="">Not linked</option>{verdictRoles.map(r => <option value={r} key={r}>{ROLE_LABEL[r]}</option>)}</select></label></article>)}</div></>, 4)}
+          <button type="button" className="k-btn k-btn-primary" onClick={() => os.open("board")}>Open evidence board</button></>, 4)}
 
         {active === "verdict.reasoning" && panel("verdict.reasoning", filled("verdict.reasoning"), "Pick a best hypothesis, one to reject, the contradiction and two counter-records.", <>
           <div className="pg-hyps">{evidence.hypotheses.map(h => { const best = f.str("verdict.reasoning", "hypothesisId") === h.id, rej = f.str("verdict.reasoning", "rejectedHypothesis") === h.id;
@@ -124,3 +132,5 @@ export function VerdictDesk({ evidence, initialState, initialDrafts, team }: { e
     </div>
   </DeskFrame>;
 }
+
+export function VerdictDesk(props: Parameters<typeof VerdictWorkspace>[0]) { return <OsDesktop scope="verdict"><VerdictWorkspace {...props} /></OsDesktop>; }

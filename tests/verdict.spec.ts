@@ -3,7 +3,7 @@ import { confirmDialog } from "./fixtures/admin-confirm";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { insiderLogin as login } from "./fixtures/insider-browser";
 import { verdictAnswers } from "./fixtures/verdict";
-import { solveVerdict, submitTask, logout } from "./fixtures/ui";
+import { solveVerdict, submitTask, logout, openTool, closeAllTools } from "./fixtures/ui";
 
 test.skip(!process.env.GHOST_E2E_VERDICT, "Run npm run test:e2e:verdict for the complete isolated Round 1 workflow");
 test.describe.configure({ mode: "serial" });
@@ -34,8 +34,8 @@ for (const variant of ["A", "B", "C"] as const) test(`Final Verdict ${variant}: 
   expect((await post({ action: "submit", chapter: 4, answer }, "https://other.example")).status()).toBe(403); expect((await post({ action: "submit", chapter: 4, answer, teamId: "VERDICT-B" })).status()).toBe(400);
   const step = (name: string) => page.getByRole("navigation", { name: /Causal chain/ }).getByRole("button", { name: new RegExp(name) }).click();
   // Evidence browser: filters work and records show their source chapter.
-  await step("Evidence map"); await page.getByRole("combobox", { name: "Chapter", exact: true }).selectOption("Trail"); await expect(page.locator(".pg-rec")).toHaveCount(4); await page.getByRole("combobox", { name: "Chapter", exact: true }).selectOption("");
-  await page.getByLabel("Search records", { exact: true }).fill(answer.chain.policyId); await expect(page.locator(".pg-rec")).toHaveCount(1); await page.getByLabel("Search records", { exact: true }).fill("");
+  await step("Evidence map"); await openTool(page, "board"); await page.getByRole("combobox", { name: "Chapter", exact: true }).selectOption("Trail"); await expect(page.locator(".pg-rec")).toHaveCount(4); await page.getByRole("combobox", { name: "Chapter", exact: true }).selectOption("");
+  await page.getByLabel("Search records", { exact: true }).fill(answer.chain.policyId); await expect(page.locator(".pg-rec")).toHaveCount(1); await page.getByLabel("Search records", { exact: true }).fill(""); await closeAllTools(page);
   // One wrong task earns nothing and never completes the chapter; the rest of the chain is untouched.
   if (variant === "A") { await step("Entry"); await page.getByLabel("Initial compromise email").selectOption(answer.chain.emailId); await page.getByLabel("Captured redirect").selectOption(answer.chain.captureId); await submitTask(page, "Entry chain");
     await step("Session"); await page.getByLabel("Victim account").selectOption(answer.chain.victimAccount); await page.getByLabel("Replayed session").selectOption("nx-a-managed"); await page.getByRole("combobox", { name: "Unauthorized export", exact: true }).selectOption(answer.chain.exportId); await submitTask(page, "Session and impact chain", /[+]2 points/); /* wrong session: only the victim and export earn */
@@ -43,7 +43,7 @@ for (const variant of ["A", "B", "C"] as const) test(`Final Verdict ${variant}: 
     const throttle = await post({ action: "submit", chapter: 4, task: "verdict.session", answer: { sessionId: "nx-a-managed" } }); expect([400, 429]).toContain(throttle.status()); }
   if (variant !== "A") { await page.locator("summary", { hasText: "Hints" }).click(); await page.getByRole("button", { name: /Reveal hint 1/ }).click(); await expect(page.locator(".pg-hints ol li")).toHaveCount(1); }
   if (variant === "C") { await page.getByRole("button", { name: /Reveal hint 2/ }).click(); await expect(page.locator(".pg-hints ol li")).toHaveCount(2); await expect(page.getByRole("button", { name: "No hints left" })).toBeDisabled(); }
-  if (variant === "B") { await step("Evidence map"); await page.getByLabel("Evidence role for CHG-B-219", { exact: true }).selectOption("assistance"); }
+  if (variant === "B") { await step("Evidence map"); await openTool(page, "board"); await page.getByLabel("Evidence role for CHG-B-219", { exact: true }).selectOption("assistance"); await closeAllTools(page); }
   if (variant === "A") { await page.route("**/api/game", route => route.request().method() === "GET" ? route.abort() : route.continue()); await expect(page.getByRole("alert").filter({ hasText: /interrupted|Offline|Reconnecting|connection/i }).first()).toBeVisible({ timeout: 15000 }); await page.unroute("**/api/game"); }
   await solveVerdict(page, variant);
   if (variant === "B") { /* maintenance rejection variant: drafts keep working while the chain is complete */ }
