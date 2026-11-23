@@ -52,4 +52,4 @@ export function PaperShell({ initial, teamName, demo }: { initial: PaperStatus; 
   </div>;
 }
 function TopBar({ team, right }: { team: string; right?: React.ReactNode }) { return <header className="rp-top"><div><small>GHOST RETURNS</small><b>OPERATION GHOST_404</b></div><div className="rp-team"><small>TEAM</small><b>{team}</b></div>{right}</header>; }
-function ChapterHead({ n, title }: { n: number; title: string }) { return <div className="rp-head"><span className="rp-chnum">CHAPTER {n} OF 4</span><h1>{title}</h1><p>{GOAL[n]}</p></div>; }
+function ChapterHead({ n, title }: { n: number; title: string }) { return <div className="rp-head"><span className="rp-chnum">CHAPTER {n} OF 4</span><h1>{title}</h1><p>{GOAL[n]}</p><p className="rp-paper"><span aria-hidden="true">✎</span> Write every answer on your paper answer sheet. Nothing is typed or sent from this screen.</p></div>; }

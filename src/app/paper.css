@@ -85,3 +85,4 @@
 .rp-conns { min-width: 780px; } .rp-evid .rp-table { min-width: 460px; }
 @media (max-width: 560px) { .rp-top b { font-size: 15px; } .rp-clocks { gap: 16px; } .rp-clocks b { font-size: 22px; } .rp-table td, .rp-table th { padding: 7px 8px; } }
 .rp-conns td, .rp-conns th { white-space: nowrap; } .rp-conns td:nth-child(7) { white-space: normal; min-width: 150px; }
+.rp-paper { margin: 8px 0 0; padding: 6px 10px; display: inline-block; border: 1px dashed rgba(232,182,103,.5); border-radius: 8px; color: var(--amber); font-size: 13px; }
