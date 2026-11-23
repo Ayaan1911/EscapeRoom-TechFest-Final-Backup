@@ -23,6 +23,8 @@ $o = Get-LabOrigin
 # No pinned APP_ORIGIN: the CSRF check then compares the browser Origin with the request Host (any consistent address works: LAN IP, localhost, hostname).
 # GHOST_LAN_HTTP=1 relaxes the Secure cookie flag ONLY for this plain-http closed-LAN mode (browsers drop Secure cookies on http://<ip>).
 $env:APP_ORIGIN = ""; $env:GHOST_LAN_HTTP = "1"; $env:NODE_ENV = "production"; $env:NEXT_TELEMETRY_DISABLED = "1"
+# Password checks (scrypt) run on libuv's thread pool, default 4 threads. A 150-login burst took 1.5 s with 4 and 0.75 s with 16 (measured, 16-core laptop); use one thread per core up to 16.
+$env:UV_THREADPOOL_SIZE = [string][Math]::Min([Environment]::ProcessorCount, 16)
 if (-not $env:DB_POOL_SIZE) { $env:DB_POOL_SIZE = "10" }
 Write-Host ""
 Write-Host "  Participants open   :  $($o.Origin)" -ForegroundColor Green

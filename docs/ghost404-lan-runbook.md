@@ -28,6 +28,7 @@ export ADMIN_ACCESS_HASH="$(GHOST_LAB_SECRET='<organizer code>' node scripts/lab
 npm ci && npx prisma generate && npm run build
 npx prisma migrate deploy                          # additive only; never `migrate reset`
 export NODE_ENV=production GHOST_LAN_HTTP=1 NEXT_TELEMETRY_DISABLED=1   # APP_ORIGIN left unset on purpose (see below)
+export UV_THREADPOOL_SIZE=$(( $(nproc) < 16 ? $(nproc) : 16 ))            # parallel password hashing during the login burst (default is 4)
 npx next start -H 0.0.0.0 -p 3000
 ```
 Run it under `systemd` or `tmux` so it survives the SSH session. Open the port in `ufw` (`sudo ufw allow from <lab subnet> to any port 3000`) only for the lab subnet. Team provisioning on Ubuntu: `node scripts/provision-teams.mjs` (reads `DATABASE_URL`; see `scripts/provision-lib.mjs`). The PowerShell wrappers do not run on Ubuntu; the commands above are what they wrap.
