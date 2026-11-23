@@ -69,3 +69,16 @@ body:has(.os-dock) { padding-bottom: 78px; }
 .gd-path li.is-locked b { color: var(--muted); }
 @media (max-width: 640px) { .gd-path b { display: none; } }
 @media (prefers-reduced-motion: reduce) { .gd-path li.is-here .gd-path-node { animation: none; } }
+
+/* Landing: atmospheric network backdrop (decorative, aria-hidden) and progressive disclosure */
+.lp-hero { position: relative; isolation: isolate; }
+.lp-net { position: absolute; inset: -4% 2% auto auto; width: min(720px, 66%); height: auto; z-index: -1; opacity: .5; pointer-events: none; }
+.lp-net line { stroke: rgba(94, 201, 216, .35); stroke-width: .25; stroke-dasharray: 1.2 1; animation: os-dash 18s linear infinite; }
+.lp-net circle { fill: #12324a; stroke: var(--evidence); stroke-width: .35; } .lp-net g { animation: os-pulse 4.5s ease-in-out infinite; }
+.lp-net text { fill: var(--muted); font: 2px var(--font-mono); letter-spacing: .08em; }
+.lp-net .is-ghost circle { fill: rgba(234, 106, 116, .25); stroke: var(--alert); } .lp-net .is-ghost text { fill: #f2a0a7; }
+@keyframes os-dash { to { stroke-dashoffset: -60; } } @keyframes os-pulse { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+.lp-more { margin-top: 8px; } .lp-more summary { cursor: pointer; color: var(--evidence); font-size: 14px; } .lp-more p { margin: 6px 0 0; color: var(--muted); }
+.lp-ruleline { margin: 0 0 6px; font: 13px var(--font-mono); letter-spacing: .04em; color: var(--muted); }
+@media (max-width: 900px) { .lp-net { opacity: .25; width: 100%; } }
+@media (prefers-reduced-motion: reduce) { .lp-net line, .lp-net g { animation: none; } }

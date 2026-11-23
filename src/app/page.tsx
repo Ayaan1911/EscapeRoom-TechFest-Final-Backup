@@ -8,6 +8,9 @@ const CHAPTERS = [
   { n: "04", name: "Containment", points: 20, what: "Reconstruct seven incident events in order, choose scoped urgent actions and build a recovery plan. Everything is a simulated decision.", tags: ["Timeline", "Response plan"] },
   { n: "05", name: "Final Verdict", points: 15, what: "Link at least twelve records across the whole case, weigh competing explanations and close it with evidence, not guesses.", tags: ["Case building", "Counter-evidence"] },
 ] as const;
+// Decorative backdrop only: a few of the systems named in the case, and the alias. It carries no evidence and no answers.
+const NET: Record<string, [number, number]> = { MAIL: [10, 14], VPN: [18, 54], IDP: [38, 32], DB: [62, 14], ADMIN: [58, 58], GHOST_404: [80, 38] };
+const NET_EDGES = [["MAIL", "IDP"], ["VPN", "IDP"], ["IDP", "DB"], ["IDP", "ADMIN"], ["DB", "GHOST_404"], ["ADMIN", "GHOST_404"]] as const;
 const RULES = [
   ["Teams of three", "One shared 60-minute clock, started by the organizer for every team at once."],
   ["Maximum 105 points", "Chapters are worth 15, 25, 25, 20 and 15. A one-time Tamper Alert bonus adds up to 5."],
@@ -23,11 +26,15 @@ export default function Home() {
     <OsHeader area="Operation briefing" secure={false}><span className="header-meta"><span className="live-dot" /> TECHFEST / ROUND 1</span></OsHeader>
     <main>
       <section className="lp-hero" aria-labelledby="hero-heading">
+        <svg className="lp-net" viewBox="0 0 100 70" aria-hidden="true" focusable="false">
+          {NET_EDGES.map(([a, b]) => <line key={a + b} x1={NET[a][0]} y1={NET[a][1]} x2={NET[b][0]} y2={NET[b][1]} />)}
+          {Object.entries(NET).map(([k, [x, y]], i) => <g key={k} className={k === "GHOST_404" ? "is-ghost" : ""} style={{ animationDelay: `${i * 0.45}s` }}><circle cx={x} cy={y} r={k === "GHOST_404" ? 2.4 : 1.7} /><text x={x} y={y - 3.2} textAnchor="middle">{k}</text></g>)}
+        </svg>
         <div className="lp-hero-copy">
           <span className="k-eyebrow">CLASSIFIED SIMULATION / CASE 404</span>
           <h1 id="hero-heading">A breach has a story.<br /><em>Find the truth.</em></h1>
           <p className="lp-lede">The attacker is inside. The evidence is lying. Your AI might be too.</p>
-          <p className="lp-body">NEXUS Corp has been breached. A figure calling themselves GHOST_404 claims responsibility, but the trail does not add up. Assemble your three-person response team and work one case across five linked investigations.</p>
+          <p className="lp-body">NEXUS Corp has been breached. GHOST_404 claims it, but the trail does not add up. Three people, five linked investigations, one case.</p>
           <div className="k-actions"><Link className="k-btn k-btn-primary k-btn-lg" href="/play">Enter investigation <span aria-hidden="true">↗</span></Link><a className="k-btn k-btn-lg" href="#chapters">See the five chapters</a></div>
           <p className="lp-note">Fictional incident simulation. No real systems, accounts or people are involved.</p>
         </div>
@@ -41,12 +48,13 @@ export default function Home() {
 
       <section className="lp-section" id="chapters" aria-labelledby="chapters-heading">
         <div className="lp-intro"><span className="k-eyebrow">THE INVESTIGATION</span><h2 id="chapters-heading">Five chapters. One case.</h2><p>Each chapter unlocks the next. Earlier evidence stays available, and every submission is checked on the server.</p></div>
-        <ol className="lp-chapters">{CHAPTERS.map(c => <li key={c.n} className="lp-chapter"><span className="lp-n k-mono">{c.n}</span><div><div className="lp-chapter-head"><h3>{c.name}</h3><span className="k-badge k-badge-amber">{c.points} points</span></div><p>{c.what}</p><div className="k-badges">{c.tags.map(t => <span className="k-badge" key={t}>{t}</span>)}</div></div></li>)}</ol>
+        <ol className="lp-chapters">{CHAPTERS.map(c => <li key={c.n} className="lp-chapter"><span className="lp-n k-mono">{c.n}</span><div><div className="lp-chapter-head"><h3>{c.name}</h3><span className="k-badge k-badge-amber">{c.points} points</span></div><details className="lp-more"><summary>What you will do</summary><p>{c.what}</p></details><div className="k-badges">{c.tags.map(t => <span className="k-badge" key={t}>{t}</span>)}</div></div></li>)}</ol>
       </section>
 
       <section className="lp-section" id="rules" aria-labelledby="rules-heading">
         <div className="lp-intro"><span className="k-eyebrow">ROUND 1 RULES</span><h2 id="rules-heading">What you need to know</h2></div>
-        <dl className="lp-rules">{RULES.map(([t, d]) => <div key={t}><dt>{t}</dt><dd>{d}</dd></div>)}</dl>
+        <p className="lp-ruleline">60 minutes · 105 points · hints cost points · AI is allowed, but all evidence is untrusted.</p>
+        <details className="lp-more"><summary>All Round 1 rules</summary><dl className="lp-rules">{RULES.map(([t, d]) => <div key={t}><dt>{t}</dt><dd>{d}</dd></div>)}</dl></details>
       </section>
 
       <section className="lp-section lp-cta" aria-labelledby="cta-heading">
