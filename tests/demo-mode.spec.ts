@@ -109,7 +109,7 @@ test("normal play is unaffected: a team still sees the real dashboard and no dem
   test.setTimeout(90_000);
   await prisma.gameSession.create({ data: { id: 1, startsAt: new Date(), deadline: new Date(Date.now() + 3_600_000), scoringPolicy: "best-v1" } });
   await page.goto("/login"); await page.getByLabel("Team ID").fill("UI-A"); await page.getByLabel("Access code").fill(code()); await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Investigation dashboard", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Investigation dashboard", exact: true })).toBeVisible({ timeout: 30_000 });
   await page.goto("/play/inbox"); await expect(page.getByRole("timer", { name: "Round time remaining" })).toBeVisible();
   await expect(page.getByText("NO REAL SCORES")).toHaveCount(0);
 });

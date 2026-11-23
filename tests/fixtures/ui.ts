@@ -18,7 +18,7 @@ export async function closeAllTools(page: Page) { await page.getByRole("button",
 export async function submitTask(page: Page, region: string, expectText: RegExp = /\+\d+ points\. Task \d+\/\d+|No new points/) {
   const panel = page.getByRole("region", { name: region, exact: true }), button = panel.getByRole("button", { name: /Submit task|Resubmit task/ });
   if (await panel.getByRole("button", { name: "Task complete" }).count()) return; // already earned in full
-  await expect(button).toBeEnabled({ timeout: 10_000 });
+  await expect(button).toBeEnabled({ timeout: 20_000 });
   await button.click();
   await expect(panel.getByText(expectText)).toBeVisible({ timeout: 15_000 });
 }

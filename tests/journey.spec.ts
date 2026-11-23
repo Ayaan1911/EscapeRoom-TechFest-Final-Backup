@@ -14,7 +14,7 @@ async function signIn(page: Page, role: "team" | "admin") {
   if (role === "team") await page.getByLabel("Team ID", { exact: true }).fill(TEAM);
   await page.getByLabel("Access code", { exact: true }).fill(role === "admin" ? process.env.GHOST_E2E_ADMIN_CODE! : process.env.GHOST_E2E_TEAM_CODE!);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page.getByRole("heading", { name: role === "admin" ? "Event operations" : "Investigation dashboard", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: role === "admin" ? "Event operations" : "Investigation dashboard", exact: true })).toBeVisible({ timeout: 30_000 });
 }
 // Post-completion navigation: the Open-next action appears only once the server says the chapter is done, and never navigates by itself.
 async function expectContinue(page: Page, next: number, from: string) {

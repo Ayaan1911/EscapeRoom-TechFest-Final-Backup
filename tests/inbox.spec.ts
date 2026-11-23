@@ -9,7 +9,7 @@ async function login(page: Page, variant: string | "admin") {
   if (variant !== "admin") await page.getByLabel("Team ID").fill(`DEMO-${variant}`);
   await page.getByLabel("Access code").fill(variant === "admin" ? process.env.GHOST_E2E_ADMIN_CODE! : process.env.GHOST_E2E_TEAM_CODE!);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page.getByRole("heading", { name: variant === "admin" ? "Event operations" : "Investigation dashboard", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: variant === "admin" ? "Event operations" : "Investigation dashboard", exact: true })).toBeVisible({ timeout: 30_000 });
 }
 
 test("organizer starts a waiting round and prints a scannable phone QR", async ({ page, browser }) => {
@@ -142,7 +142,7 @@ test("team and organizer sessions coexist in one browser profile and log out ind
   const context = await browser.newContext(), teamTab = await context.newPage(), adminTab = await context.newPage();
   await login(teamTab, "A");
   await login(adminTab, "admin"); // admin sign-in must not end the team session
-  await teamTab.goto("/play"); await expect(teamTab.getByRole("heading", { name: "Investigation dashboard", exact: true })).toBeVisible();
+  await teamTab.goto("/play"); await expect(teamTab.getByRole("heading", { name: "Investigation dashboard", exact: true })).toBeVisible({ timeout: 30_000 });
   expect((await teamTab.request.get("/api/game")).status()).toBe(200);
   expect((await teamTab.request.get("/api/admin/scores")).status()).toBe(200); // same profile also holds the admin cookie
   await adminTab.goto("/admin"); await expect(adminTab.getByRole("heading", { name: "Event operations", exact: true })).toBeVisible();

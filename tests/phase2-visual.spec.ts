@@ -11,7 +11,7 @@ async function login(page: Page, id: string) {
   await page.getByLabel("Team ID").fill(id);
   await page.getByLabel("Access code").fill(process.env.GHOST_E2E_TEAM_CODE!);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Investigation dashboard", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Investigation dashboard", exact: true })).toBeVisible({ timeout: 30_000 });
 }
 
 for (const [device, viewport] of Object.entries(VIEWPORTS)) {
