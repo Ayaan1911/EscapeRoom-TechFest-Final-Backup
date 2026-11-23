@@ -1,11 +1,11 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useChapter, type ChapterState } from "./use-chapter";
 import { useDrafts, type ServerDraft } from "./use-drafts";
 import { ContainmentCctv } from "./containment-cctv";
-import { ConnectionBanner, DeskFrame, HintBox, ResultStrip, StateBanner, TaskNav, TaskPanel, fieldApi, isEditable, taskOf } from "./workspace";
+import { ConnectionBanner, DeskFrame, HintBox, ResultStrip, StateBanner, TaskPanel, fieldApi, isEditable, taskOf } from "./workspace";
 import { Badge } from "@/components/ui/kit";
-import { StageRail, type Stage } from "./case-visuals";
+import { PhaseTabs, type Phase } from "./phase-tabs";
 import { ResponseMap } from "./response-map";
 import { useDemo } from "@/components/demo/demo-context";
 import type { ContainmentCctv as Snapshot, ContainmentEvidence } from "@/types/containment";
@@ -17,6 +17,8 @@ export function ContainmentDesk({ evidence, initialCctv, initialState, initialDr
   const { state, busy, feedback, result, connection, send, submitTask, remaining, retrySeconds } = useChapter(3, initialState);
   const editable = isEditable(state, 3), demo = useDemo();
   const drafts = useDrafts(3, initialDrafts, editable), f = fieldApi(drafts);
+  const [phase, setPhase] = useState(1);
+  useEffect(() => { const on = (e: Event) => setPhase(Number((e as CustomEvent<number>).detail) || 1); window.addEventListener("task-open", on); return () => window.removeEventListener("task-open", on); }, []);
   const [more, setMore] = useState<string[]>([]), [movement, setMovement] = useState(""), [dragging, setDragging] = useState<string | null>(null), [cctv, setCctv] = useState(initialCctv), [copyStatus, setCopyStatus] = useState("");
   const knownEvents = new Set(evidence.events.map(e => e.id));
   const saved = f.arr(DRAFT.timeline, "eventOrder").filter(id => knownEvents.has(id));
@@ -62,13 +64,11 @@ export function ContainmentDesk({ evidence, initialCctv, initialState, initialDr
     </section>
     <ResponseMap account={evidence.account} sessionId={evidence.sessionId} checkpoint={evidence.checkpoint}
       immediate={immediate.map(id => optionById(evidence.immediateOptions, id)).filter((o): o is Option => !!o)} recovery={recovery.map(id => optionById(evidence.recoveryOptions, id)).filter((o): o is Option => !!o)} />
-    <StageRail label="Incident response workflow" stages={(["Reconstruct", "Identify", "Contain", "Recover and verify", "Preserve"] as const).map((label, i): Stage => { const row = taskOf(state, 3, Object.values(DRAFT)[i]), filled = [true, !!(f.str(DRAFT.identity, "account") && f.str(DRAFT.identity, "sessionId")), immediate.length > 0, recovery.length > 0, support.length >= 5][i];
-      return { id: row.id, label, sub: `${row.earned}/${row.max}`, state: row.earned >= row.max ? "done" : row.earned > 0 ? "partial" : filled && i > 0 ? "filled" : "open", href: `#task-${i + 1}` }; })} />
+    <PhaseTabs label="Response phases" active={phase} onPick={setPhase} phases={(["Reconstruct", "Identify", "Contain", "Recover and verify", "Preserve"] as const).map((label, i): Phase => { const row = taskOf(state, 3, Object.values(DRAFT)[i]), filled = [true, !!(f.str(DRAFT.identity, "account") && f.str(DRAFT.identity, "sessionId")), immediate.length > 0, recovery.length > 0, support.length >= 5][i];
+      return { id: row.id, label, sub: `${row.earned}/${row.max}`, state: row.earned >= row.max ? "done" : row.earned > 0 ? "partial" : filled && i > 0 ? "filled" : "open"}; })} />
     {cctv && <ContainmentCctv snapshot={cctv} />}
 
-    <section className="pg-tasks" aria-label="Scored tasks">
-      <h2 className="pg-h">Tasks <small>Scored one by one</small></h2>
-      <TaskNav tasks={state.tasks[3]} />
+    <section className="pg-tasks cn-ops" aria-label="Scored tasks" data-phase={phase}>
 
       <TaskPanel phoneCollapsed step={1} task={taskOf(state, 3, DRAFT.timeline)} editable={editable} busy={busy} retrySeconds={retrySeconds} result={result} ready onSubmit={() => void submit(DRAFT.timeline)}>
         <p className="pg-hint-line">Earliest first. Use cited timestamps and causal links, not card order. Drag, or use ↑ ↓.</p>

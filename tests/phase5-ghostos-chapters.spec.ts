@@ -42,6 +42,7 @@ test("Containment: the systems map mirrors the team's own plan literally and nev
   await expect(map).toContainText("Nothing in your plan touches this system.");
   await expect(map).not.toContainText(/correct|wrong|right answer|well done|mistake|good choice|bad choice/i);
   // pick one urgent action; the identity provider node now lists it, in the option's own words
+  await page.locator('.cn-phases button[data-phase="3"]').click();
   const pick = (text: string) => page.locator(".k-choice").filter({ hasText: text }).getByRole("checkbox", { name: /Select immediate/ }).check();
   await pick("Revoke the affected replay session");
   await map.getByRole("button", { name: /Identity provider/ }).click();

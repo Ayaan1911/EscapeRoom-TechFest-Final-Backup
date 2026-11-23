@@ -113,7 +113,7 @@ export function DeskFrame({ chapter, title, objective, caseId, state, remaining,
   const nav = useSafeNavigate(drafts), confirmed = result?.unlocked ?? [], demo = useDemo();
   const mine = state.progress.chapters[chapter], urgent = state.status === "active" && remaining <= 300;
   const raw = mine.score, max = CHAPTER_META[chapter].max, left = max - raw;
-  return <div className="pg" data-chapter={chapter + 1}>
+  return <div className="pg cn-scene cn-chapter" data-chapter={chapter + 1}>
     <InvestigationMap state={state} chapter={chapter} go={nav.go} />
     <div className="pg-main">
       <header className="pg-head">

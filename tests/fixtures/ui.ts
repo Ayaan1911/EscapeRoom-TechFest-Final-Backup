@@ -79,14 +79,20 @@ export async function arrange(page: Page, kind: "event" | "recovery", target: re
   }
   expect(await page.locator(`[${attribute}]`).evaluateAll((cards, attr) => cards.map(card => card.getAttribute(attr)), attribute)).toEqual([...target]);
 }
+/** Containment shows one response phase at a time; tests open the phase whose panel they need. */
+export async function phase(page: Page, n: number) { await page.locator(`.cn-phases button[data-phase="${n}"]`).click(); await expect(page.locator(`#task-${n}`)).toBeVisible(); }
 export async function solveContainment(page: Page, variant: V, recoveryOrder?: readonly string[]) {
   const a = containmentAnswers[variant];
-  await arrange(page, "event", a.eventOrder); await submitTask(page, "Incident timeline");
+  await phase(page, 1); await arrange(page, "event", a.eventOrder); await submitTask(page, "Incident timeline");
+  await phase(page, 2);
   await page.getByLabel("Affected account", { exact: true }).fill(a.account); await page.getByLabel("Affected session", { exact: true }).fill(a.sessionId); await submitTask(page, "Affected account and session");
+  await phase(page, 3);
   for (const id of a.immediateActions) await page.getByLabel(`Select immediate ${id}`, { exact: true }).setChecked(true);
   await submitTask(page, "Parallel urgent response");
+  await phase(page, 4);
   for (const id of a.recoveryOrder) await page.getByLabel(`Select recovery ${id}`, { exact: true }).setChecked(true);
   await arrange(page, "recovery", recoveryOrder ?? a.recoveryOrder); await submitTask(page, "Ordered recovery");
+  await phase(page, 5);
   for (const id of a.supportingEvidenceIds) await page.getByLabel(`Pin evidence ${id}`, { exact: true }).setChecked(true);
   await submitTask(page, "Supporting evidence");
 }

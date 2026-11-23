@@ -79,6 +79,7 @@ test("organizer enters demo from the dashboard; the whole walkthrough makes no A
 
   // Chapter 4
   await page.goto("/admin/demo/round1/containment"); await expect(page.getByRole("heading", { name: "Containment" })).toBeVisible();
+  await page.locator('.cn-phases button[data-phase="3"]').click();
   await page.getByRole("checkbox", { name: /Select immediate/ }).first().check();
   const urgent = page.getByRole("region", { name: "Parallel urgent response", exact: true });
   await urgent.getByRole("button", { name: "Submit task" }).click(); await expect(urgent.getByText(demoNote)).toBeVisible();
