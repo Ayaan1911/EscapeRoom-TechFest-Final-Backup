@@ -68,17 +68,21 @@ The branch head is whatever `git log -1` shows; the last full regression (`docs/
 3. Remaining work in priority order: (a) organizer pages beyond the pipeline strip, (b) projector visual polish, (c) Containment density, (d) Round 1 completion cinematic, (e) human accessibility pass.
 
 ## Visual rebuild (priority zero directive) - running ledger
-Evidence: screenshots under `D:\Ghost404-TestWorkspace\shots\` (`base-1440` = before, `c1`/`c1full` = after). Tooling: `scripts/ui-dev.mjs` (persistent disposable-DB session) + `scripts/shoot.mjs`. The stylesheet is `src/app/cine.css`.
+Evidence: screenshots under `D:\Ghost404-TestWorkspace\shots\` (`base-1440` = before; `c1`, `c1full`, `c2` = 1440x900 after; `f-1366` = 1366x768; `f-390` = phone; projector at 1920x1080 in `c2`). Tooling: `scripts/ui-dev.mjs` (persistent disposable-DB session) + `scripts/shoot.mjs`. Stylesheet: `src/app/cine.css`.
 
 | Screen | State | Notes |
 |---|---|---|
-| Landing | **Rebuilt** (inspected) | Full-bleed scene: perspective grid floor, radar orbit of the five chapters around the alias, boot log, live ticker, one large primary action. Old hero + case-file card removed. |
-| Login | **Rebuilt** (inspected) | Secure-access terminal: radar backdrop, status readout, scanning edge, mono field labels. Auth logic untouched. |
-| Team dashboard | **Rebuilt** (inspected) | Mission-control: HUD clock + score, five chapter cartridges on a glowing route with per-chapter accent. |
-| Demo Mode home | **Rebuilt** (inspected) | Simulation launcher: round consoles with launch tiles. Obsolete "Part A / Part B digital tribunal" text removed. |
-| Chapter chrome (all 5 R1) | **Restyled** (Inbox + Containment inspected) | Mission rail (icon rail, expands on hover/focus), HUD header with chapter accent, illuminated panels. Content layouts of Inbox/Trail/Insider/Verdict panels are the previous ones inside the new chrome. |
-| Containment | **Reworked** | Operations deck: one response phase at a time (was five stacked panels). Systems map kept. Still the densest screen; CCTV snapshot block still inline. |
-| Final Verdict | not yet rebuilt | still the causal-chain form panels (new chrome only). |
-| Round 2 (4 chapters) | not yet restyled | |
-| Organizer, projector | not yet redesigned | |
-| Completion screens, motion pass | not yet | |
+| Landing | **Rebuilt, inspected** (1440, 1366, phone) | Full-bleed scene: perspective grid, radar orbit of the five chapters around the alias, boot log, live ticker, one large primary action. |
+| Login | **Rebuilt, inspected** (1440) | Secure-access terminal: radar backdrop, status readout, scanning edge, mono labels. Auth logic untouched. |
+| Team dashboard | **Rebuilt, inspected** (1440) | HUD clock + score; five chapter cartridges on a glowing route with per-chapter accent. |
+| Demo Mode home | **Rebuilt, inspected** (1440) | Simulation launcher with launch tiles. Obsolete "Part A / Part B digital tribunal" text removed. |
+| Chapter chrome (R1 x5) | **Restyled**, Inbox + Containment + Verdict inspected | Icon mission rail (expands on hover/focus), HUD header with chapter accent, illuminated panels. Inbox, Trail and Insider body layouts are the previous ones inside the new chrome (Trail/Insider were not re-inspected after the restyle). |
+| Containment | **Reworked** | Operations deck: one response phase at a time instead of five stacked panels (page ~3,900 px tall, was ~6,000). Evidence snapshot block still inline; still the longest screen. |
+| Final Verdict | **Partly rebuilt** | New case-reconstruction board (repeats the team's own picks, never grades). Task panels are still form-style selects. |
+| Round 2 (4 chapters) | **Restyled shell, inspected** (ch 4, 2) | Scene, HUD top bar, accent rail, glass panels. Chapter body layouts unchanged. Chapters 1 and 3 not re-inspected. |
+| Organizer | **Restyled, inspected** | Command-center header, glass modules, launcher tiles. No new controls. |
+| Projector | **Rebuilt, inspected** (1920x1080, stand-by state only) | Radar scene, chapter bar, chapter rail with names. Running / urgent / complete states not screenshotted. |
+| Completion screens, motion pass | **Not done** | Round 1 completion and Round 2 pens-down screens are unchanged; no new transitions beyond the landing/orbit/projector animations. |
+| Sound | not built | |
+
+Verification after these changes: tsc + eslint clean; phase5 suites 34 passed (incl. the 18-route x 6-viewport layout check); Round 1 chain 38 passed. Not re-run after the visual changes: Vitest, phase2/redesign harnesses, load tests.
