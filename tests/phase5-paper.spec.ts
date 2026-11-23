@@ -48,7 +48,8 @@ test("organizer starts the investigation from the control room; a waiting team f
 test("every chapter is read-only: no form, no input, no submit; tabs and inspection work", async ({ page }) => {
   test.setTimeout(120_000);
   await startedAgo(min(1)); await team(page); await page.goto("/round2"); await onlyChapter(page, 1);
-  const noInputs = async () => { await expect(page.locator("main form, main textarea, main input, main select")).toHaveCount(0); await expect(page.getByRole("button", { name: /submit|send|block|save/i })).toHaveCount(0); };
+  // No way to type or send an answer: no form/textarea/select anywhere. The only inputs allowed are the Audit desk's record search and its local "checked" ticks (investigation aids that store and send nothing).
+  const noInputs = async () => { await expect(page.locator("main form, main textarea, main select")).toHaveCount(0); expect(await page.locator("main input").count()).toBe(await page.locator("main .rp-search input[type=search], main .rp-check input[type=checkbox]").count()); await expect(page.getByRole("button", { name: /submit|send|block|save/i })).toHaveCount(0); };
   await noInputs();
   await page.getByRole("tab", { name: "Login history" }).click(); await expect(page.getByText("No events")).toBeVisible();
   await expect(page.getByText("Can I just restart it?")).toBeVisible(); await expect(page.getByText("Isolate the laptop from the network")).toBeVisible();
@@ -57,7 +58,7 @@ test("every chapter is read-only: no form, no input, no submit; tabs and inspect
   await page.getByRole("button", { name: /Inspect connection 2/ }).click(); await expect(page.getByRole("region", { name: "Connection 2" })).toBeVisible();
   await page.getByRole("button", { name: "Data sent" }).click(); await expect(page.locator(".rp-conns tbody tr").first()).toContainText("198.51.100.12"); // sorted by data sent: the 4.2 GB backup first
   await startedAgo(min(21)); await page.reload(); await onlyChapter(page, 3); await noInputs();
-  await expect(page.locator(".rp-report li")).toHaveCount(5); await expect(page.locator(".rp-timeline li")).toHaveCount(10); await expect(page.getByText("AI SUMMARY TOOL")).toBeVisible();
+  await expect(page.locator(".rp-report li")).toHaveCount(5); await expect(page.locator(".rp-tl li")).toHaveCount(10); await expect(page.getByText("AI SUMMARY TOOL")).toBeVisible();
   await startedAgo(min(31)); await page.reload(); await onlyChapter(page, 4); await noInputs();
   await expect(page.locator(".rp-call")).toHaveCount(3); await expect(page.locator(".rp-statement li")).toHaveCount(6);
 });

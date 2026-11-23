@@ -66,3 +66,34 @@ test("Verdict: records live in the evidence board window; the case file is a win
   await page.getByRole("button", { name: "Reset window layout" }).click();
   await dock(page, "casefile").click(); await expect(win(page, "casefile")).toBeVisible(); await expect(win(page, "casefile").locator("p").first()).toBeVisible();
 });
+
+const r2 = async (page: Page, unit: number, title: string) => { await page.goto(`/admin/demo/round2?unit=${unit}`); await expect(page.locator(".rp-head h1")).toHaveText(title); await page.waitForLoadState("networkidle"); };
+
+test("Round 2 Kill Switch: connection map and table share one selection; nothing is colour-coded by suspicion; no overflow on a phone", async ({ page }) => {
+  await r2(page, 2, "Kill Switch");
+  await expect(page.locator(".rp-node")).toHaveCount(10);
+  await page.getByRole("button", { name: /^Connection 3, / }).click();
+  await expect(page.getByRole("region", { name: "Connection 3" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Inspect\s*connection 3/ })).toHaveAttribute("aria-pressed", "true"); // the table row followed the map
+  await page.getByRole("button", { name: /^Connection 5, / }).focus(); await page.keyboard.press("Enter"); await expect(page.getByRole("region", { name: "Connection 5" })).toBeVisible(); // keyboard works
+  const map = await page.locator(".rp-map").innerText(); expect(map).not.toMatch(/attacker|decoy|legitimate|malicious|suspicious|block/i);
+  await page.mouse.move(0, 0); // no node is under the pointer (hover has its own colour)
+  const fills = await page.locator(".rp-node circle:not(.rp-hit)").evaluateAll(els => new Set(els.filter(e => !e.parentElement!.classList.contains("is-sel")).map(e => getComputedStyle(e).fill)).size);
+  expect(fills).toBe(1); // every unselected node looks identical apart from its size
+  for (const w of [375, 768, 1366]) { await page.setViewportSize({ width: w, height: 800 }); await r2(page, 2, "Kill Switch"); expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth), `overflow at ${w}`).toBeLessThanOrEqual(1); }
+});
+
+test("Round 2 Audit the AI: split screen with searchable independent record; ticks are a local reminder only", async ({ page }) => {
+  await r2(page, 3, "Audit the AI");
+  await expect(page.getByLabel("SENTINEL-AI report").locator("li")).toHaveCount(5);
+  await expect(page.getByRole("tab", { name: "Night timeline" })).toHaveAttribute("aria-selected", "true");
+  const n = await page.locator(".rp-tl li").count(); expect(n).toBeGreaterThan(5);
+  await page.getByLabel("Search the record").fill("zzz-no-such-entry"); await expect(page.locator(".rp-tl li")).toHaveCount(0); await expect(page.getByText("No timeline entries match.")).toBeVisible();
+  await page.getByLabel("Search the record").fill(""); await expect(page.locator(".rp-tl li")).toHaveCount(n);
+  await page.getByRole("tab", { name: "Case file extracts" }).click(); expect(await page.locator(".rp-rec li").count()).toBeGreaterThan(3);
+  await expect(page.getByRole("status").filter({ hasText: /extracts/ })).toBeVisible();
+  const first = page.getByLabel("SENTINEL-AI report").locator("li").first(); await first.getByRole("checkbox").check(); await expect(first).toHaveClass(/is-checked/);
+  expect(await page.evaluate(() => Object.keys(localStorage).concat(Object.keys(sessionStorage)).join(","))).not.toMatch(/claim|checked|audit/i); // nothing stored
+  expect(await page.locator("form").count()).toBe(0); // still no form anywhere: answers are on paper
+  await page.reload(); await expect(page.getByLabel("SENTINEL-AI report").locator("li").first()).not.toHaveClass(/is-checked/);
+});
