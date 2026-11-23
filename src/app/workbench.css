@@ -38,7 +38,6 @@
 @media (min-width: 1200px) {
   .cn-chapter .k-inbox-grid.pg-bench { height: calc(100svh - 236px); min-height: 440px; grid-template-rows: auto minmax(0, 1fr); align-items: stretch; }
   .cn-chapter .k-inbox-grid.pg-bench > * { min-height: 0; overflow: auto; scrollbar-width: thin; scrollbar-color: var(--obs-line-2) transparent; }
-  .cn-chapter .k-inbox-grid.pg-bench > *:first-child { overflow: visible; }
 }
 
 /* compact transient notices and the selection summary */
@@ -148,3 +147,4 @@ main:has(.cn-chapter) > .back-link { margin: 6px 0 0 28px; padding-bottom: 2px; 
 .k-ring { background: conic-gradient(var(--obs-brass) var(--pct), #1b211b 0); }
 @media (max-width: 700px) { .cn-standing { grid-template-columns: 1fr; } .cn-standing li { border-left: 0; border-top: 1px solid var(--obs-line); } .cn-standing li:first-child { border-top: 0; } .cn-stamp { position: static; margin: 0 auto; } }
 @media (prefers-reduced-motion: reduce) { .cn-stamp { animation: none; } }
+.pg-chain-label { white-space: nowrap; }

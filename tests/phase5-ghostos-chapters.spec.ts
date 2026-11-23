@@ -28,7 +28,7 @@ test("Inbox: mailbox + reader by default; compare and link tools show plain fiel
 test("Insider: link board counts open the dossier explorer filtered to that person and record type", async ({ page }) => {
   await open(page, "insider", "Insider");
   await expect(win(page, "dossier")).toHaveCount(0);
-  const cell = page.getByRole("button", { name: /records?\. Open them\.$/ }).first(); await cell.click();
+  const cell = page.getByRole("button", { name: /records?\. Open them\.$/ }).first(); await cell.focus(); await page.keyboard.press("Enter"); // graph lines cross, so the keyboard route is the deterministic one
   const dossier = win(page, "dossier"); await expect(dossier).toBeVisible();
   await expect(page.getByText(/^\d+ of \d+ records$/)).toBeVisible();
   const shown = Number((await page.getByText(/^\d+ of \d+ records$/).innerText()).split(" ")[0]), total = Number((await page.getByText(/^\d+ of \d+ records$/).innerText()).split(" ")[2]);

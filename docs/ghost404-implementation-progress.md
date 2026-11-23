@@ -86,3 +86,19 @@ Evidence: screenshots under `D:\Ghost404-TestWorkspace\shots\` (`base-1440` = be
 | Sound | not built | |
 
 Verification after these changes: tsc + eslint clean; phase5 suites 34 passed (incl. the 18-route x 6-viewport layout check); Round 1 chain 38 passed. Not re-run after the visual changes: Vitest, phase2/redesign harnesses, load tests.
+
+## Phase 1: Round 1 Obsidian Signal rebuild (this pass)
+Palette: `src/app/obsidian.css` (authoritative tokens; the old blue/cyan values were remapped everywhere). Layout: `src/app/workbench.css`. Audit: `docs/ghost404-round1-visual-audit.md`.
+
+| Item | State |
+|---|---|
+| Obsidian Signal palette, one accent for all chapters (no per-chapter rainbow) | Done; remaining blue values swept; Round 2/organizer/projector inherit the tokens (not redesigned) |
+| Shared Round 1 shell: compact HUD, mission rail, docked Findings column | Done at >= 1200 px; narrower screens keep the single-column stack |
+| Dashboard | Palette + compact; mission-route/cartridge structure kept from the previous pass |
+| Inbox | Mail workstation fills the viewport (list + reader scroll internally), Mail compare / Link inspector / Evidence explorer windows kept; tasks docked |
+| Trail | Filters toolbar + activity timeline + Event console/inspector windows; 144 rows still in the console |
+| Insider | Relationship graph + staff chips + dossier explorer window; no invented links |
+| Containment | Command center (map + one active phase) |
+| Final Verdict | Reconstruction board + decision slots; mechanic unchanged |
+| Completion | Sealed-case-file presentation + "where this team stands" (Round 1 complete -> organizer review -> Round 2 organizer-controlled). No automatic Round 2 |
+| Not done | React Bits / Motion not adopted (CSS/SVG only); no player playtest; Round 2, organizer, Demo, projector not touched in this phase beyond inherited colours; dashboard total vs landing score table not re-audited against scoring source |
