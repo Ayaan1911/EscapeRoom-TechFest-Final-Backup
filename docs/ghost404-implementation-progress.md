@@ -25,7 +25,7 @@ Branch `feat/ghost404-unified-ghost-os`. Pass 1 ended at `52d08fb` (shared syste
 | `78ff570` | Landing: atmospheric network backdrop, shorter copy, details behind disclosure |
 | `487dd30` | Organizer: event pipeline (Round 1 -> qualification -> Round 2) |
 | `d381d15` | Round 2 hand-off transition (waiting screen only); phone overflow fix; layout/console journey |
-The final commit of the branch is recorded in the verification report after the last regression run.
+The branch head is whatever `git log -1` shows; the last full regression (`docs/ghost404-verification.md`) ran on code identical to `d381d15`, and every later commit is documentation only.
 
 ## Definition-of-done checklist (honest)
 | Item | Status |
