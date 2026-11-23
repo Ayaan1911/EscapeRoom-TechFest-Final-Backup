@@ -8,17 +8,19 @@ const NEXT = ["/round2", "/clue/inbox", "/play/inbox", "/play/trail", "/play/ins
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string; next?: string }> }) {
   const params = await searchParams;
   const next = NEXT.includes(params.next ?? "") ? params.next : "";
-  return <div className="site-shell">
+  return <div className="site-shell cn-login">
     <OsHeader area="Secure access" secure={false} />
     <main className="dashboard-main">
-      <div className="lp-login">
-        <section className="lp-login-aside" aria-label="About this sign-in">
+      <div className="lp-login cn-scene cn-access">
+        <section className="lp-login-aside cn-status" aria-label="About this sign-in">
+          <div className="cn-radar-lg" aria-hidden="true"><i /><i /><i /><b /></div>
           <span className="k-eyebrow">SECURE ACCESS</span>
           <h2>Your case is waiting.</h2>
           <p>Sign in with the team ID and access code from your organizer. Progress, hints and your timer are saved on the server, so a refresh or a lost connection never loses work.</p>
+          <dl className="cn-readout" aria-hidden="true"><div><dt>SESSION</dt><dd>UNAUTHENTICATED</dd></div><div><dt>CHANNEL</dt><dd>HOST-ONLY COOKIE</dd></div><div><dt>CLOCK</dt><dd>SERVER AUTHORITATIVE</dd></div></dl>
           <ul className="lp-checks"><li>Never share your access code outside your team.</li><li>Use the HTTPS address your organizer gave you.</li></ul>
         </section>
-        <section className="k-card lp-login-card os-window">
+        <section className="k-card lp-login-card os-window cn-term">
           <div className="os-titlebar" aria-hidden="true"><i /><i /><i /><span>ghost-os://secure-access</span></div>
           <div className="k-card-body">
             <h1>Team login</h1>

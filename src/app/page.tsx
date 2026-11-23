@@ -20,47 +20,63 @@ const RULES = [
   ["Organizer review", "The Top 10 and two standby teams are shortlisted after organizer review. Nothing advances automatically."],
 ] as const;
 
+const ORBIT = CHAPTERS.map((c, i) => { const a = (-90 + i * 72) * Math.PI / 180; return { ...c, x: +(200 + 140 * Math.cos(a)).toFixed(1), y: +(200 + 140 * Math.sin(a)).toFixed(1) }; });
+const CHAIN = ORBIT.map((o, i) => `${i ? "L" : "M"}${o.x} ${o.y}`).join(" ");
+const TICKS = ["NX-MAIL gateway: inbound spike 02:14", "IDP: session replayed from unmanaged device", "DB-EXPORT: 18,402 rows left the building", "ADMIN: policy change approved at 02:31", "GHOST_404 claims responsibility", "Trace status: UNRESOLVED", "VPN: three tunnels, one of them lies"];
+
 export default function Home() {
-  return <div className="site-shell lp">
+  return <div className="site-shell lp cn-landing">
     <div className="os-boot" aria-hidden="true"><div><b>GHOST//OS</b><span>secure forensic shell · case 404</span><i /></div></div>
     <OsHeader area="Operation briefing" secure={false}><span className="header-meta"><span className="live-dot" /> TECHFEST / ROUND 1</span></OsHeader>
     <main>
-      <section className="lp-hero" aria-labelledby="hero-heading">
-        <svg className="lp-net" viewBox="0 0 100 70" aria-hidden="true" focusable="false">
-          {NET_EDGES.map(([a, b]) => <line key={a + b} x1={NET[a][0]} y1={NET[a][1]} x2={NET[b][0]} y2={NET[b][1]} />)}
-          {Object.entries(NET).map(([k, [x, y]], i) => <g key={k} className={k === "GHOST_404" ? "is-ghost" : ""} style={{ animationDelay: `${i * 0.45}s` }}><circle cx={x} cy={y} r={k === "GHOST_404" ? 2.4 : 1.7} /><text x={x} y={y - 3.2} textAnchor="middle">{k}</text></g>)}
+      <section className="cn-scene cn-hero" aria-labelledby="hero-heading">
+        <svg className="cn-map" viewBox="0 0 100 60" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
+          {NET_EDGES.map(([a, b]) => <line key={a + b} x1={NET[a][0]} y1={NET[a][1] * .85} x2={NET[b][0]} y2={NET[b][1] * .85} />)}
+          {Object.entries(NET).map(([k, [x, y]]) => <g key={k}><circle className={k === "GHOST_404" ? "n ghost" : "n"} cx={x} cy={y * .85} r={k === "GHOST_404" ? 1.4 : 1} /><text x={x + 2} y={y * .85 + .5}>{k}</text></g>)}
         </svg>
-        <div className="lp-hero-copy">
-          <span className="k-eyebrow">CLASSIFIED SIMULATION / CASE 404</span>
-          <h1 id="hero-heading">A breach has a story.<br /><em>Find the truth.</em></h1>
-          <p className="lp-lede">The attacker is inside. The evidence is lying. Your AI might be too.</p>
-          <p className="lp-body">NEXUS Corp has been breached. GHOST_404 claims it, but the trail does not add up. Three people, five linked investigations, one case.</p>
-          <div className="k-actions"><Link className="k-btn k-btn-primary k-btn-lg" href="/play">Enter investigation <span aria-hidden="true">↗</span></Link><a className="k-btn k-btn-lg" href="#chapters">See the five chapters</a></div>
-          <p className="lp-note">Fictional incident simulation. No real systems, accounts or people are involved.</p>
+        <div className="cn-copy">
+          <ol className="cn-boot" aria-hidden="true">
+            {["mounting forensic volumes ... ", "verifying evidence hashes ... ", "linking NEXUS telemetry ... ", "alias GHOST_404 ... ", "case NX-404 "].map((t, i) => <li key={t} style={{ ["--i" as string]: i }}>{t}{i < 4 ? <b>ok</b> : <b>OPEN</b>}</li>)}
+          </ol>
+          <p className="cn-mark">GHOST//OS · CASE 404</p>
+          <h1 id="hero-heading" className="cn-title">A breach has a story.<em>Find the truth.</em></h1>
+          <p className="cn-lede">The attacker is inside. The evidence is lying. Your AI might be too. Three investigators, five linked investigations, one case.</p>
+          <div className="cn-cta"><Link className="cn-go" href="/play">Enter investigation <span aria-hidden="true">↗</span></Link><Link className="cn-ghostbtn" href="/login">Team login</Link><a className="cn-ghostbtn" href="#chapters">See the five chapters</a></div>
+          <p className="cn-fine">Fictional incident simulation. No real systems, accounts or people are involved.</p>
         </div>
-        <aside className="lp-casefile os-window" aria-label="Case file overview">
-          <div className="os-titlebar" aria-hidden="true"><i /><i /><i /><span>case-404.ghost</span></div>
-          <header><span className="k-mono">INCIDENT NX-404</span><span className="k-badge k-badge-alert">TRACE UNRESOLVED</span></header>
-          <ol>{CHAPTERS.map(c => <li key={c.n}><span className="lp-node" aria-hidden="true">{c.n}</span><div><strong>{c.name}</strong><small>{c.points} points</small></div></li>)}</ol>
-          <footer><span>60 minutes</span><span>3 players</span><span>105 max</span></footer>
-        </aside>
+        <div className="cn-orbit" aria-hidden="true">
+          <svg viewBox="0 0 400 400" focusable="false">
+            <defs><radialGradient id="cn-glow"><stop offset="0" stopColor="#4ad7e8" stopOpacity=".16" /><stop offset="1" stopColor="#4ad7e8" stopOpacity="0" /></radialGradient>
+              <linearGradient id="cn-sw" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#4ad7e8" stopOpacity="0" /><stop offset="1" stopColor="#4ad7e8" stopOpacity=".35" /></linearGradient></defs>
+            <circle cx="200" cy="200" r="196" fill="url(#cn-glow)" />
+            <circle className="cn-ring" cx="200" cy="200" r="190" /><circle className="cn-ring dash" cx="200" cy="200" r="170" /><circle className="cn-ring dash r" cx="200" cy="200" r="104" /><circle className="cn-ring" cx="200" cy="200" r="60" />
+            <g className="cn-radar"><path d="M200 200 L200 8 A192 192 0 0 1 336 64 Z" fill="url(#cn-sw)" /></g>
+            <path className="cn-chain" d={CHAIN} />
+            <circle className="cn-packet" r="3.4" fill="#f0b45c"><animateMotion dur="9s" repeatCount="indefinite" path={CHAIN} /></circle>
+            <g className="cn-core"><circle className="c" cx="200" cy="200" r="46" /><text className="big" x="200" y="207">404</text><text className="small" x="200" y="228">GHOST</text></g>
+            {ORBIT.map((o, i) => <g key={o.n} className="cn-node" style={{ ["--i" as string]: i }}><circle className="halo" cx={o.x} cy={o.y} r="22" /><circle cx={o.x} cy={o.y} r="22" /><text className="num" x={o.x} y={o.y + 4}>{o.n}</text><text className="nm" x={o.x} y={o.y + 40}>{o.name}</text><text className="pts" x={o.x} y={o.y + 53}>{o.points} PTS</text></g>)}
+          </svg>
+        </div>
+        <div className="cn-ticker" aria-hidden="true"><div>{[...TICKS, ...TICKS].map((t, i) => <span key={i}><i>●</i> {t}</span>)}</div></div>
       </section>
 
-      <section className="lp-section" id="chapters" aria-labelledby="chapters-heading">
-        <div className="lp-intro"><span className="k-eyebrow">THE INVESTIGATION</span><h2 id="chapters-heading">Five chapters. One case.</h2><p>Each chapter unlocks the next. Earlier evidence stays available, and every submission is checked on the server.</p></div>
-        <ol className="lp-chapters">{CHAPTERS.map(c => <li key={c.n} className="lp-chapter"><span className="lp-n k-mono">{c.n}</span><div><div className="lp-chapter-head"><h3>{c.name}</h3><span className="k-badge k-badge-amber">{c.points} points</span></div><details className="lp-more"><summary>What you will do</summary><p>{c.what}</p></details><div className="k-badges">{c.tags.map(t => <span className="k-badge" key={t}>{t}</span>)}</div></div></li>)}</ol>
-      </section>
-
-      <section className="lp-section" id="rules" aria-labelledby="rules-heading">
-        <div className="lp-intro"><span className="k-eyebrow">ROUND 1 RULES</span><h2 id="rules-heading">What you need to know</h2></div>
+      <section className="cn-brief" id="chapters" aria-labelledby="chapters-heading">
+        <div className="lp-intro"><span className="k-eyebrow">THE INVESTIGATION</span><h2 id="chapters-heading">Five chapters. One case.</h2></div>
+        <ol className="cn-beats">
+          <li><strong>Read the evidence</strong><span>Mail, identity logs, staff records. Everything is real inside the simulation, and everything is untrusted.</span></li>
+          <li><strong>Work it as a team</strong><span>Three people, one shared clock. Half the points in a chapter open the next.</span></li>
+          <li><strong>Close the case</strong><span>Link the records, reject the wrong story, submit a verdict the evidence can carry.</span></li>
+        </ol>
+        <details className="lp-more"><summary>What you will do in each chapter</summary>
+          <ol className="lp-chapters">{CHAPTERS.map(c => <li key={c.n} className="lp-chapter"><span className="lp-n k-mono">{c.n}</span><div><div className="lp-chapter-head"><h3>{c.name}</h3><span className="k-badge k-badge-amber">{c.points} points</span></div><p>{c.what}</p></div></li>)}</ol>
+        </details>
         <p className="lp-ruleline">60 minutes · 105 points · hints cost points · AI is allowed, but all evidence is untrusted.</p>
-        <details className="lp-more"><summary>All Round 1 rules</summary><dl className="lp-rules">{RULES.map(([t, d]) => <div key={t}><dt>{t}</dt><dd>{d}</dd></div>)}</dl></details>
+        <details className="lp-more" id="rules"><summary>All Round 1 rules</summary><dl className="lp-rules">{RULES.map(([t, d]) => <div key={t}><dt>{t}</dt><dd>{d}</dd></div>)}</dl></details>
       </section>
 
-      <section className="lp-section lp-cta" aria-labelledby="cta-heading">
+      <section className="cn-final" aria-labelledby="cta-heading">
         <h2 id="cta-heading">Ready when your organizer is.</h2>
-        <p>Sign in with the team ID and access code your organizer gave you. Use the HTTPS address you were given and keep your code private.</p>
-        <div className="k-actions"><Link className="k-btn k-btn-primary k-btn-lg" href="/login">Team login</Link></div>
+        <div className="k-actions"><Link className="cn-go" href="/login">Team login</Link></div>
       </section>
     </main>
     <footer className="site-footer"><span>OPERATION GHOST_404</span><span>FICTIONAL INCIDENT SIMULATION · TECHFEST 2026</span></footer>

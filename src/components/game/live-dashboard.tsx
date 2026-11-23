@@ -42,7 +42,7 @@ export function LiveDashboard() {
   const urgent = data.status === "active" && remaining <= 300;
   const furthest = data.unlocked.reduce((n, u, i) => (u && data.progress.chapters[i].completedAt === null ? i : n), -1), here = furthest >= 0 ? furthest : Math.max(0, Math.min(4, data.current)), hereRaw = data.progress.chapters[here].score, hereNeed = data.unlockThresholds[here];
   const nextOpen = here < 4 && data.unlocked[here + 1];
-  return <div className="k-desk">
+  return <div className="k-desk cn-scene cn-desk">
     <header className="gd-head">
       <div><span className="k-eyebrow">OPERATION GHOST_404 · {data.name} · VARIANT {data.variant}</span><h1>Investigation dashboard</h1><p>{data.participants.join(" · ")}</p></div>
       <div className="gd-vitals">
