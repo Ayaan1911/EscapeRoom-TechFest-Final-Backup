@@ -66,7 +66,7 @@ export function ContainmentDesk({ evidence, initialCctv, initialState, initialDr
       immediate={immediate.map(id => optionById(evidence.immediateOptions, id)).filter((o): o is Option => !!o)} recovery={recovery.map(id => optionById(evidence.recoveryOptions, id)).filter((o): o is Option => !!o)} />
     <PhaseTabs label="Response phases" active={phase} onPick={setPhase} phases={(["Reconstruct", "Identify", "Contain", "Recover and verify", "Preserve"] as const).map((label, i): Phase => { const row = taskOf(state, 3, Object.values(DRAFT)[i]), filled = [true, !!(f.str(DRAFT.identity, "account") && f.str(DRAFT.identity, "sessionId")), immediate.length > 0, recovery.length > 0, support.length >= 5][i];
       return { id: row.id, label, sub: `${row.earned}/${row.max}`, state: row.earned >= row.max ? "done" : row.earned > 0 ? "partial" : filled && i > 0 ? "filled" : "open"}; })} />
-    {cctv && <ContainmentCctv snapshot={cctv} />}
+    {cctv && <details className="cn-cctv" open><summary>Security-room snapshot</summary><div className="cn-cctv-body"><ContainmentCctv snapshot={cctv} /></div></details>}
 
     <section className="pg-tasks cn-ops" aria-label="Scored tasks" data-phase={phase}>
 

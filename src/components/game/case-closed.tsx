@@ -6,6 +6,7 @@ export function CaseClosed({ teamId, teamName, progress }: { teamId: string; tea
   const result = resultTotals(progress);
   const pct = Math.min(100, Math.round((result.total / 105) * 100));
   return <section id="case-closed" className="k-closed case-closed" aria-labelledby="case-closed-heading">
+    <div className="cn-stamp" aria-hidden="true"><b>CASE NX-404</b><span>SEALED</span></div>
     <div className="k-burst" aria-hidden="true">{Array.from({ length: 14 }, (_, i) => <i key={i} style={{ ["--a" as string]: `${i * (360 / 14)}deg`, ["--d" as string]: `${(i % 3) * 40}ms` }} />)}</div>
     <div className="k-closed-hero">
       <div className="k-ring" style={{ ["--pct" as string]: `${pct}%` }} role="img" aria-label={`Final score ${result.total} out of 105`}><div><strong className="case-total">{result.total} / 105</strong><span>FINAL SCORE</span></div></div>
@@ -17,6 +18,7 @@ export function CaseClosed({ teamId, teamName, progress }: { teamId: string; tea
         <p className="k-closed-note">Total hint deductions: {result.totalDeduction} · Tamper Alert bonus: +{result.bonus}</p>
       </div>
     </div>
+    <ol className="cn-standing" aria-label="Where this team stands"><li className="is-done"><b>Round 1</b><span>Investigation complete</span></li><li className="is-now"><b>Organizer review</b><span>Awaiting qualification decision</span></li><li><b>Round 2</b><span>Opened by the organizer only</span></li></ol>
     <ol className="k-outcomes" aria-label="Chapter outcomes">{progress.chapters.map((chapter, i) => <li key={i} style={{ ["--i" as string]: i }}><span className="k-mono k-muted">0{i + 1}</span><strong>{titles[i]}</strong><span className="k-outcome-bar"><i style={{ width: `${(chapter.score / MAX[i]) * 100}%` }} /></span><span className="k-mono">{chapter.score}/{MAX[i]}</span></li>)}</ol>
     <div className="k-tablescroll" tabIndex={0} role="region" aria-label="Chapter results, scrollable"><table className="k-table" aria-label="Saved chapter results"><thead><tr><th>Chapter</th><th>Status</th><th>Raw</th><th>Hints</th><th>Deduction</th></tr></thead><tbody>{progress.chapters.map((chapter, i) => <tr key={i}><th>{i + 1}. {titles[i]}</th><td>{chapter.completedAt === null ? "Incomplete" : chapter.override ? "Completed by organizer override" : "Completed"}</td><td>{chapter.score}</td><td>{chapter.hints}</td><td>−{hintDeduction(chapter.hints)}</td></tr>)}</tbody></table></div>
     <p>The retained evidence links the captured redirect, session abuse, customer export and separately supported internal assistance. The response is a prepared simulation plan; GHOST_404 remains an alias without a proven real-world identity or location.</p>

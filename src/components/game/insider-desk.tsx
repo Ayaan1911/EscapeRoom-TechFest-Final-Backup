@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, type FormEvent } from "react";
+import { RelationGraph } from "./relation-graph";
 import { useChapter, type ChapterState } from "./use-chapter";
 import { useDrafts, type ServerDraft } from "./use-drafts";
 import { ChainDiagram, ConnectionBanner, DeskFrame, HintBox, ResultStrip, StateBanner, TaskPanel, fieldApi, isEditable, taskOf } from "./workspace";
@@ -69,12 +70,17 @@ function InsiderWorkspace({ initialDossier, initialState, initialDrafts }: { ini
         {person && <dl className="pg-profile suspect-profile"><div><dt>ID</dt><dd className="k-mono">{person.id}</dd></div><div><dt>Role</dt><dd>{person.role}</dd></div><div><dt>Privileges</dt><dd>{person.privileges}</dd></div><div><dt>Responsibilities</dt><dd>{person.responsibilities}</dd></div><div><dt>Device</dt><dd className="k-mono">{person.device}</dd></div></dl>}
       </section>
 
-      <section className="pg-board" aria-label="Link board">
-        <h2 className="pg-h">Link board</h2><p className="pg-hint-line">Who appears in which kind of record. Pick a cell to open those records in the dossier explorer. A count is not a verdict.</p>
+      <section className="pg-board cn-relboard" aria-label="Link board">
+        <h2 className="pg-h">Link board</h2><p className="pg-hint-line">Who appears in which kind of record. Pick a line to open those records. A line is not a verdict.</p>
+        <RelationGraph staff={dossier.suspects} kinds={(Object.keys(KIND) as InsiderRecord["kind"][]).map(k => ({ key: k, label: KIND[k].label }))} count={(pid, k) => dossier.records.filter(r => r.kind === k && r.employees.includes(pid)).length}
+          selectedStaff={suspect} selectedKind={kind} onStaff={setSuspect} onCell={(pid, k) => { setSuspect(pid); setKind(k); os.open("dossier"); }} />
+        <details className="cn-tableview"><summary>Table view</summary>
+
         <div className="k-tablescroll"><table className="k-table pg-linkboard"><caption className="k-sr">Number of dossier records per staff member and record type. Each count opens the matching records.</caption>
           <thead><tr><th scope="col">Staff</th>{(Object.keys(KIND) as InsiderRecord["kind"][]).map(k => <th scope="col" key={k}>{KIND[k].label}</th>)}</tr></thead>
           <tbody>{dossier.suspects.map(person => <tr key={person.id}><th scope="row">{person.name}<small>{person.role}</small></th>{(Object.keys(KIND) as InsiderRecord["kind"][]).map(k => { const n = dossier.records.filter(r => r.kind === k && r.employees.includes(person.id)).length;
             return <td key={k}>{n ? <button type="button" className="k-btn k-btn-sm" aria-label={`${person.name}: ${n} ${KIND[k].label} record${n > 1 ? "s" : ""}. Open them.`} onClick={() => { setSuspect(person.id); setKind(k); os.open("dossier"); }}>{n}</button> : <span className="k-muted" aria-label="none">·</span>}</td>; })}</tr>)}</tbody></table></div>
+        </details>
       </section>
 
       <section className="pg-console" aria-label="Dossier explorer">

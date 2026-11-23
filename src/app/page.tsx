@@ -46,13 +46,13 @@ export default function Home() {
         </div>
         <div className="cn-orbit" aria-hidden="true">
           <svg viewBox="0 0 400 400" focusable="false">
-            <defs><radialGradient id="cn-glow"><stop offset="0" stopColor="#4ad7e8" stopOpacity=".16" /><stop offset="1" stopColor="#4ad7e8" stopOpacity="0" /></radialGradient>
-              <linearGradient id="cn-sw" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#4ad7e8" stopOpacity="0" /><stop offset="1" stopColor="#4ad7e8" stopOpacity=".35" /></linearGradient></defs>
+            <defs><radialGradient id="cn-glow"><stop offset="0" stopColor="#A8D9B4" stopOpacity=".16" /><stop offset="1" stopColor="#A8D9B4" stopOpacity="0" /></radialGradient>
+              <linearGradient id="cn-sw" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#A8D9B4" stopOpacity="0" /><stop offset="1" stopColor="#A8D9B4" stopOpacity=".35" /></linearGradient></defs>
             <circle cx="200" cy="200" r="196" fill="url(#cn-glow)" />
             <circle className="cn-ring" cx="200" cy="200" r="190" /><circle className="cn-ring dash" cx="200" cy="200" r="170" /><circle className="cn-ring dash r" cx="200" cy="200" r="104" /><circle className="cn-ring" cx="200" cy="200" r="60" />
             <g className="cn-radar"><path d="M200 200 L200 8 A192 192 0 0 1 336 64 Z" fill="url(#cn-sw)" /></g>
             <path className="cn-chain" d={CHAIN} />
-            <circle className="cn-packet" r="3.4" fill="#f0b45c"><animateMotion dur="9s" repeatCount="indefinite" path={CHAIN} /></circle>
+            <circle className="cn-packet" r="3.4" fill="#C5A477"><animateMotion dur="9s" repeatCount="indefinite" path={CHAIN} /></circle>
             <g className="cn-core"><circle className="c" cx="200" cy="200" r="46" /><text className="big" x="200" y="207">404</text><text className="small" x="200" y="228">GHOST</text></g>
             {ORBIT.map((o, i) => <g key={o.n} className="cn-node" style={{ ["--i" as string]: i }}><circle className="halo" cx={o.x} cy={o.y} r="22" /><circle cx={o.x} cy={o.y} r="22" /><text className="num" x={o.x} y={o.y + 4}>{o.n}</text><text className="nm" x={o.x} y={o.y + 40}>{o.name}</text><text className="pts" x={o.x} y={o.y + 53}>{o.points} PTS</text></g>)}
           </svg>

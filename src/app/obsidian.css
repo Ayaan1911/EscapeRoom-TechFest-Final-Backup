@@ -1,0 +1,27 @@
+/* OBSIDIAN SIGNAL: authoritative palette. Loaded last. Warm graphite + ivory, phosphor (interaction), brass (focus), red (critical only).
+   Colour never marks a puzzle answer: evidence stays neutral until the game's own rules reveal a state. */
+:root {
+  --obs-0: #0B0D0B; --obs-1: #111511; --obs-2: #191E19; --obs-3: #252B24; --obs-line: #343D34; --obs-line-2: #3F4A3F;
+  --obs-ivory: #EAE8DC; --obs-sage: #9CA99A; --obs-phos: #A8D9B4; --obs-green: #78B78D; --obs-brass: #C5A477; --obs-red: #C96560;
+  --bg: #0B0D0B; --surface: #111511; --surface-2: #191E19; --surface-3: #252B24; --line: #343D34; --line-2: #3F4A3F;
+  --text: #EAE8DC; --muted: #9CA99A; --amber: #C5A477; --amber-ink: #1A1408; --evidence: #A8D9B4; --evidence-soft: rgba(168, 217, 180, .10);
+  --ok: #78B78D; --alert: #C96560; --red: #C96560;
+  --panel: linear-gradient(180deg, rgba(25, 30, 25, .72), rgba(17, 21, 17, .94));
+  --glow: 0 0 0 1px rgba(168, 217, 180, .14), 0 14px 36px rgba(0, 0, 0, .4);
+  --os-glass: rgba(14, 17, 14, .86); --os-line: rgba(156, 169, 154, .22);
+  --cn-bg0: #080A08; --cn-bg1: #0F130F; --cn-cyan: #A8D9B4; --cn-cyan-d: rgba(168, 217, 180, .14); --cn-amber: #C5A477; --cn-red: #C96560;
+  --cn-line: rgba(156, 169, 154, .22); --cn-glass: rgba(17, 21, 17, .8);
+}
+body { background: var(--bg); color: var(--text); }
+.site-shell { background: radial-gradient(ellipse at 75% 10%, rgba(120, 183, 141, .08), transparent 60%), radial-gradient(circle at 12% 90%, rgba(197, 164, 119, .05), transparent 45%), linear-gradient(145deg, #111611 0%, #0B0D0B 65%, #080A08 100%); }
+.site-shell::before { background-image: linear-gradient(rgba(156, 169, 154, .035) 1px, transparent 1px), linear-gradient(90deg, rgba(156, 169, 154, .035) 1px, transparent 1px); }
+::selection { background: #2C4A36; color: var(--obs-ivory); }
+/* one accent for every chapter: identity comes from layout and tools, not hue */
+.pg, .pg[data-chapter], .gd-stage[data-n], .dm-stage[data-n], .cn-chapter, .cn-chapter[data-chapter], .cn-r2s, .cn-r2s[data-chapter] { --accent: #A8D9B4; --accent-soft: rgba(168, 217, 180, .08); --cn-ac: #A8D9B4; }
+/* primary action: phosphor with dark ink, no cyan glow */
+.k-btn-primary { background: linear-gradient(180deg, #B9E3C4, #A8D9B4); color: #0B130D; border-color: #C4E8CC; box-shadow: 0 6px 22px rgba(120, 183, 141, .18); }
+.k-btn-primary:hover { background: linear-gradient(180deg, #C9EBD2, #B2DEBD); }
+.cn-go { background: linear-gradient(180deg, #B9E3C4, #A8D9B4); color: #0B130D; box-shadow: 0 0 0 1px rgba(255, 255, 255, .18) inset, 0 10px 34px rgba(120, 183, 141, .25); }
+.cn-go:hover { box-shadow: 0 0 0 1px rgba(255, 255, 255, .3) inset, 0 14px 44px rgba(120, 183, 141, .38); }
+.cn-launch-btn, .cn-r2 .cn-launch-btn { color: #0B130D; background: linear-gradient(180deg, #B9E3C4, #A8D9B4); box-shadow: 0 8px 26px rgba(120, 183, 141, .2); }
+.cn-r2 .cn-launch-btn { background: linear-gradient(180deg, #D8BF98, #C5A477); }
