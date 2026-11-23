@@ -66,3 +66,19 @@ The branch head is whatever `git log -1` shows; the last full regression (`docs/
 1. `git worktree list`; work in `D:\Ghost404-TestWorkspace\unified` on `feat/ghost404-unified-ghost-os`.
 2. `npm ci && npx prisma generate`; run the checks in `docs/ghost404-verification.md`.
 3. Remaining work in priority order: (a) organizer pages beyond the pipeline strip, (b) projector visual polish, (c) Containment density, (d) Round 1 completion cinematic, (e) human accessibility pass.
+
+## Visual rebuild (priority zero directive) - running ledger
+Evidence: screenshots under `D:\Ghost404-TestWorkspace\shots\` (`base-1440` = before, `c1`/`c1full` = after). Tooling: `scripts/ui-dev.mjs` (persistent disposable-DB session) + `scripts/shoot.mjs`. The stylesheet is `src/app/cine.css`.
+
+| Screen | State | Notes |
+|---|---|---|
+| Landing | **Rebuilt** (inspected) | Full-bleed scene: perspective grid floor, radar orbit of the five chapters around the alias, boot log, live ticker, one large primary action. Old hero + case-file card removed. |
+| Login | **Rebuilt** (inspected) | Secure-access terminal: radar backdrop, status readout, scanning edge, mono field labels. Auth logic untouched. |
+| Team dashboard | **Rebuilt** (inspected) | Mission-control: HUD clock + score, five chapter cartridges on a glowing route with per-chapter accent. |
+| Demo Mode home | **Rebuilt** (inspected) | Simulation launcher: round consoles with launch tiles. Obsolete "Part A / Part B digital tribunal" text removed. |
+| Chapter chrome (all 5 R1) | **Restyled** (Inbox + Containment inspected) | Mission rail (icon rail, expands on hover/focus), HUD header with chapter accent, illuminated panels. Content layouts of Inbox/Trail/Insider/Verdict panels are the previous ones inside the new chrome. |
+| Containment | **Reworked** | Operations deck: one response phase at a time (was five stacked panels). Systems map kept. Still the densest screen; CCTV snapshot block still inline. |
+| Final Verdict | not yet rebuilt | still the causal-chain form panels (new chrome only). |
+| Round 2 (4 chapters) | not yet restyled | |
+| Organizer, projector | not yet redesigned | |
+| Completion screens, motion pass | not yet | |
