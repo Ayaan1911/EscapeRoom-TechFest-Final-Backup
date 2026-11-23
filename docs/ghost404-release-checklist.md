@@ -9,7 +9,9 @@ Tick every line on the day. Any unchecked **MUST** is a no-go. Evidence for what
 - [ ] **MUST** `lan-smoke.mjs` run from a **different PC on the lab network** against the server's real address: all PASS (this was never done on a real LAN).
 - [ ] **MUST** 3+ real team PCs open the URL, sign in, reach `/play`, refresh without losing the session. Same browser versions as the lab's students.
 - [ ] Firewall: only the lab subnet can reach the server port; the server PC has a static address or reserved DHCP lease and does not sleep.
-- [ ] A rehearsal with the **real number of PCs** at the same time (staggered logins are fine; a simultaneous start is the worst case: login p95 was 3.5 s with 50 simulated teams on one laptop core).
+- [ ] A rehearsal with the **real number of PCs** at the same time (staggered logins are fine; a simultaneous start is the worst case: login p95 was 2.0 s with 50 simulated teams on a 16-core laptop with the thread pool sized to the CPUs, and 3.5 s with Node's default pool of 4; a lab server with fewer cores will be slower).
+- [ ] **MUST** On two real team PCs (the lab's browser and screen size, at least 1280x720): open a Round 1 chapter, confirm the dock appears at the bottom, open a tool window, drag it, minimize/restore it, close it, refresh and confirm the layout returns. Confirm the Round 2 Kill Switch map and Audit split screen fit the screen without sideways scrolling.
+- [ ] Server start used `start-lab.ps1` (sets the password-hashing thread pool to the CPU count); on Ubuntu confirm `UV_THREADPOOL_SIZE` is exported before `next start`.
 - [ ] Backup: `pg_dump` (or `npm run db:backup`) scheduled to a second device, restore tested once.
 - [ ] Printables: print `/admin/round2/print` (answer sheets for all finalists, rubrics, score sheet, timing script). Check one printed sheet on paper (only checked on screen so far).
 - [ ] Projector: `/admin/round2/projector` shown on the real projector at its real resolution; readable from the back of the room.

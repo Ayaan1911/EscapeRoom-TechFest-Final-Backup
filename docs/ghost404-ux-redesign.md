@@ -1,30 +1,39 @@
-# GHOST//OS UX redesign: what changed and what did not
+# GHOST//OS UX redesign: what changed, per screen
 
-This documents the state of the unified branch honestly. The product was already a polished cyan/charcoal investigation workstation (earlier "hybrid redesign" work, inherited). This branch adds the shared GHOST//OS shell on top and fixes defects found on the way. It does **not** contain a complete rewrite of every chapter.
+Design goal from player feedback: *too much text, too many logs, weak visuals, not interactive enough.* The rule applied everywhere: **raw material stays reachable but is no longer the default view.** Every tool below works on the case's real data; none shows a verdict.
 
-## Added in this branch
+## The shell (all screens)
+- **System bar** (every page): GHOST//OS chip, current application, secure-session indicator, page actions.
+- **Dock + windows** (Round 1 chapters): each chapter registers its evidence tools as windows. Click a dock button to open; click again to minimize; restore from the dock; drag by the title bar, resize by the corner grip; arrow keys move a focused window, Shift+arrows resize, Escape closes. Windows are clamped to the viewport (below the bar, above the dock) so they cannot be lost. "Reset" closes all. Layout (geometry and open flags only) is restored after a refresh. On phones and tablets each window is a full-width sheet with the same controls.
+- Motion: boot reveal (CSS, ~1.4 s, never blocks input), window open, dock hover, path pulse, landing backdrop. Everything is off under `prefers-reduced-motion`.
+
+## Landing / login / dashboard / organizer
 | Screen | Change |
 |---|---|
-| Every page | One **system bar** (`GHOST//OS` chip, current application name, secure-session indicator, page actions). It replaces the desktop left rail and 14 separate headers, so the product reads as one system and content gets the full width. Sticky, 56 px, glass effect only where the browser supports it. |
-| Landing | Case-file panel is now a window with title bar (`case-404.ghost`); ~1.4 s CSS-only boot reveal ("GHOST//OS secure forensic shell"). The reveal never intercepts clicks and is removed for reduced-motion users and print. |
-| Login | "Secure access" window chrome; the Sign in button shows `Authenticating…` while the server verifies the code; failure text is identical for unknown teams and wrong codes. |
-| Round 2 player | Standing reminder under every chapter title: write every answer on the paper sheet, nothing is typed here. |
-| Fonts | Bundled locally (`geist`, SIL OFL). Previously fetched from Google at build time, which would break an offline build. |
-| Focus/buttons | One focus ring and one pressed/hover transition across the system; all motion off under `prefers-reduced-motion`. |
+| Landing | Atmospheric network backdrop (decorative); one-sentence mission; chapter descriptions and the rules behind "What you will do" / "All Round 1 rules" disclosures instead of two text sections |
+| Login | Window chrome; "Authenticating…" pending state; identical failure text for unknown teams and wrong codes (tested) |
+| Dashboard | **Mission path** strip (complete / current / open / locked with scores) above the chapter cards; "Next action" card unchanged |
+| Organizer | **Event pipeline** (Round 1 -> qualification -> Round 2) with real state at the top of the control center; the existing sections and confirmations are unchanged |
 
-## Inherited and verified working (not rewritten this session)
-How the player feedback ("too much text, tedious logs, weak visuals, not interactive") was already addressed by earlier work, which this branch re-tested:
-- **Inbox**: mailbox list with authentication dots, selected-message reader with Message / Headers / Attachments tabs, evidence records grouped (delivery trail, identity logs, data exports) with pin stars, QR snapshot opened on demand, answer chain tray.
-- **Trail**: 144 events behind a timeline strip, filters (user, IP, outcome, event type, session), event inspector, "session path", pinning, CSV; the raw table remains available. No event is pre-labelled as the attacker (outcome only: allowed/denied/challenged).
-- **Insider / Containment / Verdict**: evidence wall and suspect profiles, response stage rail, case reconstruction with counter-evidence.
-- Tasks are scored one at a time, drafts are saved, hints cost points, the next chapter unlocks at 50 %.
+## Round 1 chapters
+| Chapter | Default view now | Tools (dock) | Not changed |
+|---|---|---|---|
+| 1 Inbox | Mailbox + reader (auth dots, headers/attachments tabs); QR snapshot link | **Evidence explorer** (records, pins), **Mail compare** (any two messages side by side: name, address, domain, headers; no verdicts), **Link inspector** (scheme/host/path/query of every link; never fetched) | Tasks, scoring |
+| 2 Trail | Activity timeline + filters (user, IP, outcome, type, session, **time range**) | **Event console** (the 144 raw rows, paging, CSV), **Event inspector** (opens when you pick a marker or row), **Case records** | Tasks, scoring, CSV |
+| 3 Insider | Evidence Wall (staff cards) + **Link board** (who appears in which record type; cells open the dossier filtered) + timeline | **Dossier explorer** (record list + viewer) | Fragment unlock, tasks |
+| 4 Containment | **Systems map**: the systems the case names (mail gateway, device, identity provider, export service, evidence store, incident lead, admin console, support jobs) with the case path; each node lists "from the case record" and "in your plan" | none (the map is on the desk) | Option wording now behind "Details"; ordering/choice tasks and scoring |
+| 5 Verdict | Chain stepper + report preview | **Evidence board** (records, search, chapter filter, role assignment), **Case file** | Scoring, completion screen |
 
-## Known design gaps (not done)
-- No per-chapter **copy audit/rewrite**. Briefings were not shortened further this session; puzzle facts, IDs and answers are unchanged.
-- No draggable/resizable **window manager**; no sound.
-- Kill Switch is a sortable table with sparklines and an inspector, not a topology map. The Three Calls shows context tiles, not animated consequences.
-- Organizer pages only gained the shared system bar.
-- No new cinematic Round 1 -> Round 2 transition.
+The Containment map deliberately does not grade: node states are the literal wording of what the team selected, so it cannot be used as an oracle around the attempt limits (browser test asserts no verdict language).
 
-## Accessibility and layout checks
-Automated axe scans (WCAG 2 A/AA): landing, login and dashboard at 1366 px; all four Round 2 chapters at 375, 768 and 1366 px. All pass. The system bar is checked to sit above content with no horizontal scroll at 1366, 1920 and 390 px (dashboard). I personally reviewed screenshots of the dashboard (desktop), login (desktop and phone) and the Inbox chapter (desktop) after the shell change; the other chapters were not re-reviewed visually after it. Keyboard use and screen readers were not manually tested beyond axe.
+## Round 2 (paper) chapters
+| Chapter | Now |
+|---|---|
+| 1 Alert | Unchanged: alert card, tabbed evidence, chat with Ravi, options |
+| 2 Kill Switch | **Connection map** (hub-and-spoke of the ten connections; node size = data sent, line weight = active time; nothing is coloured by suspicion) sharing one selection with the table and inspector |
+| 3 Audit the AI | **Split screen**: SENTINEL-AI's claims on the left, searchable Night timeline / Case file extracts on the right; "I have checked this claim" ticks are a local reminder (nothing stored or sent) |
+| 4 Three Calls | Unchanged: situation board, three calls, six statements |
+| All | Standing "write on paper" reminder; Round 2 hand-off transition on the waiting screen only, so it can never cost investigation time |
+
+## Accessibility and layout
+Automated: axe (WCAG A/AA) on landing, login, dashboard and Round 2 chapters at 375/768/1366; window manager keyboard tests; layout journey on **18 routes x 6 viewports** (1920x1080, 1440x900, 1366x768, 1280x720, tablet, phone) for overflow, console errors, failed requests and system-bar stacking. Not done: manual screen-reader and keyboard-only pass by a person.

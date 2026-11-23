@@ -1,47 +1,68 @@
-# GHOST_404 unified branch: implementation progress
+# GHOST_404 unified branch: implementation ledger
 
-Branch `feat/ghost404-unified-ghost-os`, started from `85eef4e1` (Round 2 paper edition). Updated as work lands; see `docs/ghost404-verification.md` for evidence.
+Branch `feat/ghost404-unified-ghost-os`. Pass 1 ended at `52d08fb` (shared system bar, offline fonts, docs). Pass 2 (this ledger) started from `52d08fb`. Evidence for every claim is in `docs/ghost404-verification.md`.
 
-## Branch reconnaissance (Phase A)
+## Branch reconnaissance
 | Branch | Head | Relationship |
 |---|---|---|
-| `test/ghost404-lab-lan` | `3327e506` | Phase 1 LAN baseline. Ancestor of the Round 2 branch. **Untouched.** |
-| `feat/ghost404-hybrid-ui-redesign` | `129c32f` | Earlier visual redesign. **Already an ancestor** of `85eef4e1` (`git merge-base` = `129c32f`), so nothing needed merging or cherry-picking. |
-| `feat/ghost404-round2-paper` | `85eef4e1` | Four-chapter paper Round 2. Chosen as the integration base because it contains all of the above. |
+| `test/ghost404-lab-lan` | `3327e506` | Phase 1 LAN baseline. **Untouched.** |
+| `feat/ghost404-hybrid-ui-redesign` | `129c32f` | Already an ancestor of `85eef4e1`; nothing to merge. |
+| `feat/ghost404-round2-paper` | `85eef4e1` | Paper Round 2, the base of this branch. **Untouched.** |
 | `main`, Render-tracked branches | n/a | Not touched. |
 
-Because the base already contains Round 1, the hybrid redesign and the paper Round 2, "integration" was a verification exercise, not a merge. There were no conflicts to resolve.
+## Pass 2 commits (all on this branch)
+| SHA | What |
+|---|---|
+| `60be423` | **GHOST//OS window manager** + dock; Trail rebuilt (overview + Event console / inspector / records windows); time-range filter (unit-tested) |
+| `ec904da` | Inbox: mailbox + reader by default; Evidence explorer, **Mail compare**, **Link inspector** windows |
+| `a0b230f` | Insider: Evidence Wall + **Link board** (staff x record type); Dossier explorer window |
+| `747f10c` | Containment: **systems map** (topology from the case's own systems; node states mirror the team's plan literally, never grade it) |
+| `f8267c1` | Verdict: Evidence board + Case file windows; chapter-tools browser suite |
+| `babf87c` | Round 2: Kill Switch **connection map**; Audit the AI **split screen** with searchable record |
+| `a78912f` | Containment: option wording behind "Details" |
+| `4cdb0c0` | Perf: libuv thread pool sized to the CPU count in the lab start script |
+| `1d317d6` | Dashboard: mission path strip |
+| `78ff570` | Landing: atmospheric network backdrop, shorter copy, details behind disclosure |
+| `487dd30` | Organizer: event pipeline (Round 1 -> qualification -> Round 2) |
+| `d381d15` | Round 2 hand-off transition (waiting screen only); phone overflow fix; layout/console journey |
+The final commit of the branch is recorded in the verification report after the last regression run.
 
-## Done in this branch
-- [x] Worktree `D:\Ghost404-TestWorkspace\unified`, disposable local PostgreSQL only.
-- [x] **GHOST//OS system bar** (`OsHeader`) on every screen: landing, login, player dashboard, five Round 1 chapters, forensic snapshot, Round 2, organizer pages, organizer login, Demo Mode. Replaces the desktop command rail and 14 hand-written headers.
-- [x] Window-chrome treatment for the landing case file and the login portal; CSS-only boot reveal (~1.4 s, never blocks input, off for reduced motion/print).
-- [x] Sign-in button with a real pending state (`useFormStatus`).
-- [x] Fonts now ship with the build (`geist` package, SIL OFL) instead of `next/font/google`: no request to Google at build or run time.
-- [x] Round 2 player screen: standing "write every answer on paper" reminder.
-- [x] Bug fixed: intermittent page-wide horizontal overflow on Kill Switch (`.rp-sr` absolutely positioned outside the scroll wrapper). It failed the a11y/overflow test about half the time.
-- [x] New browser suite `tests/phase5-ghostos-shell.spec.ts` (6 tests).
-- [x] LAN smoke with the unchanged Phase 1 scripts against a separate `ghost404_lab_unified` database (see runbook).
-- [x] 50-team Round 1 load test repeated on this build.
-- [x] Documentation set (this file, architecture, UX, LAN runbook, verification, release checklist).
+## Definition-of-done checklist (honest)
+| Item | Status |
+|---|---|
+| Landing redesigned | **Done** (atmosphere, shorter copy, boot reveal; not a long cinematic by design) |
+| Login redesigned | **Partly**: window chrome + pending state from pass 1; no new success animation |
+| Team dashboard redesigned | **Done** (mission path + next action; cards kept as navigation) |
+| Desktop shell | **Done**: system bar + dock + windows |
+| Window manager | **Done**: open, close, focus/stack, drag, resize, minimize, restore, viewport clamping, keyboard, phone/tablet sheet fallback, layout restore on refresh |
+| Functional investigation applications | **Done** where the game has the data: Event console/inspector, Case records, Evidence explorer, Mail compare, Link inspector, Dossier explorer, Link board, Evidence board, Case file, Systems map. Not built (no supporting data): standalone "Network Analysis" and "Incident Timeline" apps |
+| Inbox / Trail / Insider / Containment / Verdict redesigned | **Done** as described above. Verdict's reasoning step and Containment's task panels keep their existing form-style panels (scoring contract unchanged) |
+| Round 1 text audit | **Done and measured** (`docs/ghost404-text-audit.md`). Containment remains the densest screen |
+| Default log walls replaced | **Done** for Trail (25 table rows -> 0 on arrival, 42 % fewer words) and Insider (26 records -> 0) |
+| Round 1 scoring and progression preserved | Verified by the existing Round 1 chain (31 tests) |
+| Round 2 Ch1 console | Existing alert console kept (tabs, chat, options); no new work |
+| Kill Switch topology | **Done** |
+| Audit the AI comparison | **Done** |
+| Three Calls command center | **Existing** situation board + three call cards kept; no per-call consequence animation (answers are on paper, and consequences would reveal answers) |
+| Round 2 shared-clock timing | Unchanged engine; re-verified by the paper DB and browser suites |
+| Organizer interface redesigned | **Partly**: event pipeline + system bar; the existing cards/sections are unchanged |
+| Projector polished | **Not changed** this pass (checked at 6 viewports for overflow/console only) |
+| Round transitions | **Partly**: Round 2 hand-off on the waiting screen; Round 1 completion screen is the pre-existing one |
+| Motion + reduced motion | Boot reveal, window open, dock, path pulse, landing backdrop; all off under `prefers-reduced-motion` |
+| Target desktop layouts verified | **Done**: 18 routes x 6 viewports (1920x1080, 1440x900, 1366x768, 1280x720, tablet, phone) |
+| Browser journeys | A (Round 1), B (Round 2 incl. live boundaries), C (windows), D (organizer), E (security), F (layout) all have browser tests; see verification |
+| Local LAN smoke | Run on this build (see verification) |
+| Real college LAN | **Not done; cannot be done from this laptop** |
 
-## Already present and verified (inherited, not rebuilt)
-- Round 1: five chapters, task scoring, 50% unlock threshold, Continue to next chapter, draft preservation, back navigation, hints, Tamper Alert bonus, server clock.
-- Round 1 interactive tools from the hybrid redesign: Inbox evidence grouping/mail authentication, Trail activity timeline + filters + session path, Insider evidence wall, Containment response stage rail, Verdict case reconstruction.
-- Round 2: 8/12/10/10 server-clock chapters, no backtracking, no digital answers, organizer control room, projector countdown, printables, Demo Mode.
-
-## Not done (honest list)
-- [ ] **Window manager** (drag, resize, minimize/restore of panels). Not built: the chapters are single-purpose workspaces and decorative windows would not help solve them. The window chrome on landing/login is styling only.
-- [ ] Optional sound design. Not built.
-- [ ] React Bits / Motion / shadcn / Lucide were **not adopted**. The existing CSS/SVG system and the system bar cover the need; adding them would be dependency weight without a gameplay benefit this session.
-- [ ] **Per-chapter text audit and rewrite of Round 1.** Not performed. The earlier hybrid redesign already moved logs behind filters/inspectors and this session did not re-author chapter copy.
-- [ ] Round 2 Kill Switch is a sortable monitor table with sparklines and an inspector, **not** a topology/connection map. Chapter 4 gives context tiles, not per-option consequence animations.
-- [ ] Cinematic Round 1 → Round 2 transition. The existing qualification board and organizer enrollment gate remain; no new animation.
-- [ ] Organizer pages other than the shared system bar were not visually redesigned.
-- [ ] Real multi-device college-LAN test. Only localhost and this laptop's own LAN-interface address were tested.
-- [ ] Legacy Round 2 browser specs (`phase4-round2`, `phase5-round2`, `phase5-visual`, `organizer-ties`) still excluded unless `GHOST_R2_LEGACY=1` (they test the retired 8-unit UI).
+## Not done / known gaps
+- Sound design (optional): not built.
+- React Bits / Motion / shadcn: not adopted. A small CSS + reducer implementation covers the need; only `lucide-react` (icons) and `geist` (fonts) were added.
+- "Network Analysis" and "Incident Timeline" as separate apps: no new data exists for them; the Trail timeline and Kill Switch map cover those roles.
+- Round 2 Chapter 1 and 4 structure unchanged (screenshots reviewed: they already read as an alert console and a command-center board).
+- Keyboard-only and screen-reader use verified by automation (axe, keyboard tests for the window manager and map) but not by a human.
+- Legacy Round 2 browser specs still excluded (`GHOST_R2_LEGACY=1`).
 
 ## Continuation instructions
-1. `git worktree list` and check out `feat/ghost404-unified-ghost-os` in `D:\Ghost404-TestWorkspace\unified`.
-2. `npm ci`, `npx prisma generate`, then run the checks in `docs/ghost404-verification.md`.
-3. Remaining work in priority order: Round 1 copy audit (Part 4 of the directive), Round 2 Kill Switch topology view, organizer page redesign, window manager (only if it proves useful in playtests).
+1. `git worktree list`; work in `D:\Ghost404-TestWorkspace\unified` on `feat/ghost404-unified-ghost-os`.
+2. `npm ci && npx prisma generate`; run the checks in `docs/ghost404-verification.md`.
+3. Remaining work in priority order: (a) organizer pages beyond the pipeline strip, (b) projector visual polish, (c) Containment density, (d) Round 1 completion cinematic, (e) human accessibility pass.

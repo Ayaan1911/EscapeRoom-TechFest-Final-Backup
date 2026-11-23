@@ -32,7 +32,19 @@ No migrations were added in this branch. The five existing migrations are unchan
 ## Offline behavior
 No external fonts, scripts, images, analytics or API calls. The built client contains only documentation/namespace strings (`w3.org`, `nextjs.org`, `react.dev`) that are never fetched. A browser test records every request on the landing page, login, dashboard and all five chapters and fails if any leaves the app origin.
 
+## Window manager (`src/components/os/os-windows.tsx`)
+- `<OsDesktop scope="trail">` provides a reducer-held map of windows (`x, y, w, h, open, min, z`). Chapter desks render `<ToolWindow id title icon size side>` children; closed windows render nothing, minimized ones stay mounted (scroll and inner state are kept). The dock lists the registered tools.
+- **UI-only state**: nothing here touches game state, scoring, drafts or the server. Geometry and open flags are kept in `sessionStorage` (`ghostos.windows.<scope>`) so a refresh restores the layout; a test asserts no evidence or answer text is stored there.
+- **Bounds**: `clampRect` keeps every window fully inside the viewport, below the 56 px system bar and above the dock, on every move/resize and on browser resize, so a window can never become unreachable.
+- **Responsive**: at <1100 px (`matchMedia`) windows become full-width sheets without drag/resize; the same controls and keyboard handling apply.
+- **Accessibility**: windows are non-modal `role="dialog"` with labels; title bar focusable; arrows move, Shift+arrows resize, Escape closes; dock buttons use `aria-pressed` plus text state.
+- **Stacking**: windows `z-index: 1000 + focus order`, dock above all, so a window is never hidden under the Demo Mode bar or the system bar.
+- Fonts and icons are bundled (`geist`, `lucide-react`); no network access at run time.
+
+## Chapter tools (all read-only presentations of data the player can already see)
+Mail compare and Link inspector (derived from the recovered mailbox), Link board (counts of dossier records by person and type), Systems map (case systems; node states mirror the team's own selections), Evidence board and Case file (Verdict), Connection map and Audit split-screen (Round 2 content). Scoring, answer validation, drafts and the Round 2 clock are unchanged.
+
 ## Known architectural limits
 - Polling, not push: a Round 2 tab learns of a transition within about a second of the boundary (it refetches every second near the end of a chapter); a tab opened mid-chapter polls every ~4 s.
 - A tab already open keeps the framework payload it was served in its page source after the chapter closes. It stops rendering it; nothing about later chapters is ever sent early.
-- Login is CPU-bound (password hashing): a simultaneous burst from 50 teams on one core is the slowest path measured.
+- Login is CPU-bound (scrypt on libuv's thread pool, default 4 threads). The lab start script now sizes the pool to the CPU count (up to 16): in the local 50-team test login p95 went from 3.5 s to 2.1 s. Page rendering still runs on one Node main thread.
