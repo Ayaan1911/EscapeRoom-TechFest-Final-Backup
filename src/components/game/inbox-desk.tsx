@@ -6,6 +6,8 @@ import { ChainDiagram, ConnectionBanner, DeskFrame, HintBox, ResultStrip, StateB
 import { Badge, Tabs } from "@/components/ui/kit";
 import { AuthDots } from "./case-visuals";
 import { useDemo } from "@/components/demo/demo-context";
+import { OsDesktop, ToolWindow, useOs } from "@/components/os/os-windows";
+import { FolderSearch, GitCompare, Link2 } from "lucide-react";
 import type { InboxArtifact, InboxEvidence } from "@/types/inbox";
 
 const KIND_LABEL = { gateway: "Gateway", authentication: "Sign-in", database: "Export" } as const;
@@ -17,14 +19,42 @@ function AuthBadges({ value }: { value: string }) {
   return <>{value.split(";").map(part => part.trim()).filter(Boolean).map(part => { const [k, v = ""] = part.split("="); return <Badge key={part} tone={v === "pass" ? "ok" : v === "fail" ? "alert" : "amber"}>{k.toUpperCase()} {v === "pass" ? "✓" : v === "fail" ? "✕" : "?"} {v || "?"}</Badge>; })}</>;
 }
 
-export function InboxDesk({ evidence, initialState, initialDrafts }: { evidence: Omit<InboxEvidence, "snapshot">; initialState: ChapterState; initialDrafts: ServerDraft[] }) {
+type Email = InboxEvidence["emails"][number];
+/** Side-by-side field comparison of any two recovered messages. Plain values only: it never marks which one is suspicious. */
+function MailCompare({ emails, a, b, setA, setB }: { emails: Email[]; a: string; b: string; setA: (id: string) => void; setB: (id: string) => void }) {
+  const A = emails.find(e => e.id === a)!, B = emails.find(e => e.id === b)!;
+  const header = [...new Set([...Object.keys(A.headers), ...Object.keys(B.headers)])];
+  const rows: [string, string, string][] = [
+    ["Display name", A.sender, B.sender], ["Address", A.address, B.address], ["Address domain", A.address.split("@")[1] ?? "", B.address.split("@")[1] ?? ""], ["Sent (UTC)", A.timestamp, B.timestamp],
+    ["Subject", A.subject, B.subject], ["Links", String(A.links.length), String(B.links.length)], ["Attachments", A.attachments.map(x => `${x.name} (${x.type})`).join(", ") || "none", B.attachments.map(x => `${x.name} (${x.type})`).join(", ") || "none"],
+    ...header.map((h): [string, string, string] => [h, A.headers[h] ?? "(absent)", B.headers[h] ?? "(absent)"]),
+  ];
+  const pick = (label: string, value: string, set: (id: string) => void) => <label>{label}<select value={value} onChange={e => set(e.target.value)}>{emails.map(e => <option key={e.id} value={e.id}>{e.id} · {e.sender}</option>)}</select></label>;
+  return <div className="pg-compare"><div className="pg-fields">{pick("Message A", a, setA)}{pick("Message B", b, setB)}</div>
+    <table className="k-table"><caption className="k-sr">Field-by-field comparison of messages {a} and {b}</caption><thead><tr><th scope="col">Field</th><th scope="col">{a}</th><th scope="col">{b}</th></tr></thead>
+      <tbody>{rows.map(([k, x, y]) => <tr key={k}><th scope="row">{k}</th><td className="k-mono">{x}</td><td className="k-mono">{y}</td></tr>)}</tbody></table></div>;
+}
+function parts(url: string) {
+  try { const u = new URL(url); return { scheme: u.protocol.replace(":", ""), host: u.host, path: u.pathname + u.hash, query: [...u.searchParams.entries()].map(([k, v]) => `${k}=${v}`).join(" & ") || "none" }; } catch { return null; }
+}
+/** Every link in the mailbox, broken into scheme / host / path / query. Links are inert text; nothing is ever fetched. */
+function LinkInspector({ emails, onPick }: { emails: Email[]; onPick: (id: string) => void }) {
+  const all = emails.flatMap(e => e.links.map(l => ({ email: e, link: l })));
+  if (!all.length) return <p className="k-empty">No links in this mailbox.</p>;
+  return <table className="k-table"><caption className="k-sr">Links found in the mailbox, split into parts. Links are not opened.</caption><thead><tr><th scope="col">Message</th><th scope="col">Scheme</th><th scope="col">Host</th><th scope="col">Path</th><th scope="col">Query</th></tr></thead>
+    <tbody>{all.map(({ email, link }, i) => { const p = parts(link); return <tr key={email.id + i}><th scope="row"><button type="button" className="k-btn k-btn-sm" onClick={() => onPick(email.id)}>{email.id}</button></th>
+      {p ? <><td className="k-mono">{p.scheme}</td><td className="k-mono">{p.host}</td><td className="k-mono">{p.path}</td><td className="k-mono">{p.query}</td></> : <td colSpan={4} className="k-mono">{link} (not a valid URL)</td>}</tr>; })}</tbody></table>;
+}
+
+function InboxWorkspace({ evidence, initialState, initialDrafts }: { evidence: Omit<InboxEvidence, "snapshot">; initialState: ChapterState; initialDrafts: ServerDraft[] }) {
   const { state, busy, feedback, result, connection, send, submitTask, remaining, retrySeconds } = useChapter(0, initialState);
-  const editable = isEditable(state, 0), demo = useDemo();
+  const editable = isEditable(state, 0), demo = useDemo(), os = useOs();
   const drafts = useDrafts(0, initialDrafts, editable), f = fieldApi(drafts);
   const [selectedId, setSelectedId] = useState(evidence.emails[0].id);
   const [read, setRead] = useState([evidence.emails[0].id]);
   const [tab, setTab] = useState("message"), [open, setOpen] = useState<string | null>(null);
   const [tamper, setTamper] = useState({ emailId: "", artifactId: "", technique: "" });
+  const [cmpA, setCmpA] = useState(evidence.emails[0].id), [cmpB, setCmpB] = useState(evidence.emails[Math.min(1, evidence.emails.length - 1)].id);
   const list = useRef<HTMLElement>(null);
   const email = evidence.emails.find(item => item.id === selectedId)!;
   const marked = f.str("inbox.entry", "emailId");
@@ -52,7 +82,7 @@ export function InboxDesk({ evidence, initialState, initialDrafts }: { evidence:
       { id: "mail", label: "Email", value: marked }, { id: "nav", label: "Navigation", value: pick("gateway") }, { id: "cap", label: "Capture", value: f.str("inbox.entry", "snapshotId") },
       { id: "auth", label: "Sign-in", value: pick("authentication") }, { id: "ses", label: "Session", value: sessionId }, { id: "db", label: "Export", value: pick("database") }]} />
 
-    <div className="k-inbox-grid pg-bench">
+    <div className="k-inbox-grid pg-bench is-two">
       <aside className="k-mail-list" aria-label="Recovered emails" ref={list} onKeyDown={moveSelection}>
         <div className="k-pane-head"><span className="k-eyebrow">MAILBOX · {evidence.emails.length}</span><small>{evidence.recipient}</small></div>
         {evidence.emails.map(item => <button key={item.id} type="button" className={`k-mail-item ${read.includes(item.id) ? "is-read" : "is-unread"}`} aria-pressed={selectedId === item.id} onClick={() => select(item.id)}>
@@ -60,6 +90,7 @@ export function InboxDesk({ evidence, initialState, initialDrafts }: { evidence:
           <strong>{item.sender}</strong><span className="k-mail-subject">{item.subject}</span>
           <span className="k-mail-flags">{marked === item.id && <Badge tone="amber">★ Breach email</Badge>}{item.attachments.length > 0 && <Badge>📎 {item.attachments.length}</Badge>}{!read.includes(item.id) && <Badge tone="info">Unread</Badge>}</span>
         </button>)}
+        <div className="pg-qr"><strong>QR forensic snapshot</strong><span>Printed card → capture ID.</span>{demo ? <a className="k-btn k-btn-primary k-btn-sm" href="/admin/inbox-kit" target="_blank" rel="noopener">Open the printed card kit ↗</a> : <a className="k-btn k-btn-primary k-btn-sm" href="/clue/inbox" target="_blank" rel="noopener">Open QR forensic snapshot ↗</a>}</div>
       </aside>
 
       <article className="k-viewer" aria-label="Selected email" key={email.id}>
@@ -71,11 +102,13 @@ export function InboxDesk({ evidence, initialState, initialDrafts }: { evidence:
           {tab === "attachments" && (email.attachments.length ? email.attachments.map(a => <div className="k-attachment" key={a.id}><div><strong className="k-mono">{a.id}</strong> · {a.name}<small>{a.type} / {a.size}</small></div>{a.text && <blockquote>{a.text}</blockquote>}</div>) : <p className="k-empty">No attachments.</p>)}
           {tab === "headers" && <dl className="k-facts">{Object.entries(email.headers).map(([k, v]) => <div key={k}><dt>{k}</dt><dd className="k-mono">{v}</dd></div>)}</dl>}
         </Tabs>
-        <footer className="k-viewer-actions"><button type="button" className="k-btn" aria-pressed={marked === email.id} disabled={!editable} onClick={() => f.set("inbox.entry", "emailId", marked === email.id ? "" : email.id)}>{marked === email.id ? "★ Marked as breach email" : "☆ Mark as breach email"}</button></footer>
+        <footer className="k-viewer-actions"><button type="button" className="k-btn" aria-pressed={marked === email.id} disabled={!editable} onClick={() => f.set("inbox.entry", "emailId", marked === email.id ? "" : email.id)}>{marked === email.id ? "★ Marked as breach email" : "☆ Mark as breach email"}</button><button type="button" className="k-btn" onClick={() => { setCmpA(email.id); os.open("compare"); }}>Compare with another message</button><button type="button" className="k-btn" onClick={() => os.open("links")}>Inspect links</button></footer>
       </article>
 
-      <aside className="k-rail pg-rail" aria-label="Case file">
-        <div className="pg-qr"><strong>QR forensic snapshot</strong><span>Printed card → capture ID.</span>{demo ? <a className="k-btn k-btn-primary k-btn-sm" href="/admin/inbox-kit" target="_blank" rel="noopener">Open the printed card kit ↗</a> : <a className="k-btn k-btn-primary k-btn-sm" href="/clue/inbox" target="_blank" rel="noopener">Open QR forensic snapshot ↗</a>}</div>
+    </div>
+
+    <ToolWindow id="records" title="Evidence explorer" icon={FolderSearch} side="right" size={{ w: 460, h: 600 }}>
+      <div className="pg-rail" aria-label="Case file records">
         <h2 className="pg-rail-h">Records <span className="pg-chip">{evidence.artifacts.length}</span></h2>
         <div className="k-artifacts">{(["gateway", "authentication", "database"] as const).map(kind => <section key={kind} className="pg-kind" aria-label={`${GROUP[kind]} (${evidence.artifacts.filter(a => a.kind === kind).length})`}><h3 className="pg-kindh">{GROUP[kind]}</h3>{evidence.artifacts.filter(a => a.kind === kind).map(a => { const [task, key] = KIND_TASK[a.kind], pinned = f.str(task, key) === a.id, expanded = open === a.id;
           return <article key={a.id} className={`k-artifact ${pinned ? "is-pinned" : ""}`}>
@@ -83,8 +116,14 @@ export function InboxDesk({ evidence, initialState, initialDrafts }: { evidence:
               <button type="button" className="k-pin" aria-pressed={pinned} aria-label={`${pinned ? "Unpin" : "Use"} ${a.id} as ${KIND_LABEL[a.kind]} evidence`} disabled={!editable} onClick={() => f.set(task, key, pinned ? "" : a.id)}>{pinned ? "★" : "☆"}</button></header>
             {expanded && <dl className="k-facts">{Object.entries(a.facts).map(([k, v]) => <div key={k}><dt>{k}</dt><dd className="k-mono">{v}</dd></div>)}</dl>}
           </article>; })}</section>)}</div>
-      </aside>
-    </div>
+      </div>
+    </ToolWindow>
+    <ToolWindow id="compare" title="Mail compare" icon={GitCompare} size={{ w: 760, h: 540 }}>
+      <MailCompare emails={evidence.emails} a={cmpA} b={cmpB} setA={setCmpA} setB={setCmpB} />
+    </ToolWindow>
+    <ToolWindow id="links" title="Link inspector" icon={Link2} side="right" size={{ w: 560, h: 420 }}>
+      <LinkInspector emails={evidence.emails} onPick={select} />
+    </ToolWindow>
 
     <section className="pg-tasks" aria-label="Scored tasks">
       <h2 className="pg-h">Tasks <small>Scored one by one</small></h2>
@@ -119,3 +158,5 @@ export function InboxDesk({ evidence, initialState, initialDrafts }: { evidence:
     </div>
   </DeskFrame>;
 }
+
+export function InboxDesk(props: Parameters<typeof InboxWorkspace>[0]) { return <OsDesktop scope="inbox"><InboxWorkspace {...props} /></OsDesktop>; }

@@ -28,3 +28,9 @@ body:has(.os-dock) { padding-bottom: 78px; }
 @media (max-width: 760px) { .os-dock-btn span:not(.k-sr) { font-size: 12px; } .os-dock-btn { padding: 0 10px; } }
 @media (prefers-reduced-motion: reduce) { .os-win { animation: none; } .os-dock-btn { transition: none; } .os-dock-btn:hover { transform: none; } }
 @media print { .os-dock, .os-win { display: none !important; } }
+
+/* Inbox: with the evidence explorer in a window the mailbox is two panes (list | reader) */
+@media (min-width: 900px) { .k-inbox-grid.is-two { grid-template-columns: minmax(250px, 360px) minmax(0, 1fr); } }
+.k-mail-list .pg-qr { margin: 12px; }
+.pg-compare .k-table th[scope="row"] { width: 22%; font: 600 12px var(--font-mono); letter-spacing: .06em; color: var(--muted); text-align: left; }
+.pg-compare .k-table td { overflow-wrap: anywhere; }
