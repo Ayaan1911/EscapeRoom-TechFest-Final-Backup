@@ -102,3 +102,18 @@ Palette: `src/app/obsidian.css` (authoritative tokens; the old blue/cyan values 
 | Final Verdict | Reconstruction board + decision slots; mechanic unchanged |
 | Completion | Sealed-case-file presentation + "where this team stands" (Round 1 complete -> organizer review -> Round 2 organizer-controlled). No automatic Round 2 |
 | Not done | React Bits / Motion not adopted (CSS/SVG only); no player playtest; Round 2, organizer, Demo, projector not touched in this phase beyond inherited colours; dashboard total vs landing score table not re-audited against scoring source |
+
+## Round 2 case document v2 (open-60) - this pass
+Spec, policies, key-file format and approvals: `docs/ghost404-round2-open60.md`. Answers live only in the git-ignored private key file.
+
+| Item | State |
+|---|---|
+| Inject 1 data, five choices, paper workflow, incident-triage desk | Done, browser-verified |
+| Inject 2 four-attempt BLOCK terminal (server-side, atomic, persistent, team-isolated, locks at pens down) | Done, DB + browser tested |
+| Inject 2 target classification | **PROVISIONAL**: case document v2 lists no targets; the private key reuses the earlier approved Kill Switch classification; owner must confirm |
+| Inject 3 twelve records, eight claims, click-based verification desk | Done, browser-verified |
+| Inject 4 status, three calls, six statements, command center | Done; statement and chat wording reconstructed from the spec summary (VERIFY against the PDF) |
+| Organizer-selected format, snapshotted at start, cannot switch while running | Done; default stays 40-minute |
+| 40-minute sequential format | Unchanged; its suites pass |
+| v2 printables, Demo format switch, projector 60-minute view | Done |
+| Not done | Boardroom Verdict (out of scope); terminal attempt-reset procedure |

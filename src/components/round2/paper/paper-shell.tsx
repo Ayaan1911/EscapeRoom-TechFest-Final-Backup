@@ -19,7 +19,9 @@ export function PaperShell({ initial, teamName, demo }: { initial: PaperStatus; 
     try {
       const r = await fetch("/api/round2/status", { cache: "no-store" });
       if (!r.ok) throw new Error(String(r.status));
-      const next = (await r.json()) as PaperStatus; base.current = { server: Date.parse(next.serverNow), perf: performance.now() }; latest.current = next; setStatus(next); setNowMs(base.current.server); setOffline(false);
+      const raw = await r.json();
+      if (raw && raw.format === "open-60") { window.location.reload(); return; } // the organizer started the 60-minute format: reload into its shell
+      const next = raw as PaperStatus; base.current = { server: Date.parse(next.serverNow), perf: performance.now() }; latest.current = next; setStatus(next); setNowMs(base.current.server); setOffline(false);
     } catch { setOffline(true); }
   }, []);
   useEffect(() => {

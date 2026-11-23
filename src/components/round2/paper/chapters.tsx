@@ -26,13 +26,13 @@ export function AlertDesk({ c }: { c: Ch1 }) {
     </div></div>;
 }
 
-function Spark({ series, tone }: { series: number[]; tone?: string }) {
+export function Spark({ series, tone }: { series: number[]; tone?: string }) {
   const max = Math.max(1, ...series);
   return <svg className={`rp-spark ${tone ?? ""}`} viewBox={`0 0 ${series.length * 4} 24`} role="img" aria-label="Traffic over time">{series.map((v, i) => <rect key={i} x={i * 4 + 0.5} width="3" y={24 - (v / max) * 22 - 1} height={(v / max) * 22 + 1} />)}</svg>;
 }
 const mbOf = (v: string) => { const m = /([\d.]+)\s*(GB|MB|KB)/.exec(v); return m ? Number(m[1]) * (m[2] === "GB" ? 1024 : m[2] === "KB" ? 1 / 1024 : 1) : 0; };
 /** Connection map: the monitor's own ten connections around the NEXUS network. Size = data sent, line weight = active time. Nothing is colour-coded by suspicion. */
-function ConnMap({ conns, sel, onSelect }: { conns: Conn[]; sel: number | null; onSelect: (n: number | null) => void }) {
+export function ConnMap({ conns, sel, onSelect }: { conns: Conn[]; sel: number | null; onSelect: (n: number | null) => void }) {
   const maxSent = Math.max(1, ...conns.map(k => mbOf(k.sent))), maxActive = Math.max(1, ...conns.map(k => k.series.filter(Boolean).length));
   const pos = (i: number) => { const a = (-90 + (i * 360) / conns.length) * Math.PI / 180; return { x: 50 + 38 * Math.cos(a), y: 28 + 20 * Math.sin(a) }; };
   return <figure className="rp-map"><svg viewBox="0 0 100 56" role="group" aria-label="Connection map. Select a connection to inspect it.">

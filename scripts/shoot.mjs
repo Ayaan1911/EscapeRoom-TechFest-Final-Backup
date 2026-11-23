@@ -13,7 +13,7 @@ const PAGES = {
   inbox: ["/play/inbox", "SHOT-MID"], trail: ["/play/trail", "SHOT-MID"], insider: ["/play/insider", "SHOT-MID"],
   containment: ["/admin/demo/round1/containment", "ADMIN"], verdict: ["/admin/demo/round1/verdict", "ADMIN"],
   insiderd: ["/admin/demo/round1/insider", "ADMIN"], trailu: ["/admin/demo/round1/trail", "ADMIN"], inboxd: ["/admin/demo/round1/inbox", "ADMIN"],
-  done: ["/play", "SHOT-DONE"], demo: ["/admin/demo", "ADMIN"], r2a: ["/admin/demo/round2?unit=1", "ADMIN"], r2b: ["/admin/demo/round2?unit=2", "ADMIN"], r2c: ["/admin/demo/round2?unit=3", "ADMIN"], r2d: ["/admin/demo/round2?unit=4", "ADMIN"],
+  done: ["/play", "SHOT-DONE"], v1: ["/admin/demo/round2?format=open-60&unit=1", "ADMIN"], v2: ["/admin/demo/round2?format=open-60&unit=2", "ADMIN"], v3: ["/admin/demo/round2?format=open-60&unit=3", "ADMIN"], v4: ["/admin/demo/round2?format=open-60&unit=4", "ADMIN"], demo: ["/admin/demo", "ADMIN"], r2a: ["/admin/demo/round2?unit=1", "ADMIN"], r2b: ["/admin/demo/round2?unit=2", "ADMIN"], r2c: ["/admin/demo/round2?unit=3", "ADMIN"], r2d: ["/admin/demo/round2?unit=4", "ADMIN"],
   admin: ["/admin", "ADMIN"], projector: ["/admin/round2/projector", "ADMIN"], projector1: ["/admin/projector", "ADMIN"], r2wait: ["/round2", "R2-01"],
 };
 const browser = await chromium.launch(), ctxs = new Map();

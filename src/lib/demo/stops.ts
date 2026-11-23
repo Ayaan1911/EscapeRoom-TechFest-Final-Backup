@@ -6,5 +6,6 @@ export const DEMO_STOPS: { href: string; label: string; group: string }[] = [
   { href: "/admin/demo/round1", label: "Round 1 dashboard", group: "Round 1" },
   ...R1.map(([slug, label]) => ({ href: `/admin/demo/round1/${slug}`, label, group: "Round 1" })),
   ...R2.map(([unit, label]) => ({ href: `/admin/demo/round2?unit=${unit}`, label, group: "Round 2" })),
+  ...R2.map(([unit, label]) => ({ href: `/admin/demo/round2?format=open-60&unit=${unit}`, label: `v2 ${label}`, group: "Round 2 v2" })),
 ];
 

@@ -107,6 +107,20 @@ model R2Session {
   resultsPublishedAt DateTime?
   contentVersion String?
   scoringPolicy String? // fixed at start ("best-v1"); NULL on a legacy session = "union-v0"
+  format String? // fixed at start: "paper-40" (sequential, default) or "open-60" (case document v2). NULL = paper-40
+}
+// Inject 2 terminal (open-60 format only). One row per consumed BLOCK attempt. The (team, session start, seq) key makes the 4-attempt budget
+// impossible to exceed even with concurrent tabs: seq is 1..4 and a fifth row cannot be created. result: caught | cleared | repeat.
+model R2BlockAttempt {
+  id Int @id @default(autoincrement())
+  teamId String
+  sessionStartsAt DateTime
+  seq Int
+  ip String
+  result String
+  createdAt DateTime @default(now())
+  @@unique([teamId, sessionStartsAt, seq])
+  @@index([teamId, sessionStartsAt])
 }
 // Enrollment from the organizer-confirmed qualification snapshot. status: active | standby | withdrawn.
 model R2Finalist {
