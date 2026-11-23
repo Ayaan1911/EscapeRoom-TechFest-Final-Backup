@@ -24,7 +24,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const complete = report.rows.filter(row => row.completedAt !== null).length;
   return <div className="site-shell">
     <OsHeader area="Control center"><form action={signOutAdmin}><button className="k-btn k-btn-primary">Log out</button></form></OsHeader>
-    <main className="dashboard-main"><div className="k-desk">
+    <main className="dashboard-main"><div className="k-desk cn-scene cn-center">
       <header className="k-mission">
         <div className="k-mission-main"><div><span className="k-eyebrow">ROUND 1 / {state}</span><h1>Event operations</h1>
           <p className="k-objective">{round.startsAt ? `Started ${utc(round.startsAt)} · deadline ${utc(round.deadline!)}` : "Waiting for organizer start · fixed 60-minute clock"}</p></div>

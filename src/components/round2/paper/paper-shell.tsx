@@ -37,14 +37,14 @@ export function PaperShell({ initial, teamName, demo }: { initial: PaperStatus; 
 
   if (demo) {
     const ch = demo.chapters.find(c => c.n === demoN)!;
-    return <div className="rp-wrap" data-chapter={ch.n}><TopBar team="Organizer preview" right={<span className="rp-demo">DEMO · NO TIMERS · NOTHING IS RECORDED</span>} />
+    return <div className="rp-wrap cn-scene cn-r2s" data-chapter={ch.n}><TopBar team="Organizer preview" right={<span className="rp-demo">DEMO · NO TIMERS · NOTHING IS RECORDED</span>} />
       <nav className="rp-rail" aria-label="Chapters">{demo.chapters.map(c => <button key={c.n} aria-current={c.n === demoN ? "step" : undefined} className={c.n === demoN ? "is-active" : "is-open"} onClick={() => setDemoN(c.n)}><b>{c.n}</b><span>{c.title}</span></button>)}</nav>
       <ChapterHead n={ch.n} title={ch.title} /><ChapterBody ch={ch} /></div>;
   }
-  if (status.phase === "complete") return <div className="rp-wrap"><TopBar team={teamName} /><section className="rp-done" role="status"><h1>INVESTIGATION COMPLETE — PENS DOWN</h1><p>Put your pen down and hand your answer sheet to a volunteer. Wait for the jury.</p></section></div>;
-  if (status.phase === "not_started" || !status.chapter) return <div className="rp-wrap"><TopBar team={teamName} /><div className="os-boot os-boot-r2" aria-hidden="true"><div><b>GHOST RETURNS</b><span>incoming transmission · round 2</span><i /></div></div><section className="rp-wait" role="status"><h1>Stand by</h1><p>The investigation starts when the organizer says so. Keep this page open; it will begin by itself.</p></section>{offline && <p className="rp-offline" role="alert">Connection lost. Retrying…</p>}</div>;
+  if (status.phase === "complete") return <div className="rp-wrap cn-scene cn-r2s"><TopBar team={teamName} /><section className="rp-done" role="status"><h1>INVESTIGATION COMPLETE — PENS DOWN</h1><p>Put your pen down and hand your answer sheet to a volunteer. Wait for the jury.</p></section></div>;
+  if (status.phase === "not_started" || !status.chapter) return <div className="rp-wrap cn-scene cn-r2s"><TopBar team={teamName} /><div className="os-boot os-boot-r2" aria-hidden="true"><div><b>GHOST RETURNS</b><span>incoming transmission · round 2</span><i /></div></div><section className="rp-wait" role="status"><h1>Stand by</h1><p>The investigation starts when the organizer says so. Keep this page open; it will begin by itself.</p></section>{offline && <p className="rp-offline" role="alert">Connection lost. Retrying…</p>}</div>;
   const ch = status.chapter, left = chapterEnd! - nowMs, total = Date.parse(status.endsAt!) - nowMs;
-  return <div className="rp-wrap" data-chapter={ch.n}>
+  return <div className="rp-wrap cn-scene cn-r2s" data-chapter={ch.n}>
     <TopBar team={teamName} right={<div className="rp-clocks"><div><small>THIS CHAPTER</small><b role="timer" aria-label="Chapter time remaining" className={left < 60_000 ? "is-urgent" : ""}>{mmss(left)}</b></div><div><small>INVESTIGATION</small><b role="timer" aria-label="Investigation time remaining">{mmss(total)}</b></div></div>} />
     <nav className="rp-rail" aria-label="Chapters">{status.rail.map(r => <span key={r.n} aria-current={r.state === "active" ? "step" : undefined} className={`is-${r.state}`}><b>{r.state === "done" ? "✓" : r.state === "locked" ? "🔒" : r.n}</b><span>{r.state === "locked" ? `Chapter ${r.n}` : r.title}</span></span>)}</nav>
     {offline && <p className="rp-offline" role="alert">Connection lost. The clock keeps running. Retrying…</p>}

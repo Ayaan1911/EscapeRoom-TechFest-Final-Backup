@@ -54,13 +54,16 @@ export function PaperControl() {
 }
 
 /** Full-screen projector countdown with the GHOST_404 taunt at each transition. */
+const R2_NAMES = ["Alert at 2:14 AM", "Kill Switch", "Audit the AI", "The Three Calls"], R2_MIN = [8, 12, 10, 10];
 export function PaperProjector() {
   const { t, nowMs, err } = useTiming(1500);
   const left = t?.chapterEndsAt ? Date.parse(t.chapterEndsAt) - nowMs : 0, total = t?.endsAt && t.phase === "running" ? Date.parse(t.endsAt) - nowMs : 0;
-  return <div className="rpj"><small>OPERATION GHOST_404 · GHOST RETURNS</small>
-    {!t ? <h1>{err || "Connecting…"}</h1> : t.phase === "not_started" ? <h1>STAND BY</h1> : t.phase === "complete" ? <h1 className="rpj-done">INVESTIGATION COMPLETE — PENS DOWN</h1> :
-      <><h2>CHAPTER {t.chapter} OF 4 · {t.chapterTitle?.toUpperCase()}</h2><b className={`rpj-time ${left < 60_000 ? "is-urgent" : ""}`} role="timer" aria-label="Chapter time remaining">{mmss(left)}</b><p>Investigation ends in <b>{mmss(total)}</b></p>
-        <ol className="rpj-rail" aria-label="Chapters">{[1, 2, 3, 4].map(n => <li key={n} className={n === t.chapter ? "is-on" : n < (t.chapter ?? 0) ? "is-done" : ""}>{n}</li>)}</ol></>}
+  const span = t?.chapter ? R2_MIN[t.chapter - 1] * 60_000 : 1, frac = Math.max(0, Math.min(1, left / span));
+  return <div className="rpj"><div className="rpj-radar" aria-hidden="true"><i /><i /><i /><b /></div><small>OPERATION GHOST_404 · GHOST RETURNS</small>
+    {!t ? <h1>{err || "Connecting…"}</h1> : t.phase === "not_started" ? <><h1>STAND BY</h1><p className="rpj-sub">Awaiting the organizer. Pens down until the clock starts.</p></> : t.phase === "complete" ? <><h1 className="rpj-done">INVESTIGATION COMPLETE — PENS DOWN</h1><p className="rpj-sub">The jury will take it from here.</p></> :
+      <><h2>CHAPTER {t.chapter} OF 4 · {t.chapterTitle?.toUpperCase()}</h2><b className={`rpj-time ${left < 60_000 ? "is-urgent" : ""}`} role="timer" aria-label="Chapter time remaining">{mmss(left)}</b>
+        <div className="rpj-bar" aria-hidden="true"><i style={{ width: `${frac * 100}%` }} /></div><p>Investigation ends in <b>{mmss(total)}</b></p>
+        <ol className="rpj-rail" aria-label="Chapters">{[1, 2, 3, 4].map(n => <li key={n} className={n === t.chapter ? "is-on" : n < (t.chapter ?? 0) ? "is-done" : ""}><span>{n}</span><em>{R2_NAMES[n - 1]}</em></li>)}</ol></>}
     {t?.taunt && <p className="rpj-taunt" role="status">“{t.taunt}” <i>GHOST_404</i></p>}
   </div>;
 }
