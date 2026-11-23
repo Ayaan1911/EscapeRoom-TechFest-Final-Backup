@@ -9,6 +9,8 @@ import { signOutAdmin } from "../organizer/login/actions";
 import { administer } from "./actions";
 import { qualificationReport } from "@/lib/game/qualification.server";
 import { QualificationBoard } from "@/components/game/qualification-board";
+import { EventPipeline } from "@/components/game/event-pipeline";
+import { paperTiming } from "@/lib/round2/paper/service.server";
 
 const utc = (d: Date) => `${d.toISOString().slice(0, 16).replace("T", " ")} UTC`;
 const TONE = { waiting: "amber", active: "ok", finished: "neutral" } as const;
@@ -17,7 +19,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const report = await qualificationReport();
   if (!report) redirect("/organizer/login");
   const round = report.round, state = status(round);
-  const logs = await recentAudit();
+  const logs = await recentAudit(), r2 = await paperTiming();
   const params = await searchParams;
   const complete = report.rows.filter(row => row.completedAt !== null).length;
   return <div className="site-shell">
@@ -28,6 +30,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           <p className="k-objective">{round.startsAt ? `Started ${utc(round.startsAt)} · deadline ${utc(round.deadline!)}` : "Waiting for organizer start · fixed 60-minute clock"}</p></div>
           <dl className="k-stats"><div><dt>Round</dt><dd><Badge tone={TONE[state as keyof typeof TONE] ?? "neutral"}>{state.toUpperCase()}</Badge></dd></div><div><dt>Teams</dt><dd>{report.rows.length} registered</dd></div><div><dt>Finished</dt><dd>{complete} complete · {report.rows.length - complete} in progress</dd></div></dl></div>
       </header>
+      <EventPipeline round1={state as "waiting" | "active" | "finished"} qualification={report.label} round2={r2} />
       {params.error && <p role="alert" className="k-banner k-banner-warn">{params.error}</p>}
       <section className="dm-entry" aria-label="Demo mode"><div><span className="k-eyebrow">SAFE PREVIEW</span><h2>Showing the game to someone?</h2><p>Demo mode opens every chapter and both rounds with no timers and no real scores. It starts nothing and changes no team.</p></div>
         <a className="k-btn k-btn-primary k-btn-lg" href="/admin/demo">ENTER DEMO MODE</a></section>

@@ -65,3 +65,14 @@ test("accessibility (WCAG A/AA) on landing, login and the dashboard", async ({ b
   await page.goto("/login"); await scan("login"); await team(page); await page.goto("/play"); await scan("dashboard");
   expect(problems).toEqual([]); await ctx.close();
 });
+
+test("organizer control center: the event pipeline shows Round 1, qualification and Round 2 from real state; teams cannot see it", async ({ browser }) => {
+  const ctx = await browser.newContext(), page = await ctx.newPage();
+  await page.goto("/organizer/login"); await page.getByLabel("Access code").fill(code()); await page.getByRole("button", { name: "Sign in", exact: true }).click(); await expect(page.getByRole("heading", { name: "Event operations" })).toBeVisible();
+  const pipe = page.getByRole("list", { name: "Event status" }); await expect(pipe.locator("li")).toHaveCount(3);
+  await expect(pipe.locator("li").nth(0)).toContainText("Round 1"); await expect(pipe.locator("li").nth(0)).toContainText("Finished"); // the phase5 seed finishes Round 1
+  await expect(pipe.locator("li").nth(1)).toContainText("Qualification"); await expect(pipe.locator("li").nth(2)).toContainText("Round 2");
+  await pipe.getByRole("link", { name: /Ready|Not started|Chapter|Complete/ }).click(); await expect(page).toHaveURL(/\/admin\/round2/);
+  await ctx.close();
+  const t = await browser.newContext(), tp = await t.newPage(); await team(tp); await tp.goto("/admin"); await expect(tp).toHaveURL(/organizer\/login/); await expect(tp.getByRole("list", { name: "Event status" })).toHaveCount(0); await t.close();
+});
