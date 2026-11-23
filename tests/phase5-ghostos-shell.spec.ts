@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 
-// GHOST//OS shell: one system bar everywhere, offline guarantee (no third-party requests), non-blocking boot reveal, accessibility, generic login errors.
+// GHOST//OS shell (named phase5-* so it only runs under scripts/phase5-e2e.mjs, which seeds P5-* teams): one system bar everywhere, offline guarantee (no third-party requests), non-blocking boot reveal, accessibility, generic login errors.
 // Run through scripts/phase5-e2e.mjs (disposable database, seeded teams P5-01..).
 const code = () => process.env.GHOST_E2E_TEAM_CODE!;
 const axeSrc = readFileSync("node_modules/axe-core/axe.min.js", "utf8");

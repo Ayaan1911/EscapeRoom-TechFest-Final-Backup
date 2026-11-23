@@ -3,7 +3,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 // Static + post-build guards for the paper edition: the answer key and the not-yet-released chapter text must never be in client JavaScript.
-const walk = (dir: string, out: string[] = []) => { for (const e of readdirSync(dir)) { const p = join(dir, e); statSync(p).isDirectory() ? walk(p, out) : out.push(p); } return out; };
+const walk = (dir: string, out: string[] = []) => { for (const e of readdirSync(dir)) { const p = join(dir, e); if (statSync(p).isDirectory()) walk(p, out); else out.push(p); } return out; };
 const KEY_PHRASES = ["ORGANIZER ONLY", "Accept a clue like", "Legitimate look-alikes", "Attacker-controlled:", "fooled SENTINEL-AI", "Paper adaptation of the PDF", "unproven promise", "AI-report audit and explanation of response decisions"];
 const CONTENT_PHRASES = ["ALR-0214", "wsvc_sync.exe", "updater_svc.exe", "Disconnect the infected machines", "salary_slip.pdf.exe", "We confirmed unauthorized access", "CONFIDENCE 99.9%"];
 
