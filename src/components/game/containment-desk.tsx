@@ -17,7 +17,7 @@ export function ContainmentDesk({ evidence, initialCctv, initialState, initialDr
   const { state, busy, feedback, result, connection, send, submitTask, remaining, retrySeconds } = useChapter(3, initialState);
   const editable = isEditable(state, 3), demo = useDemo();
   const drafts = useDrafts(3, initialDrafts, editable), f = fieldApi(drafts);
-  const [movement, setMovement] = useState(""), [dragging, setDragging] = useState<string | null>(null), [cctv, setCctv] = useState(initialCctv), [copyStatus, setCopyStatus] = useState("");
+  const [more, setMore] = useState<string[]>([]), [movement, setMovement] = useState(""), [dragging, setDragging] = useState<string | null>(null), [cctv, setCctv] = useState(initialCctv), [copyStatus, setCopyStatus] = useState("");
   const knownEvents = new Set(evidence.events.map(e => e.id));
   const saved = f.arr(DRAFT.timeline, "eventOrder").filter(id => knownEvents.has(id));
   const eventOrder = saved.length === evidence.events.length ? saved : evidence.events.map(e => e.id);
@@ -49,7 +49,10 @@ export function ContainmentDesk({ evidence, initialCctv, initialState, initialDr
     try { const response = await fetch("/api/game/containment", { cache: "no-store" }); if (!response.ok) throw new Error(); const data = await response.json(); setCctv(data.fallbackCctv); setCopyStatus(data.fallbackCctv ? "Accessible copy loaded. No hint charge." : "No accessible copy granted. Ask the organizer."); }
     catch { setCopyStatus("Unable to check. Retry; nothing changed."); }
   }
-  const choice = (item: Option, picked: boolean, change: () => void, aria: string) => <label key={item.id} className={`k-choice ${picked ? "is-picked" : ""}`}><input type="checkbox" checked={picked} disabled={!editable} onChange={change} aria-label={aria} /><span><strong>{item.id} · {item.title}</strong><small>{item.detail}</small></span></label>;
+  // Option wording is the evidence for the decision, so it stays one click away rather than being removed: the list shows titles, "Details" reveals the full text.
+  const choice = (item: Option, picked: boolean, change: () => void, aria: string) => { const shown = more.includes(item.id);
+    return <label key={item.id} className={`k-choice ${picked ? "is-picked" : ""}`}><input type="checkbox" checked={picked} disabled={!editable} onChange={change} aria-label={aria} /><span><strong>{item.id} · {item.title}</strong>{shown && <small>{item.detail}</small>}</span>
+      <button type="button" className="k-btn k-btn-sm k-btn-ghost" aria-expanded={shown} aria-label={`${shown ? "Hide" : "Show"} details for ${item.id}`} onClick={() => setMore(m => shown ? m.filter(x => x !== item.id) : [...m, item.id])}>{shown ? "Hide" : "Details"}</button></label>; };
   const evidenceItems = [...evidence.artifacts.map(item => ({ id: item.id, title: item.title })), { id: evidence.cctvReference.id, title: "Security-room snapshot" }];
 
   return <DeskFrame chapter={3} title="Containment" caseId={evidence.caseId} state={state} remaining={remaining} drafts={drafts} result={result} connection={connection} objective="Stop it, keep the evidence, restore safely. All actions are fictional decisions." banner={<><StateBanner state={state} chapter={3} /><ConnectionBanner text={connection} next="/play/containment" /></>}>
