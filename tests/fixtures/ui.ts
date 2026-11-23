@@ -62,12 +62,14 @@ export async function solveInsider(page: Page, variant: V) {
   const a = insiderAnswers[variant];
   await page.getByLabel("Insider employee").selectOption(a.employeeId); await submitTask(page, "Insider identified");
   await page.getByLabel("Unauthorized policy action").selectOption(a.actionId); await submitTask(page, "Policy action identified");
+  await openTool(page, "dossier");
   for (const id of a.supportingEvidenceIds) {
     await page.getByLabel("Search dossier", { exact: true }).fill(id);
     await page.getByRole("region", { name: "Dossier records", exact: true }).getByRole("button").first().click();
     const pin = page.getByRole("button", { name: /^☆ Pin evidence/ });
     if (await pin.count()) await pin.click(); // idempotent: already pinned stays pinned
   }
+  await closeAllTools(page);
   await submitTask(page, "Intent, access and approval evidence");
 }
 export async function arrange(page: Page, kind: "event" | "recovery", target: readonly string[]) {

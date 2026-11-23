@@ -5,6 +5,8 @@ import { useDrafts, type ServerDraft } from "./use-drafts";
 import { ChainDiagram, ConnectionBanner, DeskFrame, HintBox, ResultStrip, StateBanner, TaskPanel, fieldApi, isEditable, taskOf } from "./workspace";
 import { Badge } from "@/components/ui/kit";
 import { ActivityTimeline } from "./case-visuals";
+import { OsDesktop, ToolWindow, useOs } from "@/components/os/os-windows";
+import { FolderSearch } from "lucide-react";
 import type { InsiderDossier, InsiderRecord } from "@/types/insider";
 
 const KIND: Record<InsiderRecord["kind"], { label: string; icon: string; tone: "info" | "amber" | "alert" | "ok" | "neutral" }> = {
@@ -13,9 +15,9 @@ const KIND: Record<InsiderRecord["kind"], { label: string; icon: string; tone: "
 };
 const initials = (name: string) => name.split(/\s+/).map(p => p[0]).join("").slice(0, 2).toUpperCase();
 
-export function InsiderDesk({ initialDossier, initialState, initialDrafts }: { initialDossier: InsiderDossier | null; initialState: ChapterState; initialDrafts: ServerDraft[] }) {
+function InsiderWorkspace({ initialDossier, initialState, initialDrafts }: { initialDossier: InsiderDossier | null; initialState: ChapterState; initialDrafts: ServerDraft[] }) {
   const { state, busy, feedback, result, connection, send, submitTask, remaining, retrySeconds } = useChapter(2, initialState);
-  const editable = isEditable(state, 2);
+  const editable = isEditable(state, 2), os = useOs();
   const drafts = useDrafts(2, initialDrafts, editable && state.insiderUnlocked === true), f = fieldApi(drafts);
   const [dossier, setDossier] = useState(initialDossier), [loadError, setLoadError] = useState("");
   const [suspect, setSuspect] = useState(""), [kind, setKind] = useState(""), [search, setSearch] = useState(""), [selected, setSelected] = useState(""), [copyStatus, setCopyStatus] = useState("");
@@ -41,6 +43,7 @@ export function InsiderDesk({ initialDossier, initialState, initialDrafts }: { i
   const record = dossier?.records.find(item => item.id === selected) ?? records[0];
   const person = dossier?.suspects.find(item => item.id === suspect);
   const nameOf = (id: string) => dossier?.suspects.find(s => s.id === id)?.name ?? id;
+  const pickRecord = (id: string) => { setSelected(id); os.open("dossier"); };
   const countFor = (id: string) => dossier?.records.filter(r => r.employees.includes(id)).length ?? 0;
 
   return <DeskFrame chapter={2} title="Insider" caseId="PHYSICAL + DIGITAL" state={state} remaining={remaining} drafts={drafts} result={result} connection={connection} objective="Who deliberately weakened the controls? Access shows opportunity, not intent." banner={<><StateBanner state={state} chapter={2} /><ConnectionBanner text={connection || loadError} next="/play/insider" /></>}>
@@ -66,30 +69,41 @@ export function InsiderDesk({ initialDossier, initialState, initialDrafts }: { i
         {person && <dl className="pg-profile suspect-profile"><div><dt>ID</dt><dd className="k-mono">{person.id}</dd></div><div><dt>Role</dt><dd>{person.role}</dd></div><div><dt>Privileges</dt><dd>{person.privileges}</dd></div><div><dt>Responsibilities</dt><dd>{person.responsibilities}</dd></div><div><dt>Device</dt><dd className="k-mono">{person.device}</dd></div></dl>}
       </section>
 
+      <section className="pg-board" aria-label="Link board">
+        <h2 className="pg-h">Link board</h2><p className="pg-hint-line">Who appears in which kind of record. Pick a cell to open those records in the dossier explorer. A count is not a verdict.</p>
+        <div className="k-tablescroll"><table className="k-table pg-linkboard"><caption className="k-sr">Number of dossier records per staff member and record type. Each count opens the matching records.</caption>
+          <thead><tr><th scope="col">Staff</th>{(Object.keys(KIND) as InsiderRecord["kind"][]).map(k => <th scope="col" key={k}>{KIND[k].label}</th>)}</tr></thead>
+          <tbody>{dossier.suspects.map(person => <tr key={person.id}><th scope="row">{person.name}<small>{person.role}</small></th>{(Object.keys(KIND) as InsiderRecord["kind"][]).map(k => { const n = dossier.records.filter(r => r.kind === k && r.employees.includes(person.id)).length;
+            return <td key={k}>{n ? <button type="button" className="k-btn k-btn-sm" aria-label={`${person.name}: ${n} ${KIND[k].label} record${n > 1 ? "s" : ""}. Open them.`} onClick={() => { setSuspect(person.id); setKind(k); os.open("dossier"); }}>{n}</button> : <span className="k-muted" aria-label="none">·</span>}</td>; })}</tr>)}</tbody></table></div>
+      </section>
+
       <section className="pg-console" aria-label="Dossier explorer">
         <div className="k-filterbar k-filterbar-3">
           <label className="k-filter">Search dossier<input value={search} onChange={e => setSearch(e.target.value)} placeholder="ID, device, phrase" /></label>
           <label className="k-filter">Suspect profile<select value={suspect} onChange={e => setSuspect(e.target.value)}><option value="">All</option>{dossier.suspects.map(item => <option value={item.id} key={item.id}>{item.id} · {item.name}</option>)}</select></label>
           <label className="k-filter">Record type<select value={kind} onChange={e => setKind(e.target.value)}><option value="">All</option>{Object.keys(KIND).map(value => <option key={value}>{value}</option>)}</select></label></div>
-        <div className="k-toolbar"><strong role="status">{records.length} of {dossier.records.length} records</strong><span className="k-spacer" /><button type="button" className="k-btn k-btn-sm" onClick={() => { setSearch(""); setKind(""); setSuspect(""); }}>Reset dossier filters</button></div>
+        <div className="k-toolbar"><strong role="status">{records.length} of {dossier.records.length} records</strong><span className="k-spacer" /><button type="button" className="k-btn k-btn-sm" onClick={() => { setSearch(""); setKind(""); setSuspect(""); }}>Reset dossier filters</button><button type="button" className="k-btn k-btn-sm k-btn-primary" onClick={() => os.open("dossier")}>Open dossier explorer</button></div>
         <ActivityTimeline label="Dossier timeline" items={records.map(r => ({ id: r.id, at: r.timestamp, lane: KIND[r.kind].label, tone: KIND[r.kind].tone }))} selectedId={record?.id} marked={pinned} linked={pinned}
-          highlight={suspect ? records.filter(r => r.employees.includes(suspect)).map(r => r.id) : []} onSelect={setSelected} note="Colour = record type. Ringed = pinned. The line joins only the records you pinned." />
-        <div className="k-insider-grid">
-          <div className="k-reclist" role="region" aria-label="Dossier records" tabIndex={0}>{records.map(item => <button type="button" className={`k-rec k-rec-${item.kind}`} key={item.id} aria-pressed={record?.id === item.id} onClick={() => setSelected(item.id)}>
-            <span className="k-rec-icon" aria-hidden="true">{KIND[item.kind].icon}</span>
-            <span className="k-rec-main"><span className="k-mono k-muted">{item.id}</span><strong>{item.title}</strong><span className="k-rec-meta"><Badge tone={KIND[item.kind].tone}>{KIND[item.kind].label}</Badge><time dateTime={item.timestamp}>{item.timestamp.slice(11, 19)}</time>{pinned.includes(item.id) && <Badge tone="amber">★ pinned</Badge>}</span></span></button>)}
-            {records.length === 0 && <p className="k-empty k-pad">No matching records.</p>}</div>
-          {record && <article className={`k-recview k-rec-${record.kind}`} aria-label="Evidence detail" key={record.id}>
-            <header><span className="k-eyebrow">{record.id} · {KIND[record.kind].label}</span><h3>{record.title}</h3><p className="k-mono k-muted">{record.timestamp}</p>
-              <div className="k-badges">{record.employees.map(id => <button type="button" key={id} className="k-chip-btn" onClick={() => setSuspect(id)} aria-label={`Show records for ${nameOf(id)}`}>{initials(nameOf(id))} · {nameOf(id)}</button>)}</div></header>
-            <p className="k-provenance">Source: {record.provenance}</p>
-            <dl className="k-facts">{Object.entries(record.facts).map(([label, value]) => <div key={label}><dt>{label}</dt><dd className={record.kind === "policy" || record.kind === "access" ? "k-mono" : ""}>{value}</dd></div>)}</dl>
-            <footer className="pg-actions"><button type="button" className="k-btn k-btn-sm k-btn-primary" disabled={!editable || pinned.length >= 8 && !pinned.includes(record.id)} onClick={() => f.toggle("insider.corroboration", "supportingEvidenceIds", record.id, 8)}>{pinned.includes(record.id) ? "★ Unpin evidence" : "☆ Pin evidence ID"}</button><button type="button" className="k-btn k-btn-sm" onClick={() => void copy(record.id)}>Copy ID</button>
-              {record.kind === "policy" && <button type="button" className="k-btn k-btn-sm" disabled={!editable} onClick={() => f.set("insider.action", "actionId", record.id)}>Use as policy action</button>}</footer>
-            <p role="status" className="pg-live">{copyStatus}</p>
-          </article>}
-        </div>
+          highlight={suspect ? records.filter(r => r.employees.includes(suspect)).map(r => r.id) : []} onSelect={pickRecord} note="Colour = record type. Ringed = pinned. Select a marker to open the record. The line joins only the records you pinned." />
       </section>
+
+      <ToolWindow id="dossier" title="Dossier explorer" icon={FolderSearch} size={{ w: 900, h: 600 }}>
+    <div className="k-insider-grid">
+      <div className="k-reclist" role="region" aria-label="Dossier records" tabIndex={0}>{records.map(item => <button type="button" className={`k-rec k-rec-${item.kind}`} key={item.id} aria-pressed={record?.id === item.id} onClick={() => setSelected(item.id)}>
+        <span className="k-rec-icon" aria-hidden="true">{KIND[item.kind].icon}</span>
+        <span className="k-rec-main"><span className="k-mono k-muted">{item.id}</span><strong>{item.title}</strong><span className="k-rec-meta"><Badge tone={KIND[item.kind].tone}>{KIND[item.kind].label}</Badge><time dateTime={item.timestamp}>{item.timestamp.slice(11, 19)}</time>{pinned.includes(item.id) && <Badge tone="amber">★ pinned</Badge>}</span></span></button>)}
+        {records.length === 0 && <p className="k-empty k-pad">No matching records.</p>}</div>
+      {record && <article className={`k-recview k-rec-${record.kind}`} aria-label="Evidence detail" key={record.id}>
+        <header><span className="k-eyebrow">{record.id} · {KIND[record.kind].label}</span><h3>{record.title}</h3><p className="k-mono k-muted">{record.timestamp}</p>
+          <div className="k-badges">{record.employees.map(id => <button type="button" key={id} className="k-chip-btn" onClick={() => setSuspect(id)} aria-label={`Show records for ${nameOf(id)}`}>{initials(nameOf(id))} · {nameOf(id)}</button>)}</div></header>
+        <p className="k-provenance">Source: {record.provenance}</p>
+        <dl className="k-facts">{Object.entries(record.facts).map(([label, value]) => <div key={label}><dt>{label}</dt><dd className={record.kind === "policy" || record.kind === "access" ? "k-mono" : ""}>{value}</dd></div>)}</dl>
+        <footer className="pg-actions"><button type="button" className="k-btn k-btn-sm k-btn-primary" disabled={!editable || pinned.length >= 8 && !pinned.includes(record.id)} onClick={() => f.toggle("insider.corroboration", "supportingEvidenceIds", record.id, 8)}>{pinned.includes(record.id) ? "★ Unpin evidence" : "☆ Pin evidence ID"}</button><button type="button" className="k-btn k-btn-sm" onClick={() => void copy(record.id)}>Copy ID</button>
+          {record.kind === "policy" && <button type="button" className="k-btn k-btn-sm" disabled={!editable} onClick={() => f.set("insider.action", "actionId", record.id)}>Use as policy action</button>}</footer>
+        <p role="status" className="pg-live">{copyStatus}</p>
+      </article>}
+    </div>
+      </ToolWindow>
 
       <section className="pg-tasks" aria-label="Scored tasks">
         <h2 className="pg-h">Tasks <small>Scored one by one</small></h2>
@@ -108,3 +122,5 @@ export function InsiderDesk({ initialDossier, initialState, initialDrafts }: { i
     </div>
   </DeskFrame>;
 }
+
+export function InsiderDesk(props: Parameters<typeof InsiderWorkspace>[0]) { return <OsDesktop scope="insider"><InsiderWorkspace {...props} /></OsDesktop>; }

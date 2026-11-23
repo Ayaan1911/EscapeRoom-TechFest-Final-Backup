@@ -34,3 +34,7 @@ body:has(.os-dock) { padding-bottom: 78px; }
 .k-mail-list .pg-qr { margin: 12px; }
 .pg-compare .k-table th[scope="row"] { width: 22%; font: 600 12px var(--font-mono); letter-spacing: .06em; color: var(--muted); text-align: left; }
 .pg-compare .k-table td { overflow-wrap: anywhere; }
+
+/* Insider link board */
+.pg-linkboard th[scope="row"] { text-align: left; font-weight: 600; } .pg-linkboard th[scope="row"] small { display: block; color: var(--muted); font-weight: 400; }
+.pg-linkboard td { text-align: center; } .pg-linkboard .k-btn { min-width: 40px; }

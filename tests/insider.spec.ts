@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { confirmDialog } from "./fixtures/admin-confirm";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
-import { solveInsider, submitTask, logout } from "./fixtures/ui";
+import { solveInsider, submitTask, logout, openTool, closeAllTools } from "./fixtures/ui";
 import { insiderAnswers } from "./fixtures/insider";
 import { insiderLogin, manifestPath, printedPairs, readCards } from "./fixtures/insider-browser";
 
@@ -87,9 +87,11 @@ for (const [index, variant] of (["A", "B", "C"] as const).entries()) test(`Insid
   await logout(page); await insiderLogin(page, id); await page.goto("/play/insider");
   await expect(page.getByRole("heading", { name: "The Evidence Wall", exact: true })).toBeVisible();
   await expect(page.locator(".pg-hints ol li")).toHaveCount(variant === "C" ? 2 : 1);
+  await expect(page.locator(".os-dock")).toBeVisible(); // the dock mounts after hydration: selecting earlier would be reset by React
   await page.getByRole("combobox", { name: "Suspect profile", exact: true }).selectOption(answer.employeeId); await expect(page.locator(".suspect-profile")).toContainText(answer.employeeId);
   await page.getByRole("combobox", { name: "Record type", exact: true }).selectOption("policy"); await expect(page.getByText("2 of 26 records", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Reset dossier filters", exact: true }).click();
+  await openTool(page, "dossier");
   for (const evidenceId of answer.supportingEvidenceIds) {
     await page.getByLabel("Search dossier", { exact: true }).fill(evidenceId);
     await page.getByRole("region", { name: "Dossier records", exact: true }).getByRole("button").first().click();
@@ -100,6 +102,7 @@ for (const [index, variant] of (["A", "B", "C"] as const).entries()) test(`Insid
   await page.getByRole("button", { name: "Copy ID", exact: true }).click();
   await expect(page.getByText(`Copied ${answer.supportingEvidenceIds[2]}`, { exact: true })).toBeVisible(); expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(answer.supportingEvidenceIds[2]);
   await expect(page.getByRole("button", { name: /^Unpin / })).toHaveCount(3);
+  await closeAllTools(page);
   if (variant === "B") { // wrong insider earns nothing for that task; direct rapid submissions are throttled
     await page.getByRole("combobox", { name: "Insider employee", exact: true }).selectOption(`EMP-${variant}-01`);
     await submitTask(page, "Insider identified", /No points yet/);
