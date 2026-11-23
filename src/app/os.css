@@ -91,3 +91,5 @@ body:has(.os-dock) { padding-bottom: 78px; }
 .ev-pipe li.is-done .ev-pipe-n { border-color: var(--ok); color: var(--ok); } .ev-pipe li.is-active { background: rgba(94, 201, 216, .1); } .ev-pipe li.is-active .ev-pipe-n { border-color: var(--evidence); color: var(--evidence); }
 .ev-pipe li.is-next .ev-pipe-n { border-color: var(--amber); color: var(--amber); } .ev-pipe li.is-idle strong { color: var(--muted); font-weight: 500; }
 @media (max-width: 760px) { .ev-pipe { flex-direction: column; } .ev-pipe li { border-right: 0; border-bottom: 1px solid var(--os-line); } .ev-pipe li:last-child { border-bottom: 0; } }
+/* Round 2 hand-off: shown only on the waiting screen (never during the timed investigation, so it can never cost evidence time) */
+.os-boot-r2 b { color: var(--amber); }

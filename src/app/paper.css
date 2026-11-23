@@ -109,3 +109,7 @@
 @media (max-width: 1000px) { .rp-source { max-height: none; } }
 @media (max-width: 560px) { .rp-tl li { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { .rp-node circle:not(.rp-hit) { transition: none; } }
+/* Grid children may shrink below their content's intrinsic width (tables scroll inside their own wrapper) */
+.rp-alert-grid > *, .rp-audit > *, .rp-callgrid > *, .rp-wrap > * { min-width: 0; }
+.rp-report .rp-check { grid-column: 2; display: inline-flex; width: fit-content; justify-self: start; align-items: center; gap: 8px; }
+.rp-report .rp-check input { width: 18px; height: 18px; min-height: 0; padding: 0; flex: none; }
