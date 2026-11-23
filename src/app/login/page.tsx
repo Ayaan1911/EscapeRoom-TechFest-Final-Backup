@@ -1,5 +1,6 @@
-import { Brand } from "@/components/ui/brand";
+import { OsHeader } from "@/components/ui/os-header";
 import { signIn } from "./actions";
+import { SignInButton } from "@/components/ui/sign-in-button";
 
 const NEXT = ["/round2", "/clue/inbox", "/play/inbox", "/play/trail", "/play/insider", "/play/containment", "/play/verdict"];
 
@@ -8,7 +9,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const params = await searchParams;
   const next = NEXT.includes(params.next ?? "") ? params.next : "";
   return <div className="site-shell">
-    <header className="site-header"><Brand /></header>
+    <OsHeader area="Secure access" secure={false} />
     <main className="dashboard-main">
       <div className="lp-login">
         <section className="lp-login-aside" aria-label="About this sign-in">
@@ -17,7 +18,8 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           <p>Sign in with the team ID and access code from your organizer. Progress, hints and your timer are saved on the server, so a refresh or a lost connection never loses work.</p>
           <ul className="lp-checks"><li>Never share your access code outside your team.</li><li>Use the HTTPS address your organizer gave you.</li></ul>
         </section>
-        <section className="k-card lp-login-card">
+        <section className="k-card lp-login-card os-window">
+          <div className="os-titlebar" aria-hidden="true"><i /><i /><i /><span>ghost-os://secure-access</span></div>
           <div className="k-card-body">
             <h1>Team login</h1>
             <p className="k-muted">Use the team ID and access code supplied by your organizer.</p>
@@ -26,7 +28,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
               {next && <input type="hidden" name="next" value={next} />}
               <label>Team ID<input name="id" required maxLength={80} autoComplete="username" autoCapitalize="characters" spellCheck={false} /></label>
               <label>Access code<input type="password" name="code" required minLength={12} maxLength={256} autoComplete="current-password" /></label>
-              <button className="k-btn k-btn-primary k-btn-lg">Sign in</button>
+              <SignInButton />
             </form>
           </div>
         </section>

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { Brand } from "@/components/ui/brand";
+import { OsHeader } from "@/components/ui/os-header";
 import { session } from "@/lib/auth";
 import { signInOrganizer } from "./actions";
 
@@ -7,7 +7,7 @@ export default async function OrganizerLoginPage({ searchParams }: { searchParam
   if (await session("admin")) redirect("/admin");
   const params = await searchParams;
   return <div className="site-shell">
-    <header className="site-header"><Brand /></header>
+    <OsHeader area="Organizer access" secure={false} />
     <main className="dashboard-main">
       <div className="lp-login">
         <section className="lp-login-aside" aria-label="About organizer access">

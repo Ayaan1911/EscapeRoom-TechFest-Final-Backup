@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Brand } from "@/components/ui/brand";
+import { OsHeader } from "@/components/ui/os-header";
 
 const CHAPTERS = [
   { n: "01", name: "Inbox", points: 15, what: "Six recovered emails, gateway and sign-in records and a printed QR capture. Find the one message that caused the first unauthorized export, and prove it.", tags: ["Phishing", "QR evidence", "Email headers"] },
@@ -19,7 +19,8 @@ const RULES = [
 
 export default function Home() {
   return <div className="site-shell lp">
-    <header className="site-header"><Brand /><span className="header-meta"><span className="live-dot" /> TECHFEST / ROUND 1</span></header>
+    <div className="os-boot" aria-hidden="true"><div><b>GHOST//OS</b><span>secure forensic shell · case 404</span><i /></div></div>
+    <OsHeader area="Operation briefing" secure={false}><span className="header-meta"><span className="live-dot" /> TECHFEST / ROUND 1</span></OsHeader>
     <main>
       <section className="lp-hero" aria-labelledby="hero-heading">
         <div className="lp-hero-copy">
@@ -30,7 +31,8 @@ export default function Home() {
           <div className="k-actions"><Link className="k-btn k-btn-primary k-btn-lg" href="/play">Enter investigation <span aria-hidden="true">↗</span></Link><a className="k-btn k-btn-lg" href="#chapters">See the five chapters</a></div>
           <p className="lp-note">Fictional incident simulation. No real systems, accounts or people are involved.</p>
         </div>
-        <aside className="lp-casefile" aria-label="Case file overview">
+        <aside className="lp-casefile os-window" aria-label="Case file overview">
+          <div className="os-titlebar" aria-hidden="true"><i /><i /><i /><span>case-404.ghost</span></div>
           <header><span className="k-mono">INCIDENT NX-404</span><span className="k-badge k-badge-alert">TRACE UNRESOLVED</span></header>
           <ol>{CHAPTERS.map(c => <li key={c.n}><span className="lp-node" aria-hidden="true">{c.n}</span><div><strong>{c.name}</strong><small>{c.points} points</small></div></li>)}</ol>
           <footer><span>60 minutes</span><span>3 players</span><span>105 max</span></footer>

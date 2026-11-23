@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { session } from "@/lib/auth";
 import { recentAudit } from "@/lib/game/service";
 import { status } from "@/lib/game/engine";
-import { Brand } from "@/components/ui/brand";
+import { OsHeader } from "@/components/ui/os-header";
 import { Badge, Card } from "@/components/ui/kit";
 import { ConfirmForm } from "@/components/ui/confirm";
 import { signOutAdmin } from "../organizer/login/actions";
@@ -21,7 +21,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const params = await searchParams;
   const complete = report.rows.filter(row => row.completedAt !== null).length;
   return <div className="site-shell">
-    <header className="site-header"><Brand /><form action={signOutAdmin}><button className="k-btn k-btn-primary">Log out</button></form></header>
+    <OsHeader area="Control center"><form action={signOutAdmin}><button className="k-btn k-btn-primary">Log out</button></form></OsHeader>
     <main className="dashboard-main"><div className="k-desk">
       <header className="k-mission">
         <div className="k-mission-main"><div><span className="k-eyebrow">ROUND 1 / {state}</span><h1>Event operations</h1>

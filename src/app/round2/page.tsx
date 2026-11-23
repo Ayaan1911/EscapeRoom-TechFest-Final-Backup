@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { Brand } from "@/components/ui/brand";
+import { OsHeader } from "@/components/ui/os-header";
 import { Restricted } from "@/components/round2/states";
 import { PaperShell } from "@/components/round2/paper/paper-shell";
 import { signOut } from "@/app/login/actions";
@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 export default async function Round2Page() {
   const access = await finalistAccess();
   if (access.state === "anonymous") redirect("/login?next=/round2");
-  const shell = (body: React.ReactNode) => <div className="site-shell r2-site"><header className="site-header"><Brand /><form action={signOut}><button className="button-primary">Log out</button></form></header><main className="dashboard-main">{body}</main></div>;
+  const shell = (body: React.ReactNode) => <div className="site-shell r2-site"><OsHeader area="Round 2 · Paper investigation"><form action={signOut}><button className="button-primary">Log out</button></form></OsHeader><main className="dashboard-main">{body}</main></div>;
   if (access.state !== "active") return shell(<Restricted kind={access.state} />);
   return shell(<PaperShell teamName={access.teamName} initial={await paperStatus()} />);
 }

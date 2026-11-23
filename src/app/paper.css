@@ -19,7 +19,7 @@
 .rp-wait, .rp-done { display: grid; place-items: center; text-align: center; gap: 8px; min-height: 44vh; padding: 28px; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); }
 .rp-done { border-color: var(--alert); } .rp-done h1 { font-size: clamp(30px, 6vw, 60px); margin: 0; color: var(--text); letter-spacing: .02em; }
 .rp-offline { margin: 0; padding: 8px 12px; border: 1px solid var(--amber); border-radius: 8px; color: var(--amber); }
-.rp-tablewrap { overflow: auto; } .rp-table { width: 100%; border-collapse: collapse; font-size: 14px; } .rp-table th { text-align: left; color: var(--muted); font: 600 11px var(--font-mono); letter-spacing: .1em; text-transform: uppercase; padding: 8px 10px; border-bottom: 1px solid var(--line-2); } .rp-table td { padding: 9px 10px; border-bottom: 1px solid rgba(47,90,116,.45); vertical-align: top; }
+.rp-tablewrap { overflow: auto; position: relative; } /* position: contains the absolutely-positioned .rp-sr cells, otherwise they widen the page's scroll area */ .rp-table { width: 100%; border-collapse: collapse; font-size: 14px; } .rp-table th { text-align: left; color: var(--muted); font: 600 11px var(--font-mono); letter-spacing: .1em; text-transform: uppercase; padding: 8px 10px; border-bottom: 1px solid var(--line-2); } .rp-table td { padding: 9px 10px; border-bottom: 1px solid rgba(47,90,116,.45); vertical-align: top; }
 .rp-note { margin: 0 0 8px; color: var(--muted); }
 
 /* Chapter 1: alert console */
