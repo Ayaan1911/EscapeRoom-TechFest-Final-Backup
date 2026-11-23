@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { taskAnswer } from "./fixtures/tasks";
-import { solveInbox, submitTask } from "./fixtures/ui";
+import { solveInbox, submitTask, openTool, closeAllTools } from "./fixtures/ui";
 import { trailAnswers } from "./fixtures/trail";
 
 // Critical player journey (Phase 2 acceptance), once per case variant, on disposable P2-J-* teams:
@@ -42,13 +42,14 @@ for (const V of ["A", "B", "C"] as const) test(`critical journey, variant ${V}`,
   await submitTask(page, "Compromised account and source", /\+4 points/);
   await page.getByLabel("Incident session ID", { exact: true }).fill("nx-wrong-session"); await page.getByLabel("Replay event ID", { exact: true }).fill(trail.eventId);
   await submitTask(page, "Replayed session and event", /\+6 points/);
+  await openTool(page, "console");
   const inspect = await page.getByRole("button", { name: /^Inspect EV-/ }).evaluateAll(b => b.map(x => x.getAttribute("aria-label")!.replace("Inspect ", "")));
   const decoys = inspect.filter(x => !(trail.supportingEvidenceIds as readonly string[]).includes(x) && x !== trail.eventId).slice(0, 2);
   expect(decoys).toHaveLength(2);
   for (const d of decoys) { await page.getByLabel("Search records", { exact: true }).fill(d); await page.getByRole("button", { name: `Inspect ${d}`, exact: true }).click(); const pin = page.getByRole("button", { name: /Pin as evidence/ }); if (await pin.count()) await pin.click(); }
-  const more = page.locator("details", { has: page.locator("summary", { hasText: "Supporting records" }) });
-  if (!(await more.evaluate(el => (el as HTMLDetailsElement).open))) await more.locator("summary").first().click();
+  await openTool(page, "records");
   await page.getByRole("button", { name: `Pin ${trail.supportingEvidenceIds[2]}`, exact: true }).click();
+  await closeAllTools(page);
   await submitTask(page, "Corroborating evidence", /\+3 points/);
   expect(raw(await state(page)).slice(0, 2)).toEqual([8, 13]);
   await expect(page.getByRole("link", { name: /Insider unlocked/ })).toBeVisible();

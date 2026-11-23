@@ -7,6 +7,13 @@ import { containmentAnswers } from "./containment";
 import { verdictAnswers } from "./verdict";
 
 type V = "A" | "B" | "C";
+/** GHOST//OS tools are dock windows. Open one by its app id (no-op if already open); closeAllTools clears the desk so windows never cover the task panels. */
+export async function openTool(page: Page, app: string) {
+  const dock = page.locator(`.os-dock-btn[data-app="${app}"]`);
+  if ((await dock.getAttribute("aria-pressed")) !== "true") await dock.click();
+  await expect(page.locator(`[data-window="${app}"]`)).toBeVisible();
+}
+export async function closeAllTools(page: Page) { await page.getByRole("button", { name: "Reset window layout" }).click(); await expect(page.locator("[data-window]")).toHaveCount(0); }
 /** Submits one task panel and waits for the server's reply (the 3 s evidence cooldown makes the button wait). */
 export async function submitTask(page: Page, region: string, expectText: RegExp = /\+\d+ points\. Task \d+\/\d+|No new points/) {
   const panel = page.getByRole("region", { name: region, exact: true }), button = panel.getByRole("button", { name: /Submit task|Resubmit task/ });
@@ -31,10 +38,12 @@ export async function solveInbox(page: Page, variant: V, only?: "entry" | "ident
   if (!only || only === "impact") { await page.getByLabel("Database export record").selectOption(a.databaseId); await submitTask(page, "Unauthorized export"); }
 }
 async function pinEvent(page: Page, id: string) {
+  await openTool(page, "console");
   await page.getByLabel("Search records", { exact: true }).fill(id);
   await page.getByRole("button", { name: `Inspect ${id}`, exact: true }).click();
   const pin = page.getByRole("button", { name: /Pin as evidence/ });
   if (await pin.count()) await pin.click(); // already pinned earlier: leave it
+  await closeAllTools(page);
 }
 export async function solveTrail(page: Page, variant: V, opts: { sourceIp?: string } = {}) {
   const a = trailAnswers[variant];
@@ -44,9 +53,9 @@ export async function solveTrail(page: Page, variant: V, opts: { sourceIp?: stri
   await page.getByLabel("Incident session ID", { exact: true }).fill(a.sessionId); await page.getByLabel("Replay event ID", { exact: true }).fill(a.eventId);
   await submitTask(page, "Replayed session and event");
   await pinEvent(page, a.supportingEvidenceIds[0]);
-  const records = page.locator("details", { has: page.locator("summary", { hasText: "Supporting records" }) });
-  if (!(await records.evaluate(el => (el as HTMLDetailsElement).open))) await records.locator("summary").first().click();
+  await openTool(page, "records");
   for (const id of a.supportingEvidenceIds.slice(1)) { const pin = page.getByRole("button", { name: `Pin ${id}`, exact: true }); if (await pin.count()) await pin.click(); }
+  await closeAllTools(page);
   await submitTask(page, "Corroborating evidence");
 }
 export async function solveInsider(page: Page, variant: V) {

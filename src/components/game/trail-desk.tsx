@@ -6,6 +6,8 @@ import { ChainDiagram, ConnectionBanner, DeskFrame, HintBox, ResultStrip, StateB
 import { Badge } from "@/components/ui/kit";
 import { ActivityTimeline } from "./case-visuals";
 import { useDemo } from "@/components/demo/demo-context";
+import { OsDesktop, ToolWindow, useOs } from "@/components/os/os-windows";
+import { FolderOpen, SearchCheck, Table2 } from "lucide-react";
 import { emptyTrailFilters, filterTrailRows } from "@/lib/game/trail-view";
 import type { TrailEvidence, TrailEvent } from "@/types/trail";
 
@@ -21,13 +23,14 @@ function SessionPath({ rows, sessionId }: { rows: TrailEvent[]; sessionId: strin
       return <li key={r.id}><time className="k-mono">{r.timestamp.slice(11, 19)}</time><span className="k-mono">{r.id}</span><span>{r.eventType}</span><span className="k-mono">{r.device} @ {r.sourceIp}</span>{moved && <Badge tone="info">device or source changed</Badge>}<Badge tone={o.tone}>{o.mark} {o.text}</Badge></li>; })}</ol></div>;
 }
 
-export function TrailDesk({ evidence, initialState, initialDrafts }: { evidence: TrailEvidence; initialState: ChapterState; initialDrafts: ServerDraft[] }) {
+function TrailWorkspace({ evidence, initialState, initialDrafts }: { evidence: TrailEvidence; initialState: ChapterState; initialDrafts: ServerDraft[] }) {
   const { state, busy, feedback, result, connection, send, submitTask, remaining, retrySeconds } = useChapter(1, initialState);
-  const editable = isEditable(state, 1), demo = useDemo();
+  const editable = isEditable(state, 1), demo = useDemo(), os = useOs();
   const drafts = useDrafts(1, initialDrafts, editable), f = fieldApi(drafts);
   const [filters, setFilters] = useState(emptyTrailFilters), [page, setPage] = useState(0), [selectedId, setSelectedId] = useState(evidence.rows[0].id), [copied, setCopied] = useState("");
   const [tamper, setTamper] = useState({ eventId: "", field: "", technique: "" });
   const selected = evidence.rows.find(row => row.id === selectedId)!;
+  const select = (id: string) => { setSelectedId(id); os.open("inspector"); }; // picking an event anywhere opens the inspector window
   const filtered = useMemo(() => filterTrailRows(evidence.rows, filters), [evidence.rows, filters]);
   const pages = Math.max(1, Math.ceil(filtered.length / PAGE)), visible = filtered.slice(page * PAGE, (page + 1) * PAGE);
   const pinned = f.arr("trail.corroboration", "supportingEvidenceIds");
@@ -50,13 +53,14 @@ export function TrailDesk({ evidence, initialState, initialDrafts }: { evidence:
       { id: "acct", label: "Account", value: f.str("trail.source", "account") }, { id: "ses", label: "Session", value: f.str("trail.session", "sessionId") },
       { id: "ev", label: "Replay event", value: f.str("trail.session", "eventId") }, { id: "ip", label: "Source", value: f.str("trail.source", "sourceIp") }, { id: "pin", label: "Evidence pinned", value: pinned.length ? `${pinned.length}/3` : "" }]} />
 
-    <section className="pg-console" aria-label="Log console">
-      <ActivityTimeline label="Activity timeline" items={filtered.map(r => ({ id: r.id, at: r.timestamp, lane: r.eventType, tone: OUTCOME[r.result].tone, hint: OUTCOME[r.result].text }))} selectedId={selectedId} marked={pinned}
-        highlight={sameSession} linked={sameSession} onSelect={setSelectedId} note="Lines join events of the selected event's session. Ringed = pinned. The table below is the keyboard view." />
+    <section className="pg-console" aria-label="Authentication overview">
       <div className="pg-console-top">
         <div className="pg-outcomes" role="status" aria-label="Matching events by outcome"><b>{filtered.length}</b> of {evidence.rows.length} events{(["success", "failure", "challenge"] as const).map(k => <Badge key={k} tone={OUTCOME[k].tone}>{OUTCOME[k].mark} {counts[k]} {OUTCOME[k].text.toLowerCase()}</Badge>)}{active > 0 && <Badge tone="amber">{active} filter{active > 1 ? "s" : ""}</Badge>}</div>
+        <button type="button" className="k-btn k-btn-sm k-btn-primary" onClick={() => os.open("console")}>Open event console</button>
         {!demo && <a className="k-btn k-btn-sm" href="/api/game/trail/csv">Download CSV</a>}
       </div>
+      <ActivityTimeline label="Activity timeline" items={filtered.map(r => ({ id: r.id, at: r.timestamp, lane: r.eventType, tone: OUTCOME[r.result].tone, hint: OUTCOME[r.result].text }))} selectedId={selectedId} marked={pinned}
+        highlight={sameSession} linked={sameSession} onSelect={select} note="Select a marker to open it in the Event inspector. Lines join the selected event's session. Ringed = pinned. The raw records are in the Event console." />
       <div className="k-filterbar">
         {filterField("Search", <input aria-label="Search records" value={filters.search} onChange={e => updateFilters({ search: e.target.value })} placeholder="ID, session, device, text" />)}
         {filterField("User", <select aria-label="Filter by user" value={filters.account} onChange={e => updateFilters({ account: e.target.value })}><option value="">All</option>{choices("account").map(v => <option key={v}>{v}</option>)}</select>)}
@@ -64,37 +68,42 @@ export function TrailDesk({ evidence, initialState, initialDrafts }: { evidence:
         {filterField("Outcome", <select aria-label="Filter by result" value={filters.result} onChange={e => updateFilters({ result: e.target.value })}><option value="">All</option>{["success", "failure", "challenge"].map(v => <option key={v} value={v}>{OUTCOME[v as keyof typeof OUTCOME].text}</option>)}</select>)}
         {filterField("Event type", <select aria-label="Filter by event type" value={filters.eventType} onChange={e => updateFilters({ eventType: e.target.value })}><option value="">All</option>{choices("eventType").map(v => <option key={v}>{v}</option>)}</select>)}
         {filterField("Session", <input aria-label="Filter by session" value={filters.sessionId} onChange={e => updateFilters({ sessionId: e.target.value })} placeholder="Exact session ID" />)}
-      </div>
-      <div className="pg-console-grid">
-        <div className="k-tablecard" role="region" aria-label="Authentication events"><div className="k-tablescroll" tabIndex={0} aria-label="Event table, scrollable"><table className="k-table pg-table"><caption className="k-sr">Authentication events. Select a row to inspect it.</caption>
-          <thead><tr><th scope="col">Event</th><th scope="col">Account</th><th scope="col">Source</th><th scope="col">Outcome</th><th scope="col">Session</th></tr></thead>
-          <tbody>{visible.map(row => { const o = OUTCOME[row.result]; return <tr key={row.id} className={selectedId === row.id ? "is-selected" : pinned.includes(row.id) ? "is-pinned" : ""} aria-selected={selectedId === row.id}>
-            <td><button type="button" className="pg-rowbtn k-mono" onClick={() => setSelectedId(row.id)} aria-label={`Inspect ${row.id}`}>{row.id}</button><time dateTime={row.timestamp}>{row.timestamp.slice(11, 19)}</time></td>
-            <td>{row.account}</td><td className="k-mono">{row.sourceIp}</td><td><Badge tone={o.tone}>{o.mark} {o.text}</Badge><small>{row.eventType}</small></td><td className="k-mono">{row.sessionId}</td></tr>; })}</tbody></table>
-          {visible.length === 0 && <p className="k-empty k-pad">No events match.</p>}</div>
-          <div className="k-toolbar k-pager"><button type="button" className="k-btn k-btn-sm" disabled={page === 0} aria-label="Previous page" onClick={() => setPage(p => p - 1)}>← Prev</button><span>Page {page + 1} of {pages}</span><button type="button" className="k-btn k-btn-sm" disabled={page + 1 >= pages} aria-label="Next page" onClick={() => setPage(p => p + 1)}>Next →</button><span className="k-spacer" />
-            <button type="button" className="k-btn k-btn-sm" aria-pressed={filters.descending} onClick={() => updateFilters({ descending: !filters.descending })}>{filters.descending ? "Sort oldest first" : "Sort newest first"}</button><button type="button" className="k-btn k-btn-sm" onClick={() => { setFilters(emptyTrailFilters); setPage(0); }}>Reset filters</button></div></div>
-
-        <aside className="k-inspector pg-inspector" aria-label="Selected event details">
-          <span className="k-eyebrow">EVENT</span><h2 className="k-mono">{selected.id}</h2>
-          <div className="k-badges"><Badge tone={OUTCOME[selected.result].tone}>{OUTCOME[selected.result].mark} {OUTCOME[selected.result].text}</Badge><Badge tone="info">{selected.eventType}</Badge></div>
-          <dl className="k-facts">{(["timestamp", "account", "sourceIp", "method", "device", "sessionId", "conditionalAccess", "correlationId", "details"] as const).map(k => <div key={k}><dt>{k}</dt><dd className="k-mono">{selected[k]}</dd></div>)}</dl>
-          <div className="pg-actions">
-            <button type="button" className="k-btn k-btn-sm" disabled={!editable || pinned.length >= 3 && !pinned.includes(selected.id)} onClick={() => f.toggle("trail.corroboration", "supportingEvidenceIds", selected.id, 3)}>{pinned.includes(selected.id) ? "★ Pinned as evidence" : "☆ Pin as evidence"}</button>
-            <button type="button" className="k-btn k-btn-sm" onClick={() => void copy(selected.id)}>Copy ID</button>
-            <button type="button" className="k-btn k-btn-sm" disabled={selected.sessionId === "none"} onClick={() => updateFilters({ ...emptyTrailFilters, sessionId: selected.sessionId })}>Filter to session</button>
-            <button type="button" className="k-btn k-btn-sm k-btn-primary" disabled={!editable} onClick={() => { f.set("trail.source", "account", selected.account); f.set("trail.source", "sourceIp", selected.sourceIp); f.set("trail.session", "sessionId", selected.sessionId); f.set("trail.session", "eventId", selected.id); }}>Use in my answer</button>
-          </div>
-          <p role="status" className="pg-live">{copied}</p>
-          <h3 className="pg-rail-h">Session path</h3><SessionPath rows={evidence.rows} sessionId={selected.sessionId} />
-        </aside>
+        {filterField("From (UTC)", <input type="time" aria-label="From time" value={filters.from} onChange={e => updateFilters({ from: e.target.value })} />)}
+        {filterField("To (UTC)", <input type="time" aria-label="To time" value={filters.to} onChange={e => updateFilters({ to: e.target.value })} />)}
       </div>
     </section>
 
-    <details className="pg-hints"><summary>Supporting records <span className="pg-chip">{evidence.artifacts.length}</span></summary>
+    <ToolWindow id="console" title="Event console" icon={Table2} size={{ w: 760, h: 580 }}>
+    <div className="k-tablecard" role="region" aria-label="Authentication events"><div className="k-tablescroll" tabIndex={0} aria-label="Event table, scrollable"><table className="k-table pg-table"><caption className="k-sr">Authentication events. Select a row to inspect it.</caption>
+      <thead><tr><th scope="col">Event</th><th scope="col">Account</th><th scope="col">Source</th><th scope="col">Outcome</th><th scope="col">Session</th></tr></thead>
+      <tbody>{visible.map(row => { const o = OUTCOME[row.result]; return <tr key={row.id} className={selectedId === row.id ? "is-selected" : pinned.includes(row.id) ? "is-pinned" : ""} aria-selected={selectedId === row.id}>
+        <td><button type="button" className="pg-rowbtn k-mono" onClick={() => select(row.id)} aria-label={`Inspect ${row.id}`}>{row.id}</button><time dateTime={row.timestamp}>{row.timestamp.slice(11, 19)}</time></td>
+        <td>{row.account}</td><td className="k-mono">{row.sourceIp}</td><td><Badge tone={o.tone}>{o.mark} {o.text}</Badge><small>{row.eventType}</small></td><td className="k-mono">{row.sessionId}</td></tr>; })}</tbody></table>
+      {visible.length === 0 && <p className="k-empty k-pad">No events match.</p>}</div>
+      <div className="k-toolbar k-pager"><button type="button" className="k-btn k-btn-sm" disabled={page === 0} aria-label="Previous page" onClick={() => setPage(p => p - 1)}>← Prev</button><span>Page {page + 1} of {pages}</span><button type="button" className="k-btn k-btn-sm" disabled={page + 1 >= pages} aria-label="Next page" onClick={() => setPage(p => p + 1)}>Next →</button><span className="k-spacer" />
+        <button type="button" className="k-btn k-btn-sm" aria-pressed={filters.descending} onClick={() => updateFilters({ descending: !filters.descending })}>{filters.descending ? "Sort oldest first" : "Sort newest first"}</button><button type="button" className="k-btn k-btn-sm" onClick={() => { setFilters(emptyTrailFilters); setPage(0); }}>Reset filters</button></div></div>
+
+    </ToolWindow>
+    <ToolWindow id="inspector" title="Event inspector" icon={SearchCheck} side="right" size={{ w: 440, h: 620 }}>
+    <aside className="k-inspector pg-inspector" aria-label="Selected event details">
+      <span className="k-eyebrow">EVENT</span><h2 className="k-mono">{selected.id}</h2>
+      <div className="k-badges"><Badge tone={OUTCOME[selected.result].tone}>{OUTCOME[selected.result].mark} {OUTCOME[selected.result].text}</Badge><Badge tone="info">{selected.eventType}</Badge></div>
+      <dl className="k-facts">{(["timestamp", "account", "sourceIp", "method", "device", "sessionId", "conditionalAccess", "correlationId", "details"] as const).map(k => <div key={k}><dt>{k}</dt><dd className="k-mono">{selected[k]}</dd></div>)}</dl>
+      <div className="pg-actions">
+        <button type="button" className="k-btn k-btn-sm" disabled={!editable || pinned.length >= 3 && !pinned.includes(selected.id)} onClick={() => f.toggle("trail.corroboration", "supportingEvidenceIds", selected.id, 3)}>{pinned.includes(selected.id) ? "★ Pinned as evidence" : "☆ Pin as evidence"}</button>
+        <button type="button" className="k-btn k-btn-sm" onClick={() => void copy(selected.id)}>Copy ID</button>
+        <button type="button" className="k-btn k-btn-sm" disabled={selected.sessionId === "none"} onClick={() => updateFilters({ ...emptyTrailFilters, sessionId: selected.sessionId })}>Filter to session</button>
+        <button type="button" className="k-btn k-btn-sm k-btn-primary" disabled={!editable} onClick={() => { f.set("trail.source", "account", selected.account); f.set("trail.source", "sourceIp", selected.sourceIp); f.set("trail.session", "sessionId", selected.sessionId); f.set("trail.session", "eventId", selected.id); }}>Use in my answer</button>
+      </div>
+      <p role="status" className="pg-live">{copied}</p>
+      <h3 className="pg-rail-h">Session path</h3><SessionPath rows={evidence.rows} sessionId={selected.sessionId} />
+    </aside>
+    </ToolWindow>
+    <ToolWindow id="records" title="Case records" icon={FolderOpen} size={{ w: 760, h: 520 }}>
       <div className="k-artifact-grid">{evidence.artifacts.map(a => <article className={`k-artifact ${pinned.includes(a.id) ? "is-pinned" : ""}`} key={a.id}><div className="k-artifact-body"><span className="k-mono k-muted">{a.id}</span><strong>{a.title}</strong>
         <details><summary>View record</summary><dl className="k-facts">{Object.entries(a.facts).map(([key, value]) => <div key={key}><dt>{key}</dt><dd className="k-mono">{value}</dd></div>)}</dl></details></div>
-        <div className="k-actions"><button type="button" className="k-btn k-btn-sm" aria-label={`${pinned.includes(a.id) ? "Unpin" : "Pin"} ${a.id}`} disabled={!editable || pinned.length >= 3 && !pinned.includes(a.id)} onClick={() => f.toggle("trail.corroboration", "supportingEvidenceIds", a.id, 3)}>{pinned.includes(a.id) ? "★ Pinned" : "☆ Pin"}</button><button type="button" className="k-btn k-btn-sm" onClick={() => void copy(a.id)}>Copy ID</button></div></article>)}</div></details>
+        <div className="k-actions"><button type="button" className="k-btn k-btn-sm" aria-label={`${pinned.includes(a.id) ? "Unpin" : "Pin"} ${a.id}`} disabled={!editable || pinned.length >= 3 && !pinned.includes(a.id)} onClick={() => f.toggle("trail.corroboration", "supportingEvidenceIds", a.id, 3)}>{pinned.includes(a.id) ? "★ Pinned" : "☆ Pin"}</button><button type="button" className="k-btn k-btn-sm" onClick={() => void copy(a.id)}>Copy ID</button></div></article>)}</div>
+    </ToolWindow>
 
     <section className="pg-tasks" aria-label="Scored tasks">
       <h2 className="pg-h">Tasks <small>Scored one by one</small></h2>
@@ -122,3 +131,5 @@ export function TrailDesk({ evidence, initialState, initialDrafts }: { evidence:
     </div>
   </DeskFrame>;
 }
+
+export function TrailDesk(props: Parameters<typeof TrailWorkspace>[0]) { return <OsDesktop scope="trail"><TrailWorkspace {...props} /></OsDesktop>; }

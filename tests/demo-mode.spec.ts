@@ -67,6 +67,7 @@ test("organizer enters demo from the dashboard; the whole walkthrough makes no A
   await page.goto("/admin/demo/round1/trail"); await expect(page.getByRole("heading", { name: "Trail" })).toBeVisible();
   await page.locator(".ds-tl-dot").nth(3).click(); await page.getByRole("button", { name: /Pin as evidence/ }).click(); await expect(page.getByRole("button", { name: /Pinned as evidence/ })).toBeVisible();
   await page.getByRole("button", { name: "Use in my answer" }).click();
+  await page.getByRole("button", { name: "Reset window layout" }).click(); // windows closed: they float over the task panels
   const source = page.getByRole("region", { name: "Compromised account and source", exact: true });
   await source.getByRole("button", { name: "Submit task" }).click(); await expect(source.getByText(demoNote)).toBeVisible();
 

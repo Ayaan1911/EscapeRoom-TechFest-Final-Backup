@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { confirmDialog } from "./fixtures/admin-confirm";
 import { readFileSync } from "node:fs";
-import { solveTrail, submitTask, logout } from "./fixtures/ui";
+import { solveTrail, submitTask, logout, openTool, closeAllTools } from "./fixtures/ui";
 import { trailAnswers, trailTamper } from "./fixtures/trail";
 
 test.skip(!process.env.GHOST_E2E_TRAIL, "Run npm run test:e2e:trail for isolated Inbox and Trail regression fixtures");
@@ -54,6 +54,7 @@ for (const variant of ["A", "B", "C"] as const) test(`Trail ${variant}: filters,
     expect(await (await post({ kind: "tamper", tamper: trailTamper(variant) })).json()).toMatchObject({ accepted: false, tamperAwarded: false, awarded: 0 });
     externalSubmissionAt = Date.now();
   }
+  await openTool(page, "console");
   const table = page.getByRole("region", { name: "Authentication events" });
   await expect(table.locator("tbody tr")).toHaveCount(25);
   await page.getByRole("button", { name: "Next page", exact: true }).click(); await expect(page.getByText("Page 2 of 6", { exact: true })).toBeVisible();
@@ -74,8 +75,9 @@ for (const variant of ["A", "B", "C"] as const) test(`Trail ${variant}: filters,
   await expect(table.locator("tbody tr")).toHaveCount(3);
   await page.getByRole("button", { name: `Inspect ${answer.supportingEvidenceIds[0]}`, exact: true }).click();
   await page.getByRole("button", { name: /Pin as evidence/ }).click();
-  await page.locator("summary", { hasText: "Supporting records" }).click();
+  await openTool(page, "records");
   for (const id of answer.supportingEvidenceIds.slice(1)) await page.getByRole("button", { name: `Pin ${id}`, exact: true }).click();
+  await page.getByRole("button", { name: "Close Case records" }).click(); // the records window floats over the console toolbar
   for (const id of answer.supportingEvidenceIds) await expect(page.getByLabel("Pinned evidence").getByText(id, { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Reset filters" }).click();
   await page.getByLabel("Search records", { exact: true }).fill(trailTamper(variant).eventId);
@@ -87,6 +89,7 @@ for (const variant of ["A", "B", "C"] as const) test(`Trail ${variant}: filters,
   await page.getByRole("complementary", { name: "Selected event details" }).getByRole("button", { name: "Copy ID", exact: true }).click();
   await expect(page.getByText(`Copied ${trailTamper(variant).eventId}`, { exact: true })).toBeVisible();
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(trailTamper(variant).eventId);
+  await closeAllTools(page);
   const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("link", { name: "Download CSV", exact: true }).click()]);
   const file = testInfo.outputPath(`trail-${variant}.csv`); await download.saveAs(file);
   const csv = readFileSync(file, "utf8"); expect(csv.split("\r\n")).toHaveLength(145); expect(csv).toContain('"\'=ANALYST_NOTE(');

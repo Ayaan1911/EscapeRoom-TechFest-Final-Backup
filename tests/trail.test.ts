@@ -93,6 +93,12 @@ describe.each(["A", "B", "C"] as const)("Trail variant %s", variant => {
     const sorted = filterTrailRows(evidence.rows, { ...emptyTrailFilters, descending: true });
     expect(Date.parse(sorted[0].timestamp)).toBeGreaterThanOrEqual(Date.parse(sorted.at(-1)!.timestamp));
     expect(filterTrailRows(evidence.rows, { ...emptyTrailFilters, search: "no-such-record" })).toHaveLength(0);
+    // Time-of-day window: inclusive on both ends, either end optional, and it only ever narrows the set.
+    const hhmm = (r: { timestamp: string }) => r.timestamp.slice(11, 16), times = evidence.rows.map(hhmm).sort(), mid = times[Math.floor(times.length / 2)];
+    const early = filterTrailRows(evidence.rows, { ...emptyTrailFilters, to: mid }), late = filterTrailRows(evidence.rows, { ...emptyTrailFilters, from: mid });
+    expect(early.every(r => hhmm(r) <= mid) && late.every(r => hhmm(r) >= mid)).toBe(true);
+    expect(early.length + late.length).toBeGreaterThanOrEqual(evidence.rows.length); // the boundary minute belongs to both halves
+    expect(filterTrailRows(evidence.rows, { ...emptyTrailFilters, from: "23:59", to: "00:00" })).toHaveLength(0);
     expect(JSON.stringify(evidence)).toBe(before);
   });
   it("exports only the 12 evidence columns and escapes the planted formula", () => {

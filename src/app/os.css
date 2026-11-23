@@ -1,0 +1,30 @@
+/* GHOST//OS windows + dock. Positioned with left/top/width/height from the window manager (never arbitrary offsets); below 1100px every window is a sheet. */
+.os-win { position: fixed; display: flex; flex-direction: column; min-width: 0; background: rgba(13, 22, 35, .97); border: 1px solid var(--os-line); border-radius: 12px; box-shadow: 0 24px 64px rgba(0, 0, 0, .55); overflow: hidden; animation: os-win-in .16s var(--os-ease) both; }
+.os-win[hidden] { display: none; }
+.os-win:focus-within { border-color: rgba(94, 201, 216, .55); }
+.os-win-bar { display: flex; align-items: center; gap: 6px; height: 40px; padding: 0 8px 0 12px; background: rgba(23, 36, 55, .95); border-bottom: 1px solid var(--os-line); cursor: grab; touch-action: none; user-select: none; }
+.os-win-bar:active { cursor: grabbing; }
+.os-win-title { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; height: 100%; font: 600 13px var(--font-mono); letter-spacing: .06em; color: var(--text); }
+.os-win-title span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.os-win-title svg { color: var(--evidence); flex: none; }
+.os-win-btn { display: grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; }
+.os-win-btn:hover { background: rgba(120, 160, 200, .16); color: var(--text); }
+.os-win-btn.is-close:hover { background: rgba(234, 106, 116, .25); color: #fff; }
+.os-win-body { flex: 1; min-height: 0; overflow: auto; padding: 14px 16px; overscroll-behavior: contain; }
+.os-win-grip { position: absolute; right: 0; bottom: 0; width: 18px; height: 18px; cursor: nwse-resize; touch-action: none; background: linear-gradient(135deg, transparent 55%, var(--muted) 55% 62%, transparent 62% 72%, var(--muted) 72% 79%, transparent 79%); opacity: .6; }
+.os-win.is-sheet { inset: calc(var(--os-bar-h) + 6px) 6px 70px 6px; width: auto; height: auto; border-radius: 12px; }
+
+.os-dock { position: fixed; left: 50%; bottom: 10px; transform: translateX(-50%); z-index: 100000; display: flex; gap: 6px; max-width: calc(100vw - 16px); overflow-x: auto; padding: 6px; background: var(--os-glass); border: 1px solid var(--os-line); border-radius: 14px; box-shadow: 0 10px 34px rgba(0, 0, 0, .5); }
+@supports (backdrop-filter: blur(1px)) { .os-dock { backdrop-filter: blur(12px) saturate(1.2); } }
+.os-dock-btn { position: relative; display: inline-flex; align-items: center; gap: 8px; flex: none; min-height: 40px; padding: 0 14px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--muted); font: 600 13px var(--font-sans); cursor: pointer; white-space: nowrap; transition: background var(--os-dur) var(--os-ease), color var(--os-dur) var(--os-ease), transform var(--os-dur) var(--os-ease); }
+.os-dock-btn:hover { background: rgba(120, 160, 200, .14); color: var(--text); transform: translateY(-1px); }
+.os-dock-btn.is-open { color: var(--text); background: rgba(94, 201, 216, .12); border-color: rgba(94, 201, 216, .4); }
+.os-dock-btn.is-min { color: var(--amber); }
+.os-dock-btn i { position: absolute; left: 50%; bottom: 3px; width: 14px; height: 2px; margin-left: -7px; border-radius: 2px; background: var(--evidence); }
+.os-dock-btn.is-min i { background: var(--amber); }
+.os-dock-btn.is-reset { color: var(--muted); border-left: 1px solid var(--os-line); border-radius: 0 10px 10px 0; margin-left: 2px; }
+body:has(.os-dock) { padding-bottom: 78px; }
+@keyframes os-win-in { from { opacity: 0; transform: translateY(8px) scale(.985); } to { opacity: 1; transform: none; } }
+@media (max-width: 760px) { .os-dock-btn span:not(.k-sr) { font-size: 12px; } .os-dock-btn { padding: 0 10px; } }
+@media (prefers-reduced-motion: reduce) { .os-win { animation: none; } .os-dock-btn { transition: none; } .os-dock-btn:hover { transform: none; } }
+@media print { .os-dock, .os-win { display: none !important; } }

@@ -8,6 +8,7 @@ import "./play.css";
 import "./design.css";
 import "./ghost.css";
 import "./ghostos.css";
+import "./os.css";
 
 // Fonts ship inside the build (geist package, SIL OFL): no request to Google at build or run time, so the LAN event needs no internet.
 
