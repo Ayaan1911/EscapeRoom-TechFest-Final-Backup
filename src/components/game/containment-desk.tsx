@@ -6,6 +6,7 @@ import { ContainmentCctv } from "./containment-cctv";
 import { ConnectionBanner, DeskFrame, HintBox, ResultStrip, StateBanner, TaskNav, TaskPanel, fieldApi, isEditable, taskOf } from "./workspace";
 import { Badge } from "@/components/ui/kit";
 import { StageRail, type Stage } from "./case-visuals";
+import { ResponseMap } from "./response-map";
 import { useDemo } from "@/components/demo/demo-context";
 import type { ContainmentCctv as Snapshot, ContainmentEvidence } from "@/types/containment";
 
@@ -56,6 +57,8 @@ export function ContainmentDesk({ evidence, initialCctv, initialState, initialDr
       <Badge tone="alert">Data already exfiltrated</Badge><Badge tone="info">{evidence.checkpoint} UTC</Badge><Badge>{evidence.account}</Badge><Badge className="k-mono">{evidence.sessionId}</Badge>
       <p>Treat the session as usable until revocation is verified. Keep support and approved archive/maintenance jobs running.</p>
     </section>
+    <ResponseMap account={evidence.account} sessionId={evidence.sessionId} checkpoint={evidence.checkpoint}
+      immediate={immediate.map(id => optionById(evidence.immediateOptions, id)).filter((o): o is Option => !!o)} recovery={recovery.map(id => optionById(evidence.recoveryOptions, id)).filter((o): o is Option => !!o)} />
     <StageRail label="Incident response workflow" stages={(["Reconstruct", "Identify", "Contain", "Recover and verify", "Preserve"] as const).map((label, i): Stage => { const row = taskOf(state, 3, Object.values(DRAFT)[i]), filled = [true, !!(f.str(DRAFT.identity, "account") && f.str(DRAFT.identity, "sessionId")), immediate.length > 0, recovery.length > 0, support.length >= 5][i];
       return { id: row.id, label, sub: `${row.earned}/${row.max}`, state: row.earned >= row.max ? "done" : row.earned > 0 ? "partial" : filled && i > 0 ? "filled" : "open", href: `#task-${i + 1}` }; })} />
     {cctv && <ContainmentCctv snapshot={cctv} />}
