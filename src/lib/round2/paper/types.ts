@@ -3,12 +3,12 @@
 
 export type I1 = {
   kind: "i1";
-  alert: { id: string; severity: string; host: string; user: string; observed: string };
+  alert: { id: string; severity: string; host: string; observed: string };
   processes: { pid: string; name: string; user: string; started: string; cpu: string }[];
   logins: { time: string; account: string; type: string; result: string }[];
   network: { time: string; dest: string; traffic: string }[];
-  mail: { id: string; when: string; from: string; subject: string; attachment?: string; size?: string; note?: string }[];
-  chat: { from: "ravi" | "itdesk"; text: string }[];
+  mail: { when: string; from: string; subject: string; notes: string }[];
+  chat: { from: string; text: string }[];
   options: { letter: string; text: string }[];
   paper: string[];
 };
@@ -19,8 +19,9 @@ export type I2 = { kind: "i2"; snapshot: string; brief: string; connections: KCo
 export type I3 = {
   kind: "i3";
   claims: { n: number; text: string; confidence: string }[];
-  timeline: { n: number; time: string; tz: "IST"; event: string }[];
-  records: { id: string; source: string; lines: string[]; tz: "IST" | "UTC" }[];
+  timeline: { n: number; time: string; event: string }[];
+  /** `text` is the case document's own sentence(s), verbatim: "<label>: <body>". */
+  records: { id: string; text: string }[];
   paper: string[];
 };
 export type I4 = {

@@ -130,3 +130,10 @@
 .ij-shell .rp-head { gap: 0; padding: 0; } .ij-shell .rp-head h1 { font-size: clamp(24px, 2.4vw, 32px) !important; margin: 0; }
 .ij-shell .ij-tiles small, .ij-shell .ij-rail small { font-family: var(--font-sans, sans-serif); letter-spacing: 0; }
 .ij-shell .ij-incident { padding: 12px 16px; } .ij-shell .ij-device { width: 84px; }
+
+/* Restored PDF text: claims and public statements are quoted sentences (the quotes are typography, not part of the stored text). Long options wrap naturally. */
+.ij-quote { quotes: "\201C" "\201D"; } .ij-quote::before { content: open-quote; } .ij-quote::after { content: close-quote; }
+.ij-opts li > span, .ij-sentences li > span, .ij-claimcard p { overflow-wrap: anywhere; hyphens: manual; }
+.ij-opts li { align-items: flex-start; } .ij-opts li > b { margin-top: 2px; }
+.ij-table td { vertical-align: top; }
+@media (max-width: 1280px) { .ij-status { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
