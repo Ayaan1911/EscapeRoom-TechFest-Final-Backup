@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Inject1, Inject2, Inject3, Inject4 } from "./injects";
+import { Inject1, Inject3, Inject4 } from "./injects";
+import { Inject2 } from "./kill-switch";
 import type { InjectView, OpenStatus } from "@/lib/round2/paper/types";
 
 const mmss = (ms: number) => { const s = Math.max(0, Math.ceil(ms / 1000)); return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`; };
@@ -42,8 +43,8 @@ export function OpenShell({ initial, teamName, demo }: { initial: OpenStatus; te
   const suggested = injects?.find(v => elapsedMin >= v.pace.fromMin && elapsedMin < v.pace.toMin)?.n ?? null;
   const top = (right?: React.ReactNode) => <header className="rp-top"><div><small>GHOST RETURNS · PART A</small><b>OPERATION GHOST_404</b></div><div className="rp-team"><small>TEAM</small><b>{teamName}</b></div>{right}</header>;
 
-  if (!demo && (status.phase === "complete" || expired)) return <div className="rp-wrap cn-scene cn-r2s ij-shell">{top()}<section className="rp-done" role="status"><h1>PENS DOWN</h1><p>The 60 minutes are over. The terminal is closed. Hand your answer sheet to a volunteer and wait for the jury.</p></section></div>;
-  if (!demo && (status.phase === "not_started" || !injects)) return <div className="rp-wrap cn-scene cn-r2s ij-shell">{top()}<section className="rp-wait" role="status"><h1>Stand by</h1><p>Part A starts when the organizer says so: 60 minutes, four injects, all open from the start. Keep this page open.</p></section>{offline && <p className="rp-offline" role="alert">Connection lost. Retrying…</p>}</div>;
+  if (!demo && (status.phase === "complete" || expired)) return <div className="rp-wrap cn-scene cn-r2s ij-shell">{top()}<section className="rp-done" role="status">{status.retired ? <><h1>Round 2 is closed</h1><p>There is no Round 2 running on this server. Wait for the organizer.</p></> : <><h1>PENS DOWN</h1><p>The 60 minutes are over. The terminal is locked. Hand your answer sheet to a volunteer and wait for the jury.</p></>}</section></div>;
+  if (!demo && (status.phase === "not_started" || !injects)) return <div className="rp-wrap cn-scene cn-r2s ij-shell">{top()}<section className="rp-wait" role="status"><h1>Stand by</h1><p>GHOST RETURNS starts when the organizer says so: 60 minutes, four injects, all open from the start. No AI tools. Keep this page open.</p></section>{offline && <p className="rp-offline" role="alert">Connection lost. Retrying…</p>}</div>;
   const v = injects!.find(x => x.n === active) ?? injects![0];
   return <div className="rp-wrap cn-scene cn-r2s ij-shell" data-chapter={v.n}>
     {top(demo ? <span className="rp-demo">DEMO · CASE v2 · NO CLOCK · NOTHING IS RECORDED</span> : <div className="rp-clocks"><div><small>PART A ENDS IN</small><b role="timer" aria-label="Time remaining" className={end! - nowMs < 5 * 60_000 ? "is-urgent" : ""}>{mmss(end! - nowMs)}</b></div><div><small>SUGGESTED NOW</small><b>{suggested ? `Inject ${suggested}` : "Buffer"}</b></div></div>)}

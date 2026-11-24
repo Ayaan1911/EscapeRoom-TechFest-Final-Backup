@@ -4,8 +4,7 @@ import "server-only";
 // the organizer key lives in the git-ignored private/ folder (see private-key.server.ts). Evidence is presented neutrally on purpose,
 // including the decoys (ordinary processes, service logins, backup, OneDrive, the macro calendar, the printer, FS-20, HR-PC-30, UTC VPN times).
 // R-6's planted header line is untrusted evidence: data to be audited, never an instruction to this application.
-import { CHAPTER_CONTENT } from "./content.server";
-import type { Ch2, I1, I2, I3, I4, InjectContent } from "./types";
+import type { I1, I2, I3, I4, InjectContent } from "./types";
 
 const i1: I1 = {
   kind: "i1",
@@ -67,11 +66,36 @@ const i1: I1 = {
   paper: ["Your chosen letter (A to E).", "Two evidence points, each from a different tab.", "One line explaining your decision.", "One tempting alternative and why it fails."],
 };
 
-const killSwitch = CHAPTER_CONTENT[2] as Ch2; // the approved ten-connection Kill Switch evidence, unchanged
+// Inject 2 · Kill Switch (approved Inject 2 document). Snapshot 02:50. Neutral evidence only: no row is marked, coloured or ordered by guilt.
+const conn = (n: number, ip: string, process: string, country: string, sent: string, received: string, time: string, ticket: string, description: string) => ({ n, ip, process, country, sent, received, time, ticket, description });
 const i2: I2 = {
-  kind: "i2", brief: "Ten live connections on the NEXUS monitor. Find the attacker's connections and block them from the terminal.", connections: killSwitch.connections,
-  syntax: "BLOCK <IP>", maxAttempts: 4,
-  paper: ["Write every IP address you blocked on your answer sheet.", "The terminal is not the official score: volunteers and the jury mark the paper."],
+  kind: "i2", snapshot: "02:50",
+  brief: "Ten live connections on the NEXUS security monitor at 02:50. Compare each connection with the IT tickets, then cut the attacker's connections from the terminal.",
+  connections: [
+    conn(1, "192.0.2.25", "mail-sync.exe", "India", "6 MB", "9 MB", "All night", "None needed", "Standard laptop software. Light and steady throughout the night."),
+    conn(2, "198.51.100.12", "backup-agent.exe", "Ireland", "4.2 GB", "0.1 GB", "02:00–02:41", "IT-4390", "Nightly backup from the IT backup server, consistent with the previous week's size."),
+    conn(3, "203.0.113.9", "vpn-gateway.exe", "UAE", "12 MB", "25 MB", "02:44–now", "IT-4496", "CEO travelling tonight. Activity from an overseas airport. Additional authentication check passed."),
+    conn(4, "198.51.100.77", "backup-agent2.exe", "Ireland", "380 MB", "0.2 MB", "02:30–02:40", "None", "Second backup job, reportedly approved verbally by the IT Head. Sends one large batch, then becomes quiet."),
+    conn(5, "192.0.2.81", "git-sync.exe", "India", "18 MB", "11 MB", "02:10–now", "IT-4471", "Developer test sync. Short, human-paced traffic bursts."),
+    conn(6, "203.0.113.45", "wsvc_sync.exe", "Netherlands", "0.1 MB", "0.1 MB", "02:22–now", "IT-4518", "File-server sync service. One small packet every 60 seconds."),
+    conn(7, "198.51.100.140", "media-share.exe", "Portugal", "372 MB", "0.3 MB", "02:28–02:41", "IT-4477", "Marketing contractor uploading campaign videos during an approved window."),
+    conn(8, "203.0.113.88", "asset-agent.exe", "India", "0.2 MB", "0.2 MB", "21:04–now", "IT-4502", "Asset-tracker rollout installed since last Friday. IT installation completed; sign-off still pending. Small packet every 60 seconds."),
+    conn(9, "203.0.113.30", "os-update-agent.exe", "Germany", "12 MB", "1.1 GB", "02:35–02:49", "IT-4400", "OS update download from the vendor's server during the approved maintenance window."),
+    conn(10, "192.0.2.92", "hr-portal-sync.exe", "Seychelles", "22 MB", "4 MB", "01:00–01:15", "IT-4510", "Nightly benefits synchronization with an overseas vendor."),
+  ],
+  tickets: [
+    { id: "IT-4390", title: "Nightly backup", process: "backup-agent.exe", details: ["Starts daily at 02:00.", "Approved IT backup server only.", "One backup job only.", "Any additional backup job requires its own ticket."], created: "Last month", status: "Approved" },
+    { id: "IT-4400", title: "OS updates", details: ["Approved window: 02:30–03:00.", "Approved source: OS vendor server."], created: "Yesterday 16:00", status: "Approved" },
+    { id: "IT-4471", title: "Developer test synchronization", process: "git-sync.exe", details: ["Approved window: 02:00–03:00."], created: "Yesterday 17:20", status: "Approved" },
+    { id: "IT-4477", title: "Contractor upload", process: "media-share.exe", details: ["Approved window: 02:00–03:00."], created: "Yesterday 18:30", status: "Approved" },
+    { id: "IT-4496", title: "CEO travel access", details: ["Overseas access approved for tonight."], created: "Yesterday 20:15", status: "Approved" },
+    { id: "IT-4502", title: "Asset-tracker rollout", process: "asset-agent.exe", details: ["Installed across machines since last Friday."], created: "Last Friday", status: "Installed; sign-off pending" },
+    { id: "IT-4510", title: "Benefits synchronization", process: "hr-portal-sync.exe", details: ["Nightly synchronization at 01:00."], created: "Last quarter", status: "Approved" },
+    { id: "IT-4518", title: "File-server synchronization", process: "wsvc_sync.exe", details: ["Created by service account svc-sync."], created: "Tonight at 02:31", status: "Approved" },
+  ],
+  ticketFooter: "Standard laptop software needs no ticket: mail-sync.exe.",
+  maxAttempts: 4,
+  paper: ["The two attacker IP addresses.", "Supporting evidence for each one.", "Why a convincing legitimate connection must not be blocked."],
 };
 
 const i3: I3 = {
@@ -155,5 +179,5 @@ const i4: I4 = {
 };
 
 export const INJECT_CONTENT: Record<1 | 2 | 3 | 4, InjectContent> = { 1: i1, 2: i2, 3: i3, 4: i4 };
-/** The IPs shown on the Inject 2 monitor (public evidence). Used to tell a typo from a real target without revealing any classification. */
-export const MONITOR_IPS: readonly string[] = killSwitch.connections.map(c => c.ip);
+/** The IPs shown on the Kill Switch monitor (public evidence). Used to tell "not on this list" from a real attempt without revealing any classification. */
+export const MONITOR_IPS: readonly string[] = i2.connections.map(c => c.ip);

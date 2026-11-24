@@ -1,5 +1,5 @@
 import "server-only";
-// ORGANIZER-ONLY marking key for the open-60 case (case document v2) and the Inject 2 target classification.
+// ORGANIZER-ONLY marking key for Round 2 (case document v2) and the Kill Switch target classification + wrong-block messages.
 // The repository is public, so the key is NOT in source: it is read at runtime from a git-ignored JSON file
 // (default private/round2-key-v2.json, or GHOST_R2_KEY_FILE). Without a valid file the terminal reports "awaiting approved answer set"
 // and the printable key says it is missing. Format: docs/ghost404-round2-open60.md. Never import this from client code.
@@ -11,7 +11,8 @@ const ipv4 = z.string().regex(/^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1
 const schema = z.object({
   version: z.literal("case-v2"),
   inject1: z.object({ answer: z.string(), rationale: z.string(), evidence: z.array(z.string()), decoys: z.array(z.string()), split: z.string() }),
-  inject2: z.object({ status: z.enum(["approved", "provisional"]), source: z.string(), malicious: z.array(ipv4).min(1), cleared: z.array(ipv4), split: z.string(), hints: z.string() }),
+  // wrongMessages: the service-disruption line returned (by the server, after a committed attempt) when that legitimate connection is blocked.
+  inject2: z.object({ status: z.enum(["approved", "provisional"]), source: z.string(), malicious: z.array(ipv4).min(1), cleared: z.array(ipv4), wrongMessages: z.record(ipv4, z.string().max(200)), split: z.string(), hints: z.string() }),
   inject3: z.object({ claims: z.array(z.object({ n: z.number().int(), verdict: z.enum(["TRUE", "FALSE", "NOT ENOUGH EVIDENCE"]), reason: z.string() })).length(8), planted: z.string(), split: z.string() }),
   inject4: z.object({ calls: z.array(z.object({ n: z.number().int(), correct: z.enum(["A", "B", "C", "D"]), flaws: z.record(z.string(), z.string()) })).length(3),
     statements: z.object({ good: z.array(z.number().int()).length(2), bad: z.array(z.object({ n: z.number().int(), why: z.string() })) }), split: z.string() }),

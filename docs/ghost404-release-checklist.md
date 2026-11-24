@@ -24,8 +24,10 @@ Tick every line on the day. Any unchecked **MUST** is a no-go. Evidence for what
 ## Round 2 (paper)
 - [ ] **MUST** Enroll finalists; 10 active + standby shown correctly; every finalist PC shows "Stand by".
 - [ ] **MUST** Volunteers hold printed answer sheets; jury (2 panels x 2 judges) has rubrics.
-- [ ] Press **Start investigation** once; confirm Chapter 1 on two finalist PCs and on the projector.
-- [ ] Chapters switch by themselves at 8:00, 20:00, 30:00 and the screen shows PENS DOWN at 40:00. Do not refresh to "help" a team: the server clock decides.
+- [ ] **MUST** `private/round2-key-v2.json` is on the event server (the Kill Switch terminal says "offline" without it). Print the correct-IP slips.
+- [ ] Press **Start Round 2** once (the only format: 60 minutes, four open injects); confirm all four injects on two finalist PCs and the countdown on the projector.
+- [ ] Pacing is advice only (10/12/25/10 + 3). At 60:00 the screens show PENS DOWN and every terminal locks by themselves. Do not refresh to "help" a team: the server clock decides.
+- [ ] Kill Switch: watch "terminal review" in the control room; hand a correct-IP slip only after a team is OUT OF ATTEMPTS; never reset attempts. Print the terminal results after pens down.
 - [ ] If something goes wrong: **End now** (reason required) closes everything for everyone. It cannot be undone.
 
 ## No-go triggers

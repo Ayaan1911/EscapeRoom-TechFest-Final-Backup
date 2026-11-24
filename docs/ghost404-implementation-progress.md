@@ -113,7 +113,21 @@ Spec, policies, key-file format and approvals: `docs/ghost404-round2-open60.md`.
 | Inject 2 target classification | **PROVISIONAL**: case document v2 lists no targets; the private key reuses the earlier approved Kill Switch classification; owner must confirm |
 | Inject 3 twelve records, eight claims, click-based verification desk | Done, browser-verified |
 | Inject 4 status, three calls, six statements, command center | Done; statement and chat wording reconstructed from the spec summary (VERIFY against the PDF) |
-| Organizer-selected format, snapshotted at start, cannot switch while running | Done; default stays 40-minute |
-| 40-minute sequential format | Unchanged; its suites pass |
+| Organizer-selected format | **Superseded**: one format only (see below) |
+| 40-minute sequential format | **Retired** in the next pass (see below) |
 | v2 printables, Demo format switch, projector 60-minute view | Done |
 | Not done | Boardroom Verdict (out of scope); terminal attempt-reset procedure |
+
+## Round 2 final decision: one 60-minute format + final Kill Switch (this pass)
+Details: `docs/ghost404-round2-open60.md`.
+
+| Item | State |
+|---|---|
+| 40-minute format retired (clock, content, key, shell, desks, selector, demo option, printables, dual-mode tests) | Done; historical rows kept and shown as closed; Start refuses on such a database |
+| Organizer starts Round 2 directly, no format choice (UI and API) | Done, tested |
+| Kill Switch exact data: 10 connections, inspect descriptions, 8 IT tickets + footer | Done, unit-tested against the approved document |
+| Approved two-target key installed in the git-ignored private file | Done on this machine; must be copied to the event server |
+| Terminal: exact parser messages, duplicates free, early success lock, exhaustion lock, server-only feedback, rate limit | Done, DB + browser tested |
+| Hybrid scoring (15 terminal points, portal-computed) + organizer/volunteer review + printables | Done; untouched-terminal +5 flagged for the owner |
+| Volunteer correct-IP slips (print), no digital reveal, no reset | Done |
+| SOC terminal visual design (banner, cursor, BLOCKING sequence, attempt colours, flashes, reduced motion) | Done, screenshots in `D:\Ghost404-TestWorkspace\shots\ks` |

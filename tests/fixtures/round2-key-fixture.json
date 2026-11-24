@@ -16,12 +16,22 @@
   "source": "TEST FIXTURE ONLY - NOT THE CASE KEY",
   "malicious": [
    "192.0.2.81",
-   "192.0.2.92"
+   "203.0.113.88"
   ],
   "cleared": [
    "192.0.2.25",
-   "192.0.2.53"
+   "198.51.100.12",
+   "203.0.113.9",
+   "198.51.100.77",
+   "203.0.113.45",
+   "198.51.100.140",
+   "203.0.113.30",
+   "192.0.2.92"
   ],
+  "wrongMessages": {
+   "192.0.2.25": "TEST: fixture outage one.",
+   "198.51.100.12": "TEST: fixture outage two."
+  },
   "split": "test",
   "hints": "test"
  },

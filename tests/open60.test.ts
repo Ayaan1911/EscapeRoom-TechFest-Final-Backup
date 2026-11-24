@@ -2,10 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 vi.mock("../src/lib/db", () => ({ db: {}, serializable: () => { throw new Error("not in unit tests"); } }));
 import { INJECT_CONTENT, MONITOR_IPS } from "../src/lib/round2/paper/content-v2.server";
-import { asFormat, FORMAT_INFO, OPEN_BUFFER, OPEN_MS, OPEN_PACE, openClock } from "../src/lib/round2/paper/format";
+import { FORMAT, isRetiredSession, OPEN_BUFFER, OPEN_MS, OPEN_PACE, openClock, POINTS } from "../src/lib/round2/paper/format";
 import type { I1, I2, I3, I4 } from "../src/lib/round2/paper/types";
 
-// Case document v2 ("open-60"): exact case data, timing rules and terminal parsing. Pure tests (no database).
+// Round 2 (GHOST RETURNS, the only format): exact case data, 60-minute timing, Kill Switch parsing and scoring. Pure tests (no database).
 const i1 = INJECT_CONTENT[1] as I1, i2 = INJECT_CONTENT[2] as I2, i3 = INJECT_CONTENT[3] as I3, i4 = INJECT_CONTENT[4] as I4;
 
 describe("Inject 1 · Alert at 2:14 AM: exact records", () => {
@@ -67,23 +67,70 @@ describe("Inject 4 · The Three Calls", () => {
   });
 });
 
-describe("Inject 2 terminal: evidence and command parsing (no shell, no network)", async () => {
-  const { parseCommand, classify, MAX_BLOCKS } = await import("../src/lib/round2/paper/terminal.server");
-  it("the ten approved Kill Switch connections are reused unchanged; Server X from Inject 1 is not one of them", () => {
-    expect(i2.connections).toHaveLength(10); expect(MONITOR_IPS).not.toContain("203.0.113.250"); expect(i2.maxAttempts).toBe(4); expect(MAX_BLOCKS).toBe(4);
-    expect(JSON.stringify(i2)).not.toMatch(/rogue|decoy|malicious|cleared/i);
+describe("Inject 2 · Kill Switch: exact evidence (approved document)", () => {
+  it("ten connection records with exact values, in order, carrying no classification", () => {
+    expect(i2.snapshot).toBe("02:50");
+    expect(i2.connections.map(c => [c.n, c.ip, c.process, c.country, c.sent, c.received, c.time].join("|"))).toEqual([
+      "1|192.0.2.25|mail-sync.exe|India|6 MB|9 MB|All night", "2|198.51.100.12|backup-agent.exe|Ireland|4.2 GB|0.1 GB|02:00–02:41", "3|203.0.113.9|vpn-gateway.exe|UAE|12 MB|25 MB|02:44–now",
+      "4|198.51.100.77|backup-agent2.exe|Ireland|380 MB|0.2 MB|02:30–02:40", "5|192.0.2.81|git-sync.exe|India|18 MB|11 MB|02:10–now", "6|203.0.113.45|wsvc_sync.exe|Netherlands|0.1 MB|0.1 MB|02:22–now",
+      "7|198.51.100.140|media-share.exe|Portugal|372 MB|0.3 MB|02:28–02:41", "8|203.0.113.88|asset-agent.exe|India|0.2 MB|0.2 MB|21:04–now", "9|203.0.113.30|os-update-agent.exe|Germany|12 MB|1.1 GB|02:35–02:49",
+      "10|192.0.2.92|hr-portal-sync.exe|Seychelles|22 MB|4 MB|01:00–01:15"]);
+    for (const c of i2.connections) expect(Object.keys(c).sort()).toEqual(["country", "description", "ip", "n", "process", "received", "sent", "ticket", "time"]);
+    expect(JSON.stringify(i2)).not.toMatch(/rogue|malicious|isRogue|correctTarget|suspicion|attacker-controlled|decoy/i);
   });
-  it.each([["block 192.0.2.53", "192.0.2.53"], ["BLOCK 203.0.113.30", "203.0.113.30"], ["  Block   198.51.100.12  ", "198.51.100.12"]])("accepts %j", (line, ip) => expect(parseCommand(line)).toEqual({ ip }));
-  it.each(["", "block", "block 999.1.1.1", "block 1.2.3", "rm -rf /", "block 1.2.3.4; shutdown", "block 1.2.3.4 && ls", "allow 1.2.3.4", "block 01.2.3.4", "$(whoami)", 42, null, "block ".padEnd(100, "1")])("rejects %j without using an attempt", line => expect(parseCommand(line)).toHaveProperty("error"));
-  it("classifies attempts: caught, cleared, and repeats always count as repeat", () => {
-    expect(classify("10.0.0.1", [], ["10.0.0.1"])).toBe("caught"); expect(classify("10.0.0.2", [], ["10.0.0.1"])).toBe("cleared"); expect(classify("10.0.0.1", ["10.0.0.1"], ["10.0.0.1"])).toBe("repeat");
+  it("inspect descriptions and ticket references match", () => {
+    expect(i2.connections.map(c => c.ticket)).toEqual(["None needed", "IT-4390", "IT-4496", "None", "IT-4471", "IT-4518", "IT-4477", "IT-4502", "IT-4400", "IT-4510"]);
+    const d = (n: number) => i2.connections[n - 1].description;
+    expect(d(1)).toBe("Standard laptop software. Light and steady throughout the night."); expect(d(4)).toContain("approved verbally by the IT Head"); expect(d(6)).toBe("File-server sync service. One small packet every 60 seconds.");
+    expect(d(7)).toContain("approved window"); expect(d(8)).toContain("sign-off still pending. Small packet every 60 seconds."); expect(d(10)).toBe("Nightly benefits synchronization with an overseas vendor.");
+  });
+  it("eight IT tickets with exact facts and the footer", () => {
+    expect(i2.tickets.map(t => `${t.id}|${t.created}|${t.status}`)).toEqual(["IT-4390|Last month|Approved", "IT-4400|Yesterday 16:00|Approved", "IT-4471|Yesterday 17:20|Approved", "IT-4477|Yesterday 18:30|Approved", "IT-4496|Yesterday 20:15|Approved", "IT-4502|Last Friday|Installed; sign-off pending", "IT-4510|Last quarter|Approved", "IT-4518|Tonight at 02:31|Approved"]);
+    const t = (id: string) => i2.tickets.find(x => x.id === id)!;
+    expect(t("IT-4390").details).toEqual(["Starts daily at 02:00.", "Approved IT backup server only.", "One backup job only.", "Any additional backup job requires its own ticket."]);
+    expect(t("IT-4518").details).toEqual(["Created by service account svc-sync."]); expect(t("IT-4400").details).toContain("Approved window: 02:30–03:00.");
+    expect(i2.ticketFooter).toBe("Standard laptop software needs no ticket: mail-sync.exe."); expect(i2.maxAttempts).toBe(4);
+  });
+  it("is consistent with Injects 1, 3 and 4", () => {
+    const r = (id: string) => i3.records.find(x => x.id === id)!.lines.join(" "), row = (n: number) => i2.connections[n - 1];
+    expect(r("R-4")).toContain("02:22"); expect(row(6).time.startsWith("02:22")).toBe(true);
+    expect(r("R-4")).toContain("380 MB"); expect(r("R-4")).toContain("02:30 and 02:40"); expect(row(4).sent).toBe("380 MB"); expect(row(4).time).toBe("02:30–02:40");
+    expect(r("R-3")).toContain("4.2 GB"); expect(r("R-3")).toContain("02:00 to 02:41"); expect(row(2).time).toBe("02:00–02:41");
+    expect(r("R-9")).toContain("21:14 UTC"); expect(row(3).time.startsWith("02:44")).toBe(true); // 21:14 UTC = 02:44 IST
+    expect(r("R-5")).toContain("02:35"); expect(row(9).time.startsWith("02:35")).toBe(true);
+    expect(r("R-7")).toContain("svc-sync"); expect(i2.tickets.find(x => x.id === "IT-4518")!.created).toContain("02:31");
+    expect(r("R-8")).toContain("03:05"); expect(MONITOR_IPS).not.toContain("203.0.113.250"); // Server X from Inject 1 is not on the monitor
   });
 });
 
-describe("open-60 clock: 60 minutes, everything open, suggested pacing only", () => {
+describe("Kill Switch terminal: parsing and scoring (no shell, no network)", async () => {
+  const { parseCommand, terminalScore, MAX_BLOCKS } = await import("../src/lib/round2/paper/terminal.server");
+  it.each([["block 192.0.2.53", "192.0.2.53"], ["BLOCK 203.0.113.30", "203.0.113.30"], ["  Block   198.51.100.12  ", "198.51.100.12"]])("accepts %j", (line, ip) => expect(parseCommand(line)).toEqual({ ip }));
+  it.each([
+    ["BLOK 192.0.2.25", "Unknown command. Usage: BLOCK <ip address>"], ["BLCOK 192.0.2.25", "Unknown command. Usage: BLOCK <ip address>"], ["rm -rf /", "Unknown command. Usage: BLOCK <ip address>"],
+    ["BLOCK", "Missing IP address. Usage: BLOCK <ip address>"], ["  block  ", "Missing IP address. Usage: BLOCK <ip address>"],
+    ["BLOCK abc", "Invalid IP address format."], ["BLOCK 203.0.113.999", "Invalid IP address format."], ["block 01.2.3.4", "Invalid IP address format."], ["block 1.2.3.4;ls", "Invalid IP address format."],
+    ["BLOCK 192.0.2.25 192.0.2.81", "Too many arguments. Usage: BLOCK <ip address>"], ["", "Unknown command. Usage: BLOCK <ip address>"], [42, "Unknown command. Usage: BLOCK <ip address>"],
+  ] as const)("%j gives a message and uses no attempt", (line, message) => expect(parseCommand(line)).toEqual({ message }));
+  it("15-point score: +5 per attacker blocked, +5 for no legitimate block, -2 per legitimate block, clamped 0..15", () => {
+    expect(MAX_BLOCKS).toBe(4); expect(POINTS.inject2).toBe(15);
+    const c = "caught", w = "cleared";
+    expect(terminalScore([c, c])).toBe(15);
+    expect(terminalScore([c, w])).toBe(3);
+    expect(terminalScore([c, w, c])).toBe(8);
+    expect(terminalScore([w, w])).toBe(0);
+    expect(terminalScore([w, w, w, w])).toBe(0);
+    expect(terminalScore([w, c, w, c])).toBe(6);
+    expect(terminalScore([c])).toBe(10);
+    expect(terminalScore([])).toBe(5); // untouched terminal: formula as written (flagged for the organizer)
+    expect(terminalScore([c, c, c])).toBe(15);
+  });
+});
+
+describe("Round 2 clock: 60 minutes, everything open, suggested pacing only", () => {
   const at = (m: number) => openClock({ startsAt: new Date(0), endedAt: null }, m * 60_000);
   it("pacing adds up to 60 minutes (10 + 12 + 25 + 10 + 3)", () => {
-    expect(OPEN_PACE.map(p => p.toMin - p.fromMin)).toEqual([10, 12, 25, 10]); expect(OPEN_BUFFER.toMin - OPEN_BUFFER.fromMin).toBe(3); expect(OPEN_MS).toBe(3_600_000); expect(FORMAT_INFO["open-60"].minutes).toBe(60);
+    expect(OPEN_PACE.map(p => p.toMin - p.fromMin)).toEqual([10, 12, 25, 10]); expect(OPEN_BUFFER.toMin - OPEN_BUFFER.fromMin).toBe(3); expect(OPEN_MS).toBe(3_600_000); expect(POINTS.total).toBe(60); expect(FORMAT).toBe("open-60");
   });
   it.each([[0, 1], [9.99, 1], [10, 2], [21.99, 2], [22, 3], [46.99, 3], [47, 4], [56.99, 4], [57, null], [59.99, null]] as const)("at %s min it is running with suggested inject %s", (m, s) => expect(at(m)).toMatchObject({ phase: "running", suggested: s }));
   it("pens down at exactly 60:00, early end supported, nothing before the start", () => {
@@ -91,5 +138,8 @@ describe("open-60 clock: 60 minutes, everything open, suggested pacing only", ()
     expect(openClock({ startsAt: new Date(0), endedAt: new Date(5 * 60_000) }, 6 * 60_000)).toMatchObject({ phase: "complete", endedEarly: true });
     expect(openClock({ startsAt: null, endedAt: null }, 0)).toEqual({ phase: "not_started" }); expect(openClock({ startsAt: new Date(60_000), endedAt: null }, 0)).toEqual({ phase: "not_started" });
   });
-  it("unknown or missing formats fall back to the existing 40-minute default", () => { expect(asFormat(null)).toBe("paper-40"); expect(asFormat("weird")).toBe("paper-40"); expect(asFormat("open-60")).toBe("open-60"); });
+  it("a session from the retired 40-minute format is recognised as historical and never treated as a running round", () => {
+    expect(isRetiredSession({ startsAt: new Date(0), format: null })).toBe(true); expect(isRetiredSession({ startsAt: new Date(0), format: "paper-40" })).toBe(true);
+    expect(isRetiredSession({ startsAt: new Date(0), format: "open-60" })).toBe(false); expect(isRetiredSession({ startsAt: null, format: null })).toBe(false);
+  });
 });

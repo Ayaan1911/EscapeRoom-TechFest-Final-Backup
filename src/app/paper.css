@@ -113,3 +113,5 @@
 .rp-alert-grid > *, .rp-audit > *, .rp-callgrid > *, .rp-wrap > * { min-width: 0; }
 .rp-report .rp-check { grid-column: 2; display: inline-flex; width: fit-content; justify-self: start; align-items: center; gap: 8px; }
 .rp-report .rp-check input { width: 18px; height: 18px; min-height: 0; padding: 0; flex: none; }
+.pp-slips { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.pp-slip { display: grid; gap: 6px; padding: 12px; border: 1px dashed #333; } .pp-slip span { font: 700 18px ui-monospace, monospace; } .pp-slip small { color: #555; }

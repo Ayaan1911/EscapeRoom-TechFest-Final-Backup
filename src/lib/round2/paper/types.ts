@@ -1,38 +1,6 @@
-// Shapes of the PARTICIPANT-visible chapter content (safe to import anywhere). Contains no answer data.
-export type Row = Record<string, string>;
-export type Ch1 = {
-  kind: "alert";
-  alert: { id: string; severity: string; host: string; time: string; summary: string };
-  options: { letter: string; text: string }[];
-  tabs: { id: string; title: string; columns: { key: string; label: string }[]; rows: Row[]; note?: string }[];
-  chat: { from: "ravi" | "responder"; text: string }[];
-};
-export type Conn = { n: number; ip: string; process: string; country: string; sent: string; received: string; duration: string; pattern: string; series: number[] };
-export type Ch2 = { kind: "network"; brief: string; connections: Conn[] };
-export type Ch3 = {
-  kind: "audit";
-  claims: { n: number; text: string; confidence: string }[];
-  timeline: { time: string; event: string; note?: string }[];
-  records: { id: string; source: string; text: string }[];
-};
-export type Ch4 = {
-  kind: "calls";
-  situation: { label: string; value: string }[];
-  calls: { n: number; title: string; question: string; pressure: string; options: { letter: string; text: string }[] }[];
-  statements: { n: number; text: string }[];
-};
-export type ChapterContent = Ch1 | Ch2 | Ch3 | Ch4;
-export type ChapterView = { n: 1 | 2 | 3 | 4; title: string; endsAt: string; content: ChapterContent };
-export type PaperStatus = {
-  serverNow: string;
-  phase: "not_started" | "running" | "complete";
-  endsAt: string | null;
-  endedEarly?: boolean;
-  chapter: ChapterView | null;
-  rail: { n: number; title: string; state: "done" | "active" | "locked" }[];
-};
+// Shapes of the PARTICIPANT-visible Round 2 content (safe to import anywhere). Contains no answer data.
+// Round 2 has one format: GHOST RETURNS Part A, 60 minutes, four open injects (case document v2).
 
-// ---- Case document v2 ("open-60" format): participant-visible inject content. Still contains NO answer data. ----
 export type I1 = {
   kind: "i1";
   alert: { id: string; severity: string; host: string; user: string; observed: string };
@@ -44,7 +12,10 @@ export type I1 = {
   options: { letter: string; text: string }[];
   paper: string[];
 };
-export type I2 = { kind: "i2"; brief: string; connections: Conn[]; syntax: string; maxAttempts: number; paper: string[] };
+/** One Kill Switch monitor row (Inject 2 document). Deliberately carries no classification. */
+export type KConn = { n: number; ip: string; process: string; country: string; sent: string; received: string; time: string; ticket: string; description: string };
+export type Ticket = { id: string; title: string; process?: string; details: string[]; created: string; status: string };
+export type I2 = { kind: "i2"; snapshot: string; brief: string; connections: KConn[]; tickets: Ticket[]; ticketFooter: string; maxAttempts: number; paper: string[] };
 export type I3 = {
   kind: "i3";
   claims: { n: number; text: string; confidence: string }[];
@@ -61,7 +32,8 @@ export type I4 = {
 };
 export type InjectContent = I1 | I2 | I3 | I4;
 export type InjectView = { n: 1 | 2 | 3 | 4; title: string; pace: { fromMin: number; toMin: number }; content: InjectContent };
-/** open-60 participant status: every inject is readable while the 60-minute clock runs; nothing is returned before the start or after pens down. */
+/** Participant status: every inject is readable while the 60-minute clock runs; nothing is returned before the start or after pens down.
+ *  `retired` marks a historical session from the retired 40-minute format: it is shown as closed and can never resume. */
 export type OpenStatus = {
   format: "open-60";
   serverNow: string;
@@ -69,15 +41,17 @@ export type OpenStatus = {
   startsAt: string | null;
   endsAt: string | null;
   endedEarly?: boolean;
+  retired?: boolean;
   injects: InjectView[] | null;
 };
-/** Inject 2 terminal state for the signed-in team. Never contains the target list. */
+export type AttemptResult = "caught" | "cleared";
+/** Kill Switch terminal state for the signed-in team. Only the team's own attempts (and the message each one earned); never the target list. */
 export type TerminalState = {
   open: boolean;
   max: number;
   remaining: number;
   locked: boolean;
-  allCaught: boolean;
-  attempts: { seq: number; ip: string; result: "caught" | "cleared" | "repeat"; at: string }[];
-  keyReady: boolean;
+  lockReason: "none" | "contained" | "exhausted" | "closed" | "no-key";
+  contained: number;
+  attempts: { seq: number; ip: string; result: AttemptResult; message: string; at: string }[];
 };

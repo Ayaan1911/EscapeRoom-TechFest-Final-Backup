@@ -1,3 +1,5 @@
+> **Superseded.** This describes the retired 40-minute sequential format. The only Round 2 format is now GHOST RETURNS Part A, 60 minutes, four open injects: see `docs/ghost404-round2-open60.md`.
+
 # GHOST RETURNS — paper edition (Round 2 rebuild)
 
 Branch `feat/ghost404-round2-paper`, based on Phase 1 checkpoint `3327e506`. Phase 1 (`test/ghost404-lab-lan`) is untouched.

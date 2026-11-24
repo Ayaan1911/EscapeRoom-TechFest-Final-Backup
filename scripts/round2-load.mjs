@@ -1,9 +1,9 @@
 // Round 2 (paper) load rehearsal: disposable local PostgreSQL + the real production build (`next start`). Local only, never a hosted target.
 //   npm run build && node scripts/round2-load.mjs [--finalists 10] [--per-team 3] [--window 40] [--port 3110]
-// Simulates every finalist PC (and teammates' second/third screens) polling the server-clock status endpoint as the real shell does (every 4 s, every 1 s near a
-// chapter end), the organizer + projector polling timing, and a simultaneous sign-in burst. The shared clock is moved so that each of the four transitions
-// (8:00, 20:00, 30:00, 40:00) happens inside the run. Checks: every response agrees with the clock for its own serverNow; no chapter other than the open one is
-// served; no 5xx; lag between a transition and the first client that sees it.
+// GHOST RETURNS (60 minutes, four open injects). Simulates every finalist PC (and teammates' screens) polling the status endpoint as the real shell does,
+// the organizer + projector polling timing, a simultaneous sign-in burst, and every screen firing Kill Switch BLOCK commands at once (TEST key fixture).
+// The shared clock is moved so that the start (0:00) and pens down (60:00) both happen inside the run. Checks: every response agrees with the clock for its
+// own serverNow; injects only while running; no team ever stores more than 4 attempts; no 5xx; lag between a transition and the first client that sees it.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { PrismaClient } from "@prisma/client";
@@ -11,14 +11,15 @@ import { createTempDatabase } from "./pg-temp.mjs";
 import { hashPassword } from "../src/lib/password.mjs";
 import { generateCode } from "./provision-lib.mjs";
 import { initialProgress } from "../src/lib/game/engine.ts";
-import { paperClock } from "../src/lib/round2/paper/clock.ts";
+import { openClock } from "../src/lib/round2/paper/format.ts";
+import { resolve } from "node:path";
 
 const arg = (n, d) => { const i = process.argv.indexOf(`--${n}`); return i >= 0 ? process.argv[i + 1] : d; };
 const FIN = Number(arg("finalists", 10)), PER = Number(arg("per-team", 3)), WIN = Number(arg("window", 40)), PORT = Number(arg("port", 3110));
 const ORIGIN = `http://127.0.0.1:${PORT}`, sleep = ms => new Promise(r => setTimeout(r, ms));
 const temp = await createTempDatabase("r2load"), url = temp.url, adminCode = generateCode(), teamCode = generateCode();
 assert.ok(/ghostt_/.test(url) && ["127.0.0.1", "localhost"].includes(new URL(url).hostname), "disposable local database only");
-const env = { ...process.env, DATABASE_URL: url, DIRECT_URL: url, ADMIN_ACCESS_HASH: hashPassword(adminCode), APP_ORIGIN: ORIGIN, NODE_ENV: "production", UV_THREADPOOL_SIZE: process.env.UV_THREADPOOL_SIZE ?? "16" };
+const env = { ...process.env, DATABASE_URL: url, DIRECT_URL: url, ADMIN_ACCESS_HASH: hashPassword(adminCode), APP_ORIGIN: ORIGIN, NODE_ENV: "production", GHOST_R2_KEY_FILE: resolve("tests/fixtures/round2-key-fixture.json"), UV_THREADPOOL_SIZE: process.env.UV_THREADPOOL_SIZE ?? "16" };
 const db = new PrismaClient({ datasourceUrl: url });
 const stats = new Map(), problems = [];
 const pct = (a, p) => a.length ? [...a].sort((x, y) => x - y)[Math.min(a.length - 1, Math.floor(a.length * p))] : 0;
@@ -45,7 +46,7 @@ class Client {
   }
 }
 async function waitUp() { for (let i = 0; i < 90; i++) { try { if ((await fetch(ORIGIN + "/login")).ok) return; } catch { /* starting */ } await sleep(1000); } throw new Error("server did not start"); }
-const setClock = (startsAt) => db.r2Session.upsert({ where: { id: 1 }, create: { id: 1, startsAt, contentVersion: "r2-v1", scoringPolicy: "best-v1" }, update: { startsAt, endedAt: null } });
+const setClock = (startsAt) => db.r2Session.upsert({ where: { id: 1 }, create: { id: 1, startsAt, contentVersion: "case-v2", format: "open-60" }, update: { startsAt, endedAt: null, format: "open-60" } });
 
 let exitCode = 1;
 try {
@@ -64,31 +65,38 @@ try {
   console.log(`Sign-in burst: ${clients.length} screens + organizer in ${((performance.now() - burst) / 1000).toFixed(1)} s`);
 
   let session = { startsAt: null, endedAt: null }, run = true, observed = []; // observed: {t, chapter|0|5}
-  const expectFor = now => { const c = paperClock(session, now); return c.phase === "running" ? c.chapter : c.phase === "complete" ? 5 : 0; };
+  const expectFor = now => { const c = openClock(session, now); return c.phase === "running" ? 1 : c.phase === "complete" ? 5 : 0; };
   const check = (name, text, status) => {
     if (status >= 500) problems.push(`${name} -> ${status}`);
     if (status !== 200) return;
     let j; try { j = JSON.parse(text); } catch { problems.push(`${name}: not JSON`); return; }
-    const now = Date.parse(j.serverNow), want = expectFor(now), got = j.chapter ? (typeof j.chapter === "object" ? j.chapter.n : j.chapter) : j.phase === "complete" ? 5 : 0;
+    const now = Date.parse(j.serverNow), want = expectFor(now), got = j.phase === "running" ? 1 : j.phase === "complete" ? 5 : 0;
     if (want !== got) problems.push(`INVARIANT ${name}: serverNow says chapter ${want}, payload says ${got}`);
-    if (j.chapter && typeof j.chapter === "object" && (j.chapter.n !== got || Object.keys(j).some(k => /^chapters$/.test(k)))) problems.push(`INVARIANT ${name}: more than the open chapter served`);
+    if (name === "status" && (j.phase === "running") !== Array.isArray(j.injects)) problems.push(`INVARIANT ${name}: injects present outside the running phase`);
     observed.push({ at: now, got });
   };
   const pollers = clients.map(c => (async () => {
     await sleep(Math.random() * 3000); let end = null;
     while (run) {
       const r = await c.req(c.team.endsWith(String(FIN + 1).padStart(2, "0")) || c.team.endsWith(String(FIN + 2).padStart(2, "0")) ? "status:standby" : "status", "/api/round2/status");
-      if (r.status === 200) { check("status", r.text, r.status); const j = JSON.parse(r.text); end = j.chapter ? Date.parse(j.chapter.endsAt) : null; } else if (r.status >= 500) check("status", r.text, r.status);
+      if (r.status === 200) { check("status", r.text, r.status); const j = JSON.parse(r.text); end = j.endsAt ? Date.parse(j.endsAt) : null; } else if (r.status >= 500) check("status", r.text, r.status);
       const near = end !== null && end - Date.now() < 2500; await sleep(near ? 1000 : 4000);
     }
   })());
   const orgPoll = (async () => { while (run) { const r = await org.req("admin:timing", "/api/round2/admin?view=timing"); check("admin:timing", r.text, r.status); await sleep(2000); } })();
 
   const lags = [];
-  for (const boundary of [8, 20, 30, 40]) { // start so that this boundary falls WIN/2 s into the segment
+  for (const boundary of [0, 60]) { // start so that this boundary falls WIN/2 s into the segment
     const startsAt = new Date(Date.now() - boundary * 60_000 + (WIN / 2) * 1000); session = { startsAt, endedAt: null }; await setClock(startsAt);
     const at = startsAt.getTime() + boundary * 60_000, before = observed.length;
     await sleep(WIN * 1000);
+    if (boundary === 0) { // Kill Switch burst: every screen fires 3 BLOCK commands at once; the server must keep each team at 4 attempts or fewer
+      const ips = ["192.0.2.25", "198.51.100.12", "203.0.113.9", "198.51.100.77", "192.0.2.81", "203.0.113.45", "198.51.100.140", "203.0.113.88", "203.0.113.30", "192.0.2.92"];
+      await Promise.all(clients.flatMap(c => [0, 1, 2].map(() => c.req("terminal:block", "/api/round2/terminal", { method: "POST", body: JSON.stringify({ command: `block ${ips[Math.floor(Math.random() * ips.length)]}` }), headers: { "content-type": "application/json" } }))));
+      const counts = await db.r2BlockAttempt.groupBy({ by: ["teamId"], _count: { _all: true } });
+      for (const t of counts) if (t._count._all > 4) problems.push(`INVARIANT terminal: ${t.teamId} stored ${t._count._all} attempts`);
+      console.log(`Terminal burst: ${clients.length * 3} BLOCK commands; teams with attempts: ${counts.length}; max per team: ${Math.max(0, ...counts.map(t => t._count._all))}`);
+    }
     const after = observed.slice(before).filter(o => o.at >= at), firstNew = after.filter(o => o.got === expectFor(at + 1)).map(o => o.at).sort((a, b) => a - b);
     lags.push({ boundary, seen: firstNew.length, lagMs: firstNew.length ? firstNew[0] - at : null });
   }

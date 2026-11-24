@@ -91,11 +91,12 @@ test("organizer enters demo from the dashboard; the whole walkthrough makes no A
   await chain.getByRole("button", { name: "Submit task" }).click(); await expect(chain.getByText(demoNote)).toBeVisible();
   await page.getByRole("link", { name: "Back to Investigation Dashboard" }).click(); await expect(page).toHaveURL(/\/admin\/demo\/round1$/); // navigation stays inside the preview
 
-  // Round 2 (paper edition): all four chapters open, no clock, no enrollment, nothing to submit
+  // Round 2 (GHOST RETURNS, 60 minutes): all four injects open, no clock, no enrollment, nothing to submit
   const TITLES = ["Alert at 2:14 AM", "Kill Switch", "Audit the AI", "The Three Calls"];
   for (const [i, title] of TITLES.entries()) {
     await page.goto(`/admin/demo/round2?unit=${i + 1}`); await expect(page.locator(".rp-head h1")).toHaveText(title);
-    await expect(page.getByRole("timer")).toHaveCount(0); await expect(page.locator("main form, main textarea, main input, main select")).toHaveCount(0);
+    await expect(page.getByRole("timer")).toHaveCount(0); await expect(page.locator("main textarea, main select")).toHaveCount(0);
+    await expect(page.locator("main input")).toHaveCount(i === 1 ? 1 : 0); // only the Kill Switch terminal accepts typing (demo: nothing stored)
   }
 
   // Exit returns to the organizer dashboard

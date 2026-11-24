@@ -1,66 +1,74 @@
-# Round 2 · Case document v2 ("open-60" format)
+# Round 2 · GHOST RETURNS (the only format)
 
-Source: the owner's document "OPERATION GHOST_404 – Round 2 Part A: Injects 1, 3 and 4 and Inject 2 prompt". The PDF itself was not available in the repository; the content was implemented from the detailed specification supplied with the task. Items marked **VERIFY** must be checked against the PDF.
+**Decision (owner):** one Round 2, four open injects, 60 minutes, four terminal attempts, 60 total points. The earlier 40-minute sequential format is retired.
+Sources: "Round 2 Part A: Injects 1, 3 and 4 and Inject 2 prompt" and "Round 2 Part A: Inject 2 – Kill Switch" (8 pages). Answers are **not** in this repository (it is public); they live in the git-ignored `private/round2-key-v2.json`.
 
-## Two formats, side by side (nothing was overwritten)
+## Format
+* One organizer-started, server-authoritative 60-minute clock. The organizer presses **Start Round 2**; there is no format choice anywhere (UI or API: a `format` field is rejected with 400).
+* All four injects are readable from the start until pens down; teams move between them freely. Suggested pacing (not enforced): Inject 1 10 min, Inject 2 12, Inject 3 25, Inject 4 10, buffer 3.
+* At 60:00 (or an organizer early end with a reason): injects close, the Kill Switch terminal locks, PENS DOWN shows; history and scores are kept.
+* Only Inject 2 takes typed commands. Everything else is written on paper. No external AI assistance. No Part B is launched.
 
-| | `paper-40` (**current default**) | `open-60` (case document v2) |
+## Retired 40-minute format (data safety)
+* Removed: the sequential clock and chapter locking, the original chapter content and its key, the sequential participant shell and desks, the format selector, the 40-minute demo and printables, and the dual-mode tests.
+* Not removed: database tables and rows. `R2Session.format` stays; a row with `format` NULL or `"paper-40"` and a start time is a **historical** session: participants see "Round 2 is closed", the organizer sees "Historical session", the terminal stays locked, and `Start Round 2` refuses with 409. Nothing is rewritten or deleted.
+* **Migration plan** if an event database already holds such a row: run Round 2 on a fresh event database (recommended), or, with separate organizer approval, back up the database, export the row and its audit trail, and only then clear it manually. No code path does this automatically.
+
+## Kill Switch (Inject 2)
+**Evidence** (participant-visible, `content-v2.server.ts`): snapshot 02:50; the ten connection records exactly as in the approved document (IP, process, country, sent, received, time), each with its inspect description and ticket reference; the eight IT tickets with the footer "Standard laptop software needs no ticket: mail-sync.exe." No field carries a classification; nodes and rows look identical until the team itself blocks one.
+
+**Terminal policy** (`terminal.server.ts`, `GET/POST /api/round2/terminal`; simulation only, no shell/firewall/network call exists):
+
+| Input | Response | Attempt used |
 |---|---|---|
-| Duration | 40 min | 60 min |
-| Access | Chapters 1→4 open one at a time (0, 8, 20, 30 min); a closed chapter never reopens | All four injects readable from the start until pens down |
-| Pacing | Enforced | Suggested only: 10 / 12 / 25 / 10 + 3-minute buffer |
-| Content | Original chapters (unchanged) | Case document v2 injects |
-| Typing | None | Only Inject 2: `BLOCK <IP>`, 4 attempts per team |
-| Answers | Paper | Paper (terminal attempts are not the official score) |
-| Key | `src/lib/round2/paper/key.server.ts` (already public in git history) | `private/round2-key-v2.json` (git-ignored, never committed) |
+| `help` / `clear` | help text / clears the screen only (browser side; server history untouched) | no |
+| unknown command (e.g. `BLOK …`) | `Unknown command. Usage: BLOCK <ip address>` | no |
+| `BLOCK` | `Missing IP address. Usage: BLOCK <ip address>` | no |
+| bad IP | `Invalid IP address format.` | no |
+| two IPs | `Too many arguments. Usage: BLOCK <ip address>` | no |
+| IP not on the monitor | `Not a connection on this list.` | no |
+| IP already blocked by the team | `Already blocked.` | no |
+| any command after lock | `Terminal locked.` | no |
+| attacker connection | `[OK] <ip> BLOCKED. Suspicious traffic stopped. N of 2 threats contained.` | yes |
+| legitimate connection | `[BLOCKED] <ip>.` + that connection's disruption line (from the private key, sent only after the committed attempt) | yes |
+| both contained | `[OK] Both threats contained. Terminal locked.` (locks at once) | — |
+| fourth attempt used without both | `[FAIL] Out of attempts. Terminal locked. See a volunteer.` + `CALL THE VOLUNTEERS . ASAP , IT IS EATING THE DATABASE !!` | — |
 
-* The organizer picks the format on **Start investigation** in `/admin/round2`. It is written to `R2Session.format` and audited; a started session cannot be restarted or switched (`409`). Participants cannot choose or see a choice.
-* `NULL` / unknown = `paper-40`, so every existing session and test behaves exactly as before.
-* Part B (Boardroom Verdict) is not launched by either format.
+* Four attempts per team per session: serializable transaction + unique `(team, session start, seq)` with `seq` 1–4 (tested with parallel requests, tabs, reloads, re-login). Rate limit: 6 commands per team per 10 s (single-process LAN server; a refused command changes nothing).
+* The browser receives only the team's own attempts and the message each earned; never the target list. The ~1 s "BLOCKING…" sequence is cosmetic and starts after the request is already sent.
 
-## Inject content (participant-visible, `src/lib/round2/paper/content-v2.server.ts`)
-* **Inject 1**: alert ALR-0214 on FIN-LAP-07 / ravi.k; 13-row process snapshot (02:14), 5 login rows, 8 network rows (incl. Server X 203.0.113.250 at 02:14:00 and every 60 s, FS-02 session at 02:15), 5 mail/download rows, recorded chat with the deliberate contradictions, options A–E. Nothing is pre-marked.
-* **Inject 2**: the approved ten-connection Kill Switch evidence (unchanged) + the terminal.
-* **Inject 3**: 10 IST timeline entries, R-1…R-12 (R-9 in **UTC**, R-11's FS-20 / HR-PC-30 decoys, R-6's planted line shown as untrusted evidence), 8 claims with their confidence badges. Click-based navigation; no search box (only Inject 2 takes typing).
-* **Inject 4**: 6 status facts, 3 CEO calls with options A–D, 6 public-statement sentences.
-* **VERIFY**: the six public-statement sentences and the chat transcript lines were written from the specification's summary of each sentence/line; compare the wording with the PDF before printing.
+## Scoring (60 points)
+| Inject | Points | How |
+|---|---|---|
+| 1 Alert at 2:14 AM | 15 | paper, jury |
+| 2 Kill Switch | 15 | **portal**: +5 per attacker connection blocked, +5 if no legitimate connection blocked, −2 per legitimate block, clamped 0–15; derived from the stored attempts on every read (cannot drift or be farmed). Paper reasoning is checked by volunteers and adds no points. |
+| 3 Audit the AI | 15 | paper, jury |
+| 4 The Three Calls | 15 | paper, jury |
 
-## Inject 2 terminal (`src/lib/round2/paper/terminal.server.ts`, `POST/GET /api/round2/terminal`)
-* Only command: `BLOCK <IPv4>` (keyword case-insensitive). Simulation only: no shell, no `eval`, no network or firewall call exists anywhere in the code path.
-* **Attempt policy** (enforced on the server):
-  * malformed command → syntax help, **no attempt used**;
-  * valid IPv4 that is **not on the monitor** → "No live connection", **no attempt used** (typo protection; reveals nothing);
-  * any monitor IP → **one attempt**: `caught` (attacker) → `CAUGHT and BLOCKED!!`; any other monitor IP → `WHY THE HECK DID YOU BLOCKED ME ??? Connecting CEO`; already attempted → "ALREADY ATTEMPTED", still counts;
-  * 4 attempts per team per session (`R2BlockAttempt`, unique `(team, sessionStart, seq)`, `seq` 1–4, serializable transaction): concurrent tabs, reloads and re-logins cannot exceed it (tested with 9 parallel requests);
-  * locked when attempts are 0, when every attacker IP is caught, at pens down, after an early end, or when no approved key is installed;
-  * out of attempts with targets left → `CALL THE VOLUNTEERS . ASAP , IT IS EATING THE DATABASE !!`.
-* The target list never leaves the server; responses contain only the team's own attempts and a boolean `allCaught`.
-* Volunteers: hints and any deduction are handled on paper; the case document gives no amount and none was invented. There is **no** reset endpoint; a reset would need a documented organizer procedure (not built).
+Participants never see the terminal score. Organizers and volunteers see it in the control room ("Kill Switch · terminal review") and on the printable terminal results and score sheet.
 
-## Answer key (`private/round2-key-v2.json`)
-The repository is **public**, so the v2 key is loaded at runtime from a git-ignored file (`GHOST_R2_KEY_FILE` overrides the path). Copy it to the event server's `private/` folder before the event. Without it the terminal shows "awaiting the organizer's approved answer set" and the v2 key printout says it is missing. Shape (validated with zod in `private-key.server.ts`):
+**Flagged edge case (organizer decision):** the formula as written gives an **untouched terminal 5 points** (no legitimate block). This is implemented literally and marked "untouched" in the review; decide whether to keep it.
+
+## Volunteer fallback
+After OUT OF ATTEMPTS the terminal stays locked. The team calls a volunteer, who hands over one printed correct-IP slip (`/admin/round2/print/slips`, organizer only) and ticks it on the answer sheet. Revealed IPs earn no terminal credit (the score already counts only what the team blocked). No extra numeric penalty. There is **no** digital reveal and **no** reset endpoint; a reset would need a separately approved, audited procedure.
+
+## Answer key file
+`private/round2-key-v2.json` (git-ignored; `GHOST_R2_KEY_FILE` overrides the path; the build does not trace it). Without it the terminal shows "awaiting the organizer's approved answer set" and uses no attempt. Shape (validated in `private-key.server.ts`; placeholders only):
 
 ```json
 { "version": "case-v2",
   "inject1": { "answer": "", "rationale": "", "evidence": [""], "decoys": [""], "split": "" },
-  "inject2": { "status": "approved | provisional", "source": "", "malicious": ["IPv4"], "cleared": ["IPv4"], "split": "", "hints": "" },
-  "inject3": { "claims": [{ "n": 1, "verdict": "TRUE | FALSE | NOT ENOUGH EVIDENCE", "reason": "" }], "planted": "", "split": "" },
-  "inject4": { "calls": [{ "n": 1, "correct": "A-D", "flaws": { "B": "" } }], "statements": { "good": [0, 0], "bad": [{ "n": 0, "why": "" }] }, "split": "" } }
+  "inject2": { "status": "approved | provisional", "source": "", "malicious": ["IPv4"], "cleared": ["IPv4"], "wrongMessages": { "IPv4": "line" }, "split": "", "hints": "" },
+  "inject3": { "claims": [{ "n": 0, "verdict": "TRUE | FALSE | NOT ENOUGH EVIDENCE", "reason": "" }], "planted": "", "split": "" },
+  "inject4": { "calls": [{ "n": 0, "correct": "A-D", "flaws": { "X": "" } }], "statements": { "good": [0, 0], "bad": [{ "n": 0, "why": "" }] }, "split": "" } }
 ```
+Copy the file to the event server's `private/` folder before the event. Tests use `tests/fixtures/round2-key-fixture.json`, whose targets are synthetic.
 
-The Inject 1, 3 and 4 answers in the private file follow the organizer section of the case document. They are deliberately not repeated here because this repository is public.
+## Printables (`/admin/round2/print`, organizer only)
+Team answer sheet · answer key and rubric · Kill Switch correct-IP slips · Kill Switch terminal results · Round 2 score sheet (60) · 60-minute timing script.
 
-**Inject 2 targets are PROVISIONAL.** The case document v2 does not list them. The private key reuses the only previously approved Kill Switch classification in the repository (the earlier paper-format key) and is marked `"status": "provisional"`. The owner must confirm the target list (then set `"status": "approved"`) and the Inject 2 marking rubric; the provisional rubric text reuses the old paper rule and is labelled as such.
-
-## Printables (`/admin/round2/print`)
-`v2-answer-sheet` (team sheet for all four injects, incl. blocked IPs, volunteer notes, deductions), `v2-key` (organizer only, rendered from the private file), `v2-script` (60-minute pacing script). The 40-minute documents are unchanged.
-
-## Demo Mode
-`/admin/demo/round2?format=open-60&unit=N` (organizer only). The demo terminal asks an organizer-only endpoint to classify one IP and keeps its history in the browser tab; nothing is stored and "Reset demo terminal" clears it.
-
-## Needs organizer / owner approval
-1. Inject 2 target list and Inject 2 rubric (currently provisional, see above).
-2. Whether `open-60` should replace `paper-40` as the default (it does not today).
-3. Exact wording of the six public-statement sentences and the chat transcript (VERIFY against the PDF).
-4. The old 40-minute answer key is already in the public git history; rotate that case content if that matters.
-5. Any procedure for resetting a team's terminal attempts (none exists).
+## Open items for the owner
+1. Untouched-terminal +5 (see above).
+2. Public-statement sentences and chat transcript wording were reconstructed from the specification's summaries: compare with the PDF.
+3. Any terminal reset procedure (none exists).
+4. The retired format's old answer key is in the public git history.

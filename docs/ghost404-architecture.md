@@ -19,9 +19,9 @@ Next.js 16 (App Router, server components, route handlers), React 19, Prisma 6 o
 - Desks (`src/components/game/*-desk.tsx`) share `DeskFrame` (header stats, draft bar, unlock notices, safe navigation).
 
 ## Round 2 (paper, server clock)
-- `src/lib/round2/paper/clock.ts`: a pure function of the persisted `R2Session.startsAt/endedAt` and the server's `now`. Windows 0-8 / 8-20 / 20-30 / 30-40 minutes, `complete` at 40:00 or when the organizer ends it.
+- `src/lib/round2/paper/format.ts` (`openClock`): a pure function of the persisted `R2Session.startsAt/endedAt` and the server's `now`. One format: 60 minutes, all four injects open, suggested pacing only, `complete` at 60:00 or when the organizer ends it. The retired 40-minute sequential format is gone; its historical rows are shown as closed (see docs/ghost404-round2-open60.md).
 - **Timing model: one organizer-started session shared by every enrolled team** (not per-team). Restarts and reconnects land on the same chapter because nothing is held in memory.
-- `GET /api/round2/status` returns only the open chapter. Past and future chapters never appear in a response or in the rendered page. Legacy submit/draft/evidence/results routes return 410.
+- `GET /api/round2/status` returns all four injects while the clock runs and nothing before the start or after pens down. `GET/POST /api/round2/terminal` is the Kill Switch terminal (4 attempts, server-authoritative). Legacy submit/draft/evidence/results routes return 410.
 - Chapter content and the answer key are `server-only` modules; the key is imported only by the admin print module. A build test scans `.next/static` for key and chapter text.
 - Organizer: control room, projector countdown, six printables (answer sheet, answer key, rubrics, score sheet, timing script), Demo Mode (isolated, no writes, no timers).
 - Concurrent transitions: there is no transition write. The chapter is derived from the clock on every request, so racing requests cannot disagree.
