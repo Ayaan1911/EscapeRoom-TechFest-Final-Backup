@@ -1,5 +1,7 @@
 # GHOST_404 unified branch: verification report (pass 2)
 
+> **Gameplay corrections (qualification, PDF wording, Evidence Wall), 2026-11-24:** PASSED before the C: drive filled: Top 10 unit/DB/browser (11+9+2), PDF fidelity (27/27 against the source, 9 tests), Evidence Wall DB (15) and one browser journey. This finalizing pass re-ran only typecheck, lint, build and the changed-feature tests listed in `ghost404-implementation-progress.md`. **DEFERRED:** full Playwright regression, Round 1 chain and journey specs, load tests, real-LAN run. A disk-full event on C: interrupted one layout measurement (see the Evidence Wall note in the progress ledger).
+
 > **Phase 3 (event control center) verification:** see `docs/ghost404-phase3-event-control.md`. Static checks, build, 482 unit/database tests and 7 targeted browser smoke tests PASS; the exhaustive browser regression is **DEFERRED** (not run to completion in Phase 3). The pass-2 results below predate Phase 3.
 
 Developer laptop (Windows 11, 16 cores, Node 25.2.1), 23 Nov 2026. Disposable local PostgreSQL 15 in Docker (`ghost404-pg-test`, port 55432) for every test. No hosted database, Render, Neon or Vercel was touched. Everything below was executed on the final code unless marked.

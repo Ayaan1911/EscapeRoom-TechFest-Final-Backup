@@ -39,7 +39,7 @@ Run it under `systemd` or `tmux` so it survives the SSH session. Open the port i
 - Do not mix addresses in one browser session (cookies belong to one host): give teams one URL.
 
 ## Round 2 on event day
-1. After Round 1, organizer confirms qualification in `/admin`, then `/admin/round2` -> **Enroll finalists**.
+1. After Round 1, organizer opens `/admin#qualification` ("Review Top 10 Teams"), resolves any tie at 10th place, and presses **Confirm Top 10 and Advance to Round 2** (this enrolls the finalists and does not start Round 2). Check `/admin/round2` shows 10 qualified teams.
 2. Open `/admin/projector` on the projector machine (signed in as organizer; full screen with F11). It changes scenes by itself. Print `/admin/round2/print` (answer sheets, rubrics, script).
 3. **Start investigation** only when every finalist PC shows the "Stand by" screen. The clock cannot be paused; **End now** (reason required) closes every chapter immediately.
 4. After pens down: jury marks in `/admin/round2#marking`, then **Publish results**. Round 1 standings / finalist names on the projector are switched in `/admin/leaderboard`.

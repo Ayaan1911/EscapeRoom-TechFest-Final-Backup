@@ -85,6 +85,6 @@ Team answer sheet · answer key and rubric · Kill Switch correct-IP slips · Ki
 1. Untouched-terminal +5 (see above). The marking sheet and terminal review label it "final · no attempts" / "literal rule (owner decision)"; the scoring engine is unchanged.
 5. Round 2 tie-break: none approved; equal totals share a rank.
 6. Who may mark: any organizer session (there is no separate judge role); the marker name is recorded for every change.
-2. Public-statement sentences and chat transcript wording were reconstructed from the specification's summaries: compare with the PDF.
+2. RESOLVED (`294bba4`): Injects 1, 3 and 4 were restored verbatim from the PDF and checked against it; see `ghost404-round2-content-fidelity.md`.
 3. Any terminal reset procedure (none exists).
 4. The retired format's old answer key is in the public git history.

@@ -26,6 +26,10 @@ Next.js 16 (App Router, server components, route handlers), React 19, Prisma 6 o
 - Organizer: control room with jury marking (`R2PaperMark`, Injects 1/3/4; the terminal score is read-only), one-time results publication (`R2Session.resultsPublishedAt`), event broadcast projector (`/admin/projector`, scenes chosen by `sceneOf()` in `src/lib/game/broadcast.ts` from server state), six printables (answer sheet, answer key, rubrics, score sheet, timing script), Demo Mode (isolated, no writes, no timers).
 - Concurrent transitions: there is no transition write. The chapter is derived from the clock on every request, so racing requests cannot disagree.
 
+## Advancement and Evidence Wall
+- `src/lib/game/top10.ts` (pure selection and tie rule) and `advanceTopTen` in `qualification.server.ts` (one serializable transaction: audit record + `R2Finalist`). `teamState().round2` drives the participant panel. See `ghost404-qualification-workflow.md`.
+- `src/lib/game/evidence-wall.server.ts` (+ client-safe `evidence-wall-meta.ts`): `InsiderPair` / `InsiderWallCard`, `solvePair`, folder filtering of the dossier. See `ghost404-evidence-wall.md`.
+
 ## Event control (Phase 3)
 - `/admin` command center, `/admin/leaderboard`, `/admin/projector`, `/admin/demo`. Shared organizer primitives in `src/components/admin/`; styles in `src/app/command.css`.
 - Pipeline stages are a pure function (`src/lib/game/stages.ts`) of data the page already loads. Projector publication switches are audited `AuditLog` entries (`broadcast-standings-on|off`, `broadcast-finalists-on|off`; latest wins, default off).

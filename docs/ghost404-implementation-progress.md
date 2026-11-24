@@ -165,3 +165,12 @@ Not done: real LAN rehearsal, real projector hardware, a separate judge role, a 
 
 ### Phase 3 verification status
 Typecheck, lint, build: PASS. Unit + database: 482 passed, 19 skipped. Targeted browser smoke (7 tests: organizer access, Demo Mode isolation, projector publication controls, 60-minute Round 2 start, marking and publication): PASS. Exhaustive browser regression: **DEFERRED** to release-candidate verification. Full report: `docs/ghost404-phase3-event-control.md`.
+
+## Gameplay corrections: Top 10 advancement, PDF wording, three-pair Evidence Wall
+| Item | Problem | Fix | Commit | Verified |
+|---|---|---|---|---|
+| Top 10 -> Round 2 | confirmation only recorded a snapshot; enrollment hidden on another page; tie settled silently; no participant state | one transactional, idempotent "Confirm Top 10 and Advance to Round 2"; tie needs the organizer; participant states; readiness count. See `ghost404-qualification-workflow.md` | `b8783e8` | 11 unit + 9 DB + 2 browser, passed 2026-11-24 |
+| Injects 1, 3, 4 wording | everything paraphrased (also a length cue) | restored verbatim from the PDF, UI additions removed. See `ghost404-round2-content-fidelity.md` | `294bba4` | 27/27 against the PDF; 9 pinned tests |
+| Evidence Wall | one lookup pair opened everything | three private/public pairs, three folders, additive migration. See `ghost404-evidence-wall.md` | see git log | 15 DB + 1 browser journey passed 2026-11-24 |
+
+Deferred (not run in this pass): full Playwright regression, the Round 1 chain (`npm run test:e2e:verdict` etc., whose specs were edited for the new qualification flow), load tests, a real LAN run, the three physical clue sets.

@@ -15,15 +15,17 @@ Tick every line on the day. Any unchecked **MUST** is a no-go. Evidence for what
 - [ ] Backup: `pg_dump` (or `npm run db:backup`) scheduled to a second device, restore tested once.
 - [ ] Printables: print `/admin/round2/print` (answer sheets for all finalists, rubrics, score sheet, timing script). Check one printed sheet on paper (only checked on screen so far).
 - [ ] Projector: `/admin/projector` (organizer sign-in on the projector PC) shown on the real projector at its real resolution; readable from the back of the room; check every scene changes by itself (standby, Round 1 live, Round 2 live, pens down).
-- [ ] **MUST** `prisma migrate deploy` includes `20261125000000_round2_paper_marks` (jury marking table).
+- [ ] **MUST** `prisma migrate deploy` applies, in order, `20261125000000_round2_paper_marks` (jury marking) and `20261126000000_insider_wall_pairs` (Evidence Wall pairs). Both are additive. Take a `pg_dump` first.
+- [ ] **MUST** Evidence Wall: in `/admin/insider-kit` use "Prepare pair code sheets" ONCE, then print the physical slips and wall cards from those codes (clue text per the physical pack). Do not hand out the legacy A/B sheets for the same teams.
 
 ## Round 1 (digital)
+- [ ] Insider: each team reconstructs three folders by matching a private slip to a wall card; tasks open at 3/3. Keep the organizer code sheet private (it shows which card matches which slip).
 - [ ] All team PCs on the sign-in page; organizer starts the 60-minute clock once.
 - [ ] Watch `/admin` for stuck teams; do not restart the server unless necessary (a restart keeps scores and the clock but costs real minutes).
-- [ ] After the deadline, confirm qualification in `/admin` (organizer decision; nothing advances automatically).
+- [ ] After the deadline, open `/admin#qualification` ("Review Top 10 Teams"). If 10th place is tied, choose the open place(s) yourself. Press **Confirm Top 10 and Advance to Round 2**: this enrolls the finalists; it does NOT start Round 2.
 
 ## Round 2 (paper)
-- [ ] **MUST** Enroll finalists; 10 active + standby shown correctly; every finalist PC shows "Stand by".
+- [ ] **MUST** Round 2 control room shows "10 qualified teams enrolled" (it warns if fewer); every finalist PC shows "Qualified for Round 2 - Waiting for Organizer" on its dashboard and "Stand by" on /round2. The "Enroll finalists" button only appears for a confirmation recorded without advancing.
 - [ ] **MUST** Volunteers hold printed answer sheets; jury (2 panels x 2 judges) has rubrics.
 - [ ] **MUST** `private/round2-key-v2.json` is on the event server (the Kill Switch terminal says "offline" without it). Print the correct-IP slips.
 - [ ] Press **Start Round 2** once (the only format: 60 minutes, four open injects); confirm all four injects on two finalist PCs and the countdown on the projector.
