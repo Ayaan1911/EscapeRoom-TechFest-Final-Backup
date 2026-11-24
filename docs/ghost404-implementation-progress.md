@@ -149,3 +149,19 @@ Guard: `tests/phase5-scroll.spec.ts` counts independently scrolling regions per 
 | Motion | none purposeful | scroll-driven section reveal (no JS, no scroll-jacking), evidence/inspector fade-in, phase and claim transitions; all off under prefers-reduced-motion |
 
 Not done in this pass: a deeper Kill Switch layout change (kept as built: map, table, inspector, tickets, terminal); per-window animation tuning; a human playtest.
+
+## Phase 3: event control center (organizer, Demo Mode, leaderboard, projector)
+Baseline screenshots: `D:/Ghost404-TestWorkspace/shots/p3-before`. Per-stage after-screenshots (seeded with `GHOST_UI_STATE=prep|r1|qual|r2wait|r2run|r2end|results node scripts/ui-dev.mjs`): `shots/p3-<stage>` (admin, r2admin, board at 1366x768 full page; projector at 1920x1080 and 1366x768). Browser-journey screenshots: `shots/p3-e2e`.
+
+| Screen | Old problem | Now | Verified by |
+|---|---|---|---|
+| Command center `/admin` | stacked generic cards; qualification table overflowed sideways; 3-step strip; stale "40-minute" text | hero with live freshness stamp and server-offset clock; 7-stage pipeline (done / now / pending / blocked, word + colour, each a link); phase-aware "next action" panel; Round 1 chapter progress bars with legend; searchable/filterable/sortable team table with a detail panel (no codes); qualification decision panel; compact audit; danger zone | `phase5-event-control` (pipeline, search, details, no overflow at 1366, nothing starts), `phase5-ghostos-shell`, Round 1 chain (start/stop/override/confirm), `event-control.test.ts` |
+| Round 2 control `/admin/round2` | plain cards; no marking at all | server-clock hero with progress track and stale-connection guard; four inject cards (pacing only); readiness checklist; terminal review with summary counts and attempt chips; jury marking sheet; publish gate | `phase5-event-control` (start, validation, pending, pens down, publish, lock, team 401), `phase5-open60`, `marking-db.test.ts` |
+| Leaderboard `/admin/leaderboard` (new) | none (only the live projector list) | publication switches (audited, confirmed); Round 1 standings with podium and shared ranks; qualification groups; Round 2 results with provenance per part and pending states | `ui-projector`, `phase5-event-control`, `marking-db.test.ts` |
+| Projector `/admin/projector` | a Round 1 list; a separate Round 2 countdown page | one broadcast, 8 server-chosen scenes, 1920x1080 typography, urgent (brass < 5 min, red < 1 min, no flashing), stale guard, reduced motion | `ui-projector`, `phase5-event-control`, `event-control.test.ts`, stage screenshots |
+| Demo home `/admin/demo` | two large generic panels | mission map: Round 1 chapter path, Round 2 inject grid, answer-free scenario lines, simulation status incl. key presence (offline when missing, no fallback answers) | `demo-mode.spec`, `phase5-ghostos-layout` |
+
+Not done: real LAN rehearsal, real projector hardware, a separate judge role, a human playtest of the organizer flow.
+
+### Phase 3 verification status
+Typecheck, lint, build: PASS. Unit + database: 482 passed, 19 skipped. Targeted browser smoke (7 tests: organizer access, Demo Mode isolation, projector publication controls, 60-minute Round 2 start, marking and publication): PASS. Exhaustive browser regression: **DEFERRED** to release-candidate verification. Full report: `docs/ghost404-phase3-event-control.md`.

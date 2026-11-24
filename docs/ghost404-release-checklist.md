@@ -14,7 +14,8 @@ Tick every line on the day. Any unchecked **MUST** is a no-go. Evidence for what
 - [ ] Server start used `start-lab.ps1` (sets the password-hashing thread pool to the CPU count); on Ubuntu confirm `UV_THREADPOOL_SIZE` is exported before `next start`.
 - [ ] Backup: `pg_dump` (or `npm run db:backup`) scheduled to a second device, restore tested once.
 - [ ] Printables: print `/admin/round2/print` (answer sheets for all finalists, rubrics, score sheet, timing script). Check one printed sheet on paper (only checked on screen so far).
-- [ ] Projector: `/admin/round2/projector` shown on the real projector at its real resolution; readable from the back of the room.
+- [ ] Projector: `/admin/projector` (organizer sign-in on the projector PC) shown on the real projector at its real resolution; readable from the back of the room; check every scene changes by itself (standby, Round 1 live, Round 2 live, pens down).
+- [ ] **MUST** `prisma migrate deploy` includes `20261125000000_round2_paper_marks` (jury marking table).
 
 ## Round 1 (digital)
 - [ ] All team PCs on the sign-in page; organizer starts the 60-minute clock once.
@@ -29,6 +30,9 @@ Tick every line on the day. Any unchecked **MUST** is a no-go. Evidence for what
 - [ ] Pacing is advice only (10/12/25/10 + 3). At 60:00 the screens show PENS DOWN and every terminal locks by themselves. Do not refresh to "help" a team: the server clock decides.
 - [ ] Kill Switch: watch "terminal review" in the control room; hand a correct-IP slip only after a team is OUT OF ATTEMPTS; never reset attempts. Print the terminal results after pens down.
 - [ ] If something goes wrong: **End now** (reason required) closes everything for everyone. It cannot be undone.
+- [ ] Jury marking in `/admin/round2#marking`: enter Injects 1, 3, 4 (0-15) with the marker name; Inject 2 fills itself from the terminal. Pending stays pending (never zero).
+- [ ] **Publish results** only when every finalist is complete (reason + confirmation). Publishing locks marks and puts the ranking on the projector.
+- [ ] Projector content: Round 1 standings and finalist names are hidden until switched on in `/admin/leaderboard` (audited).
 
 ## No-go triggers
 - Server cannot be reached from a second PC on the lab network.

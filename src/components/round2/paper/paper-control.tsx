@@ -89,7 +89,7 @@ function MarkingPanel({ phase }: { phase?: string }) {
       <div className="cc-toolbar"><label>Marking as (name or initials, written to the audit log)<input value={marker} onChange={e => setMarker(e.target.value)} maxLength={40} disabled={locked} /></label>
         <p className="cc-dim rc2-hint">Enter whole numbers 0–15. Empty means pending. Inject 2 is the terminal&apos;s score and cannot be typed here. A total appears only when all four parts exist after pens down.</p></div>
       <table className="cc-table rc2-mark" aria-label="Round 2 marking sheet"><thead><tr><th>Team</th><th>Inject 1</th><th>Inject 2 · terminal</th><th>Inject 3</th><th>Inject 4</th><th>Total / {POINTS.total}</th><th><span className="sr-only">Save</span></th></tr></thead>
-        <tbody>{m.rows.map(r => { const c = changed(r), invalid = ([1, 3, 4] as const).some(i => bad(val(r, i)));
+        <tbody>{[...m.rows].sort((x, y) => x.seed - y.seed).map(r => { const c = changed(r), invalid = ([1, 3, 4] as const).some(i => bad(val(r, i)));
           return <tr key={r.teamId} className={c.length ? "is-dirty" : ""}><td><b>{r.name}</b><small>{r.teamId}</small></td>
             {([1, 2, 3, 4] as const).map(i => i === 2 ? <td key={i} className="cc-num rc2-term-cell"><b>{r.terminal.score ?? "—"}</b><small>{r.terminal.score === null ? "key missing" : r.terminal.final ? (r.terminal.untouched ? "final · no attempts" : "final") : "live · may change"}</small></td>
               : <td key={i}><input className={`rc2-in ${bad(val(r, i)) ? "is-bad" : ""}`} inputMode="numeric" aria-label={`${r.teamId} Inject ${i} mark`} value={val(r, i)} disabled={locked} onChange={e => setEdit(x => ({ ...x, [key(r.teamId, i)]: e.target.value.trim() }))} />

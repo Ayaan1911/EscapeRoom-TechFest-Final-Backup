@@ -23,11 +23,16 @@ Next.js 16 (App Router, server components, route handlers), React 19, Prisma 6 o
 - **Timing model: one organizer-started session shared by every enrolled team** (not per-team). Restarts and reconnects land on the same chapter because nothing is held in memory.
 - `GET /api/round2/status` returns all four injects while the clock runs and nothing before the start or after pens down. `GET/POST /api/round2/terminal` is the Kill Switch terminal (4 attempts, server-authoritative). Legacy submit/draft/evidence/results routes return 410.
 - Chapter content and the answer key are `server-only` modules; the key is imported only by the admin print module. A build test scans `.next/static` for key and chapter text.
-- Organizer: control room, projector countdown, six printables (answer sheet, answer key, rubrics, score sheet, timing script), Demo Mode (isolated, no writes, no timers).
+- Organizer: control room with jury marking (`R2PaperMark`, Injects 1/3/4; the terminal score is read-only), one-time results publication (`R2Session.resultsPublishedAt`), event broadcast projector (`/admin/projector`, scenes chosen by `sceneOf()` in `src/lib/game/broadcast.ts` from server state), six printables (answer sheet, answer key, rubrics, score sheet, timing script), Demo Mode (isolated, no writes, no timers).
 - Concurrent transitions: there is no transition write. The chapter is derived from the clock on every request, so racing requests cannot disagree.
 
+## Event control (Phase 3)
+- `/admin` command center, `/admin/leaderboard`, `/admin/projector`, `/admin/demo`. Shared organizer primitives in `src/components/admin/`; styles in `src/app/command.css`.
+- Pipeline stages are a pure function (`src/lib/game/stages.ts`) of data the page already loads. Projector publication switches are audited `AuditLog` entries (`broadcast-standings-on|off`, `broadcast-finalists-on|off`; latest wins, default off).
+- `GET /api/admin/projector` (organizer only) returns `{ scene, serverNow, r1, r2, standings, finalists, results }`; standings/finalists/results are `null` unless approved. Shared 3 s cache.
+
 ## Data
-No migrations were added in this branch. The five existing migrations are unchanged. Round 2 reuses `R2Session`, `R2Finalist`, `R2Audit`.
+Phase 3 added one additive migration, `20261125000000_round2_paper_marks` (table `R2PaperMark`, CHECK inject in 1/3/4 and score 0-15). Earlier migrations are unchanged. Round 2 reuses `R2Session`, `R2Finalist`, `R2Audit`.
 
 ## Offline behavior
 No external fonts, scripts, images, analytics or API calls. The built client contains only documentation/namespace strings (`w3.org`, `nextjs.org`, `react.dev`) that are never fetched. A browser test records every request on the landing page, login, dashboard and all five chapters and fails if any leaves the app origin.

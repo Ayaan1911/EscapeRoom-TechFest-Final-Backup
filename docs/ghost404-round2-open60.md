@@ -49,6 +49,20 @@ Participants never see the terminal score. Organizers and volunteers see it in t
 
 **Flagged edge case (organizer decision):** the formula as written gives an **untouched terminal 5 points** (no legitimate block). This is implemented literally and marked "untouched" in the review; decide whether to keep it.
 
+## Jury marking and publication (`/admin/round2`, organizer only)
+- **Marking sheet** ("Round 2 marking"): one row per active finalist, in seed order. The jury types whole-number marks 0–15 for Injects 1, 3 and 4 and a marker name/initials. Inject 2 is shown read-only from the terminal; there is no field, API action or parameter that writes it.
+- Stored in `R2PaperMark` (team, session start, inject), migration `20261125000000_round2_paper_marks` (additive). A database CHECK limits inject to 1/3/4 and score to 0–15. Every save or clear is written to `R2Audit` (`paper-mark`) with the previous value, the new value and the marker.
+- **Pending is never zero:** an empty mark stays "pending". The terminal part is "live · may change" until pens down. A total exists only when all four parts exist after pens down; a mark of 0 is a real mark.
+- **Publish results** needs pens down, every active finalist fully marked, a reason and a two-step confirmation. It happens once, sets `R2Session.resultsPublishedAt`, writes `publish-results` with the ranking to `R2Audit`, and locks all marks (409 afterwards).
+- **Ties:** equal totals share a rank. No Round 2 tie-break has been approved, so none is invented (owner decision).
+- Marks are keyed to the session start, so a mark can never carry over to a different session.
+
+## Projector and publication
+`/admin/projector` (organizer sign-in on the projector PC, no controls on screen) shows one scene chosen by the server: standby, Round 1 live (countdown to the server deadline), Round 1 closed, intermission, Round 2 waiting, Round 2 live (one shared countdown, all four injects open), pens down, results. `/admin/round2/projector` redirects there.
+- Round 2 results appear only after publication.
+- Round 1 standings and Round 2 finalist names are hidden until the organizer switches them on from `/admin/leaderboard` (reason plus confirmation; each switch is an `AuditLog` entry `broadcast-<key>-on|off`). Finalist names need a confirmed qualification.
+- The countdown is hidden ("CLOCK PAUSED · RECONNECTING") if the server has not answered for 15 s.
+
 ## Volunteer fallback
 After OUT OF ATTEMPTS the terminal stays locked. The team calls a volunteer, who hands over one printed correct-IP slip (`/admin/round2/print/slips`, organizer only) and ticks it on the answer sheet. Revealed IPs earn no terminal credit (the score already counts only what the team blocked). No extra numeric penalty. There is **no** digital reveal and **no** reset endpoint; a reset would need a separately approved, audited procedure.
 
@@ -68,7 +82,9 @@ Copy the file to the event server's `private/` folder before the event. Tests us
 Team answer sheet · answer key and rubric · Kill Switch correct-IP slips · Kill Switch terminal results · Round 2 score sheet (60) · 60-minute timing script.
 
 ## Open items for the owner
-1. Untouched-terminal +5 (see above).
+1. Untouched-terminal +5 (see above). The marking sheet and terminal review label it "final · no attempts" / "literal rule (owner decision)"; the scoring engine is unchanged.
+5. Round 2 tie-break: none approved; equal totals share a rank.
+6. Who may mark: any organizer session (there is no separate judge role); the marker name is recorded for every change.
 2. Public-statement sentences and chat transcript wording were reconstructed from the specification's summaries: compare with the PDF.
 3. Any terminal reset procedure (none exists).
 4. The retired format's old answer key is in the public git history.

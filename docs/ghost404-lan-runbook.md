@@ -40,9 +40,10 @@ Run it under `systemd` or `tmux` so it survives the SSH session. Open the port i
 
 ## Round 2 on event day
 1. After Round 1, organizer confirms qualification in `/admin`, then `/admin/round2` -> **Enroll finalists**.
-2. Open `/admin/round2/projector` on the projector machine. Print `/admin/round2/print` (answer sheets, rubrics, script).
+2. Open `/admin/projector` on the projector machine (signed in as organizer; full screen with F11). It changes scenes by itself. Print `/admin/round2/print` (answer sheets, rubrics, script).
 3. **Start investigation** only when every finalist PC shows the "Stand by" screen. The clock cannot be paused; **End now** (reason required) closes every chapter immediately.
-4. A server restart mid-round keeps the same chapter and countdown (the clock is the stored start time). The restart itself costs real time: the chapter keeps counting while the server is down.
+4. After pens down: jury marks in `/admin/round2#marking`, then **Publish results**. Round 1 standings / finalist names on the projector are switched in `/admin/leaderboard`.
+5. A server restart mid-round keeps the same chapter and countdown (the clock is the stored start time). The restart itself costs real time: the chapter keeps counting while the server is down.
 
 ## Recovery
 - Server process died: start it again; progress and the Round 2 clock are in the database. Teams stay signed in for 12 hours; if the address changed they must sign in again.

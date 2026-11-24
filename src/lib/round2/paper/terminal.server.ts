@@ -116,6 +116,9 @@ export async function terminalReview(now = Date.now()) {
   };
 }
 
+/** Organizer-only: whether the private answer key is installed on this server. Reveals nothing about its contents. */
+export async function keyInstalled() { await requireAdmin(); return caseKey() !== null; }
+
 /** Organizer demo: classify one IP for the disposable demo terminal. Nothing is stored; the browser keeps its own history. */
 export async function demoClassify(ip: string, previous: string[]): Promise<{ lines: Line[]; result: AttemptResult | null }> {
   await requireAdmin();

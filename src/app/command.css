@@ -325,3 +325,45 @@ a.cc-btn { text-decoration: none; }
 .lb-qual li { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto auto; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--obs-line); border-radius: 10px; }
 .lb-qual li small { display: block; color: var(--obs-sage); font-size: 12px; } .lb-qual li em { font-style: normal; font-size: 11.5px; color: var(--obs-green); }
 @media (max-width: 1000px) { .lb-qual { grid-template-columns: 1fr; } }
+
+/* ================= Demo Mode mission launcher ================= */
+.dm2 { display: grid; gap: 20px; width: min(1480px, 100%); margin: 0 auto; padding: 24px clamp(14px, 3vw, 40px) 50px; }
+.dm2-hero { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(300px, 1fr); gap: 20px; align-items: stretch; }
+.dm2-hero h1 { margin: 6px 0 8px; font-size: clamp(32px, 3.6vw, 54px); line-height: 1.05; letter-spacing: -.015em; }
+.dm2-hero h1 em { display: block; font-style: normal; color: var(--obs-phos); font-weight: 400; font-size: .7em; }
+.dm2-hero p { color: var(--obs-sage); font-size: 16px; max-width: 60ch; margin: 0; }
+.dm2-status { padding: 16px 18px; border: 1px solid var(--obs-line-2); border-radius: 16px; background: rgba(17, 21, 17, .9); }
+.dm2-status h2 { margin: 0 0 10px; font: 600 12px var(--font-mono, monospace); letter-spacing: .14em; text-transform: uppercase; color: var(--obs-sage); }
+.dm2-status .dm-guard { margin: 0 0 12px; }
+.dm2-status p { margin: 0; padding: 10px 12px; border-radius: 10px; font-size: 13.5px; line-height: 1.5; }
+.dm2-status p.is-ok { border: 1px solid rgba(120, 183, 141, .45); color: var(--obs-ivory); }
+.dm2-status p.is-warn { border: 1px solid rgba(197, 164, 119, .55); color: var(--obs-ivory); background: rgba(197, 164, 119, .06); }
+@media (max-width: 1000px) { .dm2-hero { grid-template-columns: 1fr; } }
+.dm2-round { display: grid; grid-template-columns: minmax(240px, .8fr) minmax(0, 3fr); gap: 20px; padding: 20px; border: 1px solid var(--obs-line); border-radius: 18px; background: linear-gradient(150deg, rgba(168, 217, 180, .06), rgba(17, 21, 17, .95) 45%); }
+.dm2-round.is-r2 { background: linear-gradient(150deg, rgba(197, 164, 119, .07), rgba(17, 21, 17, .95) 45%); }
+.dm2-round > header { display: grid; align-content: start; gap: 10px; }
+.dm2-round > header h2 { margin: 0; font-size: 26px; }
+.dm2-round > header p { margin: 0; color: var(--obs-sage); font-size: 14px; line-height: 1.5; }
+.dm2-round > header .cc-btn { justify-self: start; text-align: left; }
+.dm2-amber { background: var(--obs-brass); color: #0B0D0B; border-color: var(--obs-brass); font-weight: 600; }
+@media (max-width: 1000px) { .dm2-round { grid-template-columns: 1fr; } }
+.dm2-path, .dm2-grid { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; position: relative; }
+.dm2-path { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.dm2-path::before { content: ""; position: absolute; left: 6%; right: 6%; top: 37px; height: 2px; background: linear-gradient(90deg, var(--obs-phos), rgba(168, 217, 180, .15)); }
+.dm2-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 1200px) { .dm2-path { grid-template-columns: repeat(3, minmax(0, 1fr)); } .dm2-path::before { display: none; } .dm2-grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 600px) { .dm2-path, .dm2-grid { grid-template-columns: 1fr; } }
+.dm2-path li, .dm2-grid li { animation: cc-in .4s ease both; animation-delay: calc(var(--i, 0) * 60ms); }
+.dm2-mod { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; height: 100%; padding: 14px; border: 1px solid var(--obs-line-2); border-radius: 14px; background: var(--obs-1, #111511); color: var(--obs-ivory); text-decoration: none; transition: transform .18s, border-color .18s, box-shadow .18s; }
+.dm2-mod:hover, .dm2-mod:focus-visible { transform: translateY(-3px); border-color: var(--obs-phos); box-shadow: 0 10px 30px rgba(0, 0, 0, .4), 0 0 0 1px rgba(168, 217, 180, .25); }
+.dm2-mod:active { transform: translateY(0) scale(.98); }
+.is-r2 .dm2-mod:hover, .is-r2 .dm2-mod:focus-visible { border-color: var(--obs-brass); box-shadow: 0 10px 30px rgba(0, 0, 0, .4), 0 0 0 1px rgba(197, 164, 119, .25); }
+.dm2-n { font: 700 11px var(--font-mono, monospace); letter-spacing: .12em; color: var(--obs-sage); }
+.dm2-ic { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 12px; border: 1px solid var(--obs-phos); background: #0B0D0B; color: var(--obs-phos); margin: 4px 0 6px; }
+.is-r2 .dm2-ic { border-color: var(--obs-brass); color: var(--obs-brass); }
+.dm2-mod b { font-size: 17px; } .dm2-mod small { font-size: 12.5px; color: var(--obs-sage); }
+.dm2-brief { font-size: 13.5px; line-height: 1.45; color: var(--obs-ivory); opacity: .85; margin-top: 4px; }
+.dm2-go { margin-top: auto; padding-top: 8px; font: 600 12.5px var(--font-mono, monospace); letter-spacing: .06em; color: var(--obs-phos); }
+.is-r2 .dm2-go { color: var(--obs-brass); }
+@media (prefers-reduced-motion: reduce) { .dm2-path li, .dm2-grid li { animation: none; } .dm2-mod { transition: none; } .dm2-mod:hover { transform: none; } }
+.rc2-term td:first-child, .rc2-mark td:first-child { white-space: nowrap; }

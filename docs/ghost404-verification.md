@@ -1,5 +1,7 @@
 # GHOST_404 unified branch: verification report (pass 2)
 
+> **Phase 3 (event control center) verification:** see `docs/ghost404-phase3-event-control.md`. Static checks, build, 482 unit/database tests and 7 targeted browser smoke tests PASS; the exhaustive browser regression is **DEFERRED** (not run to completion in Phase 3). The pass-2 results below predate Phase 3.
+
 Developer laptop (Windows 11, 16 cores, Node 25.2.1), 23 Nov 2026. Disposable local PostgreSQL 15 in Docker (`ghost404-pg-test`, port 55432) for every test. No hosted database, Render, Neon or Vercel was touched. Everything below was executed on the final code unless marked.
 
 ## Static, unit and database
