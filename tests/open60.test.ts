@@ -67,34 +67,12 @@ describe("Inject 4 · The Three Calls", () => {
 });
 
 describe("Inject 2 · Kill Switch: exact evidence (approved document)", () => {
-  it("ten connection records with exact values, in order, carrying no classification", () => {
-    expect(i2.snapshot).toBe("02:50");
-    expect(i2.connections.map(c => [c.n, c.ip, c.process, c.country, c.sent, c.received, c.time].join("|"))).toEqual([
-      "1|192.0.2.25|mail-sync.exe|India|6 MB|9 MB|All night", "2|198.51.100.12|backup-agent.exe|Ireland|4.2 GB|0.1 GB|02:00–02:41", "3|203.0.113.9|vpn-gateway.exe|UAE|12 MB|25 MB|02:44–now",
-      "4|198.51.100.77|backup-agent2.exe|Ireland|380 MB|0.2 MB|02:30–02:40", "5|192.0.2.81|git-sync.exe|India|18 MB|11 MB|02:10–now", "6|203.0.113.45|wsvc_sync.exe|Netherlands|0.1 MB|0.1 MB|02:22–now",
-      "7|198.51.100.140|media-share.exe|Portugal|372 MB|0.3 MB|02:28–02:41", "8|203.0.113.88|asset-agent.exe|India|0.2 MB|0.2 MB|21:04–now", "9|203.0.113.30|os-update-agent.exe|Germany|12 MB|1.1 GB|02:35–02:49",
-      "10|192.0.2.92|hr-portal-sync.exe|Seychelles|22 MB|4 MB|01:00–01:15"]);
-    for (const c of i2.connections) expect(Object.keys(c).sort()).toEqual(["country", "description", "ip", "n", "process", "received", "sent", "ticket", "time"]);
-    expect(JSON.stringify(i2)).not.toMatch(/rogue|malicious|isRogue|correctTarget|suspicion|attacker-controlled|decoy/i);
-  });
-  it("inspect descriptions and ticket references match", () => {
-    expect(i2.connections.map(c => c.ticket)).toEqual(["None needed", "IT-4390", "IT-4496", "None", "IT-4471", "IT-4518", "IT-4477", "IT-4502", "IT-4400", "IT-4510"]);
-    const d = (n: number) => i2.connections[n - 1].description;
-    expect(d(1)).toBe("Standard laptop software. Light and steady throughout the night."); expect(d(4)).toContain("approved verbally by the IT Head"); expect(d(6)).toBe("File-server sync service. One small packet every 60 seconds.");
-    expect(d(7)).toContain("approved window"); expect(d(8)).toContain("sign-off still pending. Small packet every 60 seconds."); expect(d(10)).toBe("Nightly benefits synchronization with an overseas vendor.");
-  });
-  it("eight IT tickets with exact facts and the footer", () => {
-    expect(i2.tickets.map(t => `${t.id}|${t.created}|${t.status}`)).toEqual(["IT-4390|Last month|Approved", "IT-4400|Yesterday 16:00|Approved", "IT-4471|Yesterday 17:20|Approved", "IT-4477|Yesterday 18:30|Approved", "IT-4496|Yesterday 20:15|Approved", "IT-4502|Last Friday|Installed; sign-off pending", "IT-4510|Last quarter|Approved", "IT-4518|Tonight at 02:31|Approved"]);
-    const t = (id: string) => i2.tickets.find(x => x.id === id)!;
-    expect(t("IT-4390").details).toEqual(["Starts daily at 02:00.", "Approved IT backup server only.", "One backup job only.", "Any additional backup job requires its own ticket."]);
-    expect(t("IT-4518").details).toEqual(["Created by service account svc-sync."]); expect(t("IT-4400").details).toContain("Approved window: 02:30–03:00.");
-    expect(i2.ticketFooter).toBe("Standard laptop software needs no ticket: mail-sync.exe."); expect(i2.maxAttempts).toBe(4);
-  });
+  // Exact connection, inspect, ticket and terminal wording is pinned in tests/killswitch-fidelity.test.ts.
   it("is consistent with Injects 1, 3 and 4", () => {
     const r = (id: string) => i3.records.find(x => x.id === id)!.text, row = (n: number) => i2.connections[n - 1];
     expect(r("R-4")).toContain("02:22"); expect(row(6).time.startsWith("02:22")).toBe(true);
-    expect(r("R-4")).toContain("380 MB"); expect(r("R-4")).toContain("from 02:30 to 02:40"); expect(row(4).sent).toBe("380 MB"); expect(row(4).time).toBe("02:30–02:40");
-    expect(r("R-3")).toContain("4.2 GB"); expect(r("R-3")).toContain("02:00 to 02:41"); expect(row(2).time).toBe("02:00–02:41");
+    expect(r("R-4")).toContain("380 MB"); expect(r("R-4")).toContain("from 02:30 to 02:40"); expect(row(4).sent).toBe("380 MB"); expect(row(4).time).toBe("02:30 to 02:40 (10 min)");
+    expect(r("R-3")).toContain("4.2 GB"); expect(r("R-3")).toContain("02:00 to 02:41"); expect(row(2).time).toBe("02:00 to 02:41 (41 min)");
     expect(r("R-9")).toContain("Monday 21:14"); expect(row(3).time.startsWith("02:44")).toBe(true); // 21:14 UTC = 02:44 IST
     expect(r("R-5")).toContain("02:35"); expect(row(9).time.startsWith("02:35")).toBe(true);
     expect(r("R-7")).toContain("svc-sync"); expect(i2.tickets.find(x => x.id === "IT-4518")!.created).toContain("02:31");

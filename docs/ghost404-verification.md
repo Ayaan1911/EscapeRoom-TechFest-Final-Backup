@@ -1,5 +1,7 @@
 # GHOST_404 unified branch: verification report (pass 2)
 
+> **Inject 2 and LAN dry-run readiness, 2026-11-25:** PASSED: Kill Switch fidelity/parser/DB tests (see `ghost404-inject2-killswitch.md`), Round 2 browser spec (6), a 15-step organizer-to-player smoke on a disposable database with the real private key, and a production-mode `next start` probe on `0.0.0.0` via this PC's LAN address. **NOT tested:** the real college LAN or a second PC. **DEFERRED:** full Playwright regression, Round 1 chain specs, load tests.
+
 > **Gameplay corrections (qualification, PDF wording, Evidence Wall), 2026-11-24:** PASSED before the C: drive filled: Top 10 unit/DB/browser (11+9+2), PDF fidelity (27/27 against the source, 9 tests), Evidence Wall DB (15) and one browser journey. This finalizing pass re-ran only typecheck, lint, build and the changed-feature tests listed in `ghost404-implementation-progress.md`. **DEFERRED:** full Playwright regression, Round 1 chain and journey specs, load tests, real-LAN run. A disk-full event on C: interrupted one layout measurement (see the Evidence Wall note in the progress ledger).
 
 > **Phase 3 (event control center) verification:** see `docs/ghost404-phase3-event-control.md`. Static checks, build, 482 unit/database tests and 7 targeted browser smoke tests PASS; the exhaustive browser regression is **DEFERRED** (not run to completion in Phase 3). The pass-2 results below predate Phase 3.

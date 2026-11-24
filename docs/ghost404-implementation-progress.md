@@ -174,3 +174,7 @@ Typecheck, lint, build: PASS. Unit + database: 482 passed, 19 skipped. Targeted 
 | Evidence Wall | one lookup pair opened everything | three private/public pairs, three folders, additive migration. See `ghost404-evidence-wall.md` | see git log | 15 DB + 1 browser journey passed 2026-11-24 |
 
 Deferred (not run in this pass): full Playwright regression, the Round 1 chain (`npm run test:e2e:verdict` etc., whose specs were edited for the new qualification flow), load tests, a real LAN run, the three physical clue sets.
+
+## Inject 2 (Kill Switch) completion and LAN dry-run readiness, 2026-11-25
+Details: `ghost404-inject2-killswitch.md`. Corrected to the brief's wording: all ten Inspect texts, eight ticket texts and statuses, times with durations, paper lines, banner, attempt label, grey/green rows, BLOCKING only for real first-time blocks, authoritative recovery after a lost response, single [FAIL] line, free help/clear and "Terminal locked." precedence on the server. Unchanged: scoring (untouched-terminal 5 points still an owner decision), Injects 1/3/4, Round 1, qualification, Evidence Wall, design.
+Dry-run smoke (disposable DB, real key, 15 steps) PASS; production-mode LAN-style probe PASS. Runbook corrected (button name, key installation, migrations, tie rule for synthetic teams). NOT tested on the real college LAN.

@@ -21,10 +21,10 @@
 .ks-node text { font: 700 2.6px var(--font-mono, monospace); fill: var(--obs-ivory); pointer-events: none; }
 .ks-node:hover circle:not(.ks-hit), .ks-node:focus-visible circle:not(.ks-hit), .ks-node.is-sel circle:not(.ks-hit) { stroke: var(--obs-brass); fill: rgba(197, 164, 119, .18); }
 .ks-node.is-caught circle:not(.ks-hit) { stroke: #00FF9C; }
-.ks-node.is-cleared circle:not(.ks-hit) { stroke: var(--obs-red); }
+.ks-node.is-cleared circle:not(.ks-hit) { stroke: #8A938A; }
 .ks-node .ks-mark { font-size: 3px; }
 .ks-node.is-caught .ks-mark { fill: #00FF9C; }
-.ks-node.is-cleared .ks-mark { fill: var(--obs-red); }
+.ks-node.is-cleared .ks-mark { fill: #8A938A; }
 .ks-map figcaption { margin-top: 4px; font-size: 11.5px; color: var(--obs-sage); text-align: center; }
 
 .ks-tablewrap { overflow-x: auto; padding: 6px 10px; }
@@ -32,8 +32,8 @@
 .ks-conns td { white-space: nowrap; }
 .ks-conns tbody tr { cursor: pointer; }
 .ks-conns tbody tr:hover td { background: rgba(156, 169, 154, .06); }
-.ks-conns tr.is-caught td { box-shadow: inset 0 -1px 0 rgba(0, 255, 156, .35); }
-.ks-conns tr.is-cleared td { box-shadow: inset 0 -1px 0 rgba(201, 101, 96, .45); }
+.ks-conns tr.is-caught td { background: rgba(0, 255, 156, .10); box-shadow: inset 0 -1px 0 rgba(0, 255, 156, .45); }
+.ks-conns tr.is-cleared td { background: rgba(138, 147, 138, .14); color: #8A938A; box-shadow: inset 0 -1px 0 rgba(138, 147, 138, .5); }
 .ks-rowbtn { border: 0; padding: 0; background: none; color: var(--obs-ivory); font: inherit; cursor: pointer; text-decoration: underline dotted rgba(156, 169, 154, .6); text-underline-offset: 3px; }
 .ks-rowbtn[aria-pressed="true"] { color: var(--obs-brass); }
 .ks-toggle { display: flex; justify-content: space-between; align-items: baseline; width: 100%; padding: 2px 0; border: 0; background: none; color: var(--obs-ivory); cursor: pointer; font-size: 14px; }
@@ -45,6 +45,7 @@
 .ks-ticketlist header { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
 .ks-ticketlist header em { margin-left: auto; font-style: normal; font-size: 11.5px; color: var(--obs-sage); }
 .ks-ticketlist p { margin: 4px 0 0; color: var(--obs-sage); }
+.ks-ticketlist .ks-tk-text { color: var(--obs-ivory); line-height: 1.45; overflow-wrap: anywhere; }
 .ks-ticketlist ul { margin: 4px 0; padding-left: 16px; }
 .ks-ticketlist small { color: var(--obs-sage); }
 @media (max-width: 700px) { .ks-ticketlist { grid-template-columns: 1fr; } }

@@ -13,7 +13,7 @@ const specs = process.argv.slice(2);
 const temp = await createTempDatabase("p5");
 const code = randomBytes(18).toString("hex");
 const origin = "http://127.0.0.1:3000";
-const env = { ...process.env, DATABASE_URL: temp.url, DIRECT_URL: temp.url, ADMIN_ACCESS_HASH: hashPassword(code), APP_ORIGIN: origin, GHOST_PHASE5: "1", GHOST_E2E_TEAM_CODE: code, GHOST_E2E_ADMIN_CODE: code, GHOST_R2_KEY_FILE: resolvePath("tests/fixtures/round2-key-fixture.json") }; // test key fixture, never the private case key
+const env = { ...process.env, DATABASE_URL: temp.url, DIRECT_URL: temp.url, ADMIN_ACCESS_HASH: hashPassword(code), APP_ORIGIN: origin, GHOST_PHASE5: "1", GHOST_E2E_TEAM_CODE: code, GHOST_E2E_ADMIN_CODE: code, GHOST_R2_KEY_FILE: resolvePath(process.env.GHOST_P5_REAL_KEY === "1" ? "private/round2-key-v2.json" : "tests/fixtures/round2-key-fixture.json") }; // default: synthetic test fixture. GHOST_P5_REAL_KEY=1 (local lab dry-run only): the real private key, read by the test process at runtime and never printed
 const db = new PrismaClient({ datasourceUrl: temp.url });
 try {
   // Round 1 is FINISHED so the organizer can confirm qualification (through the real UI). Scores descend so P5-01..10 are the top ten, 11-12 standby.

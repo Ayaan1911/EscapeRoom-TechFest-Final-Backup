@@ -27,7 +27,7 @@ Tick every line on the day. Any unchecked **MUST** is a no-go. Evidence for what
 ## Round 2 (paper)
 - [ ] **MUST** Round 2 control room shows "10 qualified teams enrolled" (it warns if fewer); every finalist PC shows "Qualified for Round 2 - Waiting for Organizer" on its dashboard and "Stand by" on /round2. The "Enroll finalists" button only appears for a confirmation recorded without advancing.
 - [ ] **MUST** Volunteers hold printed answer sheets; jury (2 panels x 2 judges) has rubrics.
-- [ ] **MUST** `private/round2-key-v2.json` is on the event server (the Kill Switch terminal says "offline" without it). Print the correct-IP slips.
+- [ ] **MUST** `private/round2-key-v2.json` is on the event server (the Kill Switch terminal says "offline" without it; it is re-read every 30 s, no restart). The review table must say "Answer key installed (approved)". Make sure the config-repo copy has the corrected row-2 apostrophe (see `ghost404-inject2-killswitch.md`). Print the correct-IP slips.
 - [ ] Press **Start Round 2** once (the only format: 60 minutes, four open injects); confirm all four injects on two finalist PCs and the countdown on the projector.
 - [ ] Pacing is advice only (10/12/25/10 + 3). At 60:00 the screens show PENS DOWN and every terminal locks by themselves. Do not refresh to "help" a team: the server clock decides.
 - [ ] Kill Switch: watch "terminal review" in the control room; hand a correct-IP slip only after a team is OUT OF ATTEMPTS; never reset attempts. Print the terminal results after pens down.

@@ -13,22 +13,22 @@ import { db, serializable } from "@/lib/db";
 import { audit, R2Error, readSession, requireAdmin, requireFinalist } from "../common.server";
 import { FORMAT, openClock } from "./format";
 import { MONITOR_IPS } from "./content-v2.server";
+import { HELP_LINES, MSG } from "./killswitch-text";
 import { caseKey, type CaseKey } from "./private-key.server";
 import type { AttemptResult, TerminalState } from "./types";
 
 export const MAX_BLOCKS = 4;
 const IPV4 = /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/;
-const USAGE = "Usage: BLOCK <ip address>";
 export type Line = { kind: "ok" | "bad" | "warn" | "info" | "fail"; text: string };
 
 /** Parses one terminal line. Returns the IP for a valid BLOCK command, or the exact message to show (no attempt used). */
 export function parseCommand(line: unknown): { ip: string } | { message: string } {
-  if (typeof line !== "string" || line.length > 120) return { message: `Unknown command. ${USAGE}` };
+  if (typeof line !== "string" || line.length > 120) return { message: MSG.unknown };
   const parts = line.trim().split(/\s+/).filter(Boolean);
-  if (!parts.length || parts[0].toLowerCase() !== "block") return { message: `Unknown command. ${USAGE}` };
-  if (parts.length === 1) return { message: `Missing IP address. ${USAGE}` };
-  if (parts.length > 2) return { message: `Too many arguments. ${USAGE}` };
-  if (!IPV4.test(parts[1])) return { message: "Invalid IP address format." };
+  if (!parts.length || parts[0].toLowerCase() !== "block") return { message: MSG.unknown };
+  if (parts.length === 1) return { message: MSG.missing };
+  if (parts.length > 2) return { message: MSG.tooMany };
+  if (!IPV4.test(parts[1])) return { message: MSG.invalid };
   return { ip: parts[1] };
 }
 /** 15-point Kill Switch terminal score from committed attempts: +5 per attacker connection contained, +5 if no legitimate connection
@@ -53,8 +53,8 @@ function stateOf(rows: Row[], open: boolean, key: CaseKey | null): TerminalState
 }
 /** Lines that close a terminal: shown once after the attempt that locked it, and again whenever the history is reloaded. */
 export function closingLines(st: TerminalState): Line[] {
-  if (st.lockReason === "contained") return [{ kind: "ok", text: "[OK] Both threats contained. Terminal locked." }];
-  if (st.lockReason === "exhausted") return [{ kind: "fail", text: "[FAIL] Out of attempts. Terminal locked. See a volunteer." }, { kind: "bad", text: "CALL THE VOLUNTEERS . ASAP , IT IS EATING THE DATABASE !!" }];
+  if (st.lockReason === "contained") return [{ kind: "ok", text: MSG.contained }];
+  if (st.lockReason === "exhausted") return [{ kind: "fail", text: MSG.exhausted }];
   return [];
 }
 async function sessionContext(now: number) {
@@ -80,11 +80,13 @@ export async function terminalState(now = Date.now()): Promise<TerminalState> {
   return stateOf(rows, open, key);
 }
 /** Runs one BLOCK line for the signed-in finalist team. Returns the new state and the lines to print. */
-export async function runCommand(line: unknown, now = Date.now()): Promise<{ state: TerminalState; lines: Line[]; used: boolean }> {
+export async function runCommand(line: unknown, now = Date.now()): Promise<{ state: TerminalState; lines: Line[]; used: boolean; clear?: boolean }> {
   const teamId = await requireFinalist();
   if (rateLimited(teamId, now)) throw new R2Error(429, "Too many commands. Wait a few seconds; no attempt was used.");
+  const free = typeof line === "string" ? /^\s*(help|clear)\s*$/i.exec(line)?.[1].toLowerCase() : undefined; // free commands: no attempt, nothing stored
+  if (free) return { state: await terminalState(now), lines: free === "help" ? HELP_LINES.map(text => ({ kind: "info" as const, text })) : [], used: false, clear: free === "clear" };
   const parsed = parseCommand(line);
-  if ("message" in parsed) return { state: await terminalState(now), lines: [{ kind: "warn", text: parsed.message }], used: false };
+  if ("message" in parsed) { const state = await terminalState(now); return { state, lines: [{ kind: "warn", text: state.lockReason === "contained" || state.lockReason === "exhausted" ? MSG.locked : parsed.message }], used: false }; } // a locked terminal answers "Terminal locked." to anything
   const key = caseKey();
   return serializable(async tx => {
     const row = await readSession(tx), open = row.format === FORMAT && openClock(row, now).phase === "running";
@@ -92,9 +94,9 @@ export async function runCommand(line: unknown, now = Date.now()): Promise<{ sta
     const before = stateOf(rows, open, key);
     if (!key) return { state: before, lines: [{ kind: "warn", text: "Terminal offline: awaiting the organizer's approved answer set. Write your findings on paper." }], used: false };
     if (!open) return { state: before, lines: [{ kind: "warn", text: "Round 2 is not running. Terminal locked." }], used: false };
-    if (before.locked) return { state: before, lines: [{ kind: "warn", text: "Terminal locked." }], used: false };
-    if (!MONITOR_IPS.includes(parsed.ip)) return { state: before, lines: [{ kind: "warn", text: "Not a connection on this list." }], used: false };
-    if (rows.some(r => r.ip === parsed.ip)) return { state: before, lines: [{ kind: "warn", text: "Already blocked." }], used: false };
+    if (before.locked) return { state: before, lines: [{ kind: "warn", text: MSG.locked }], used: false };
+    if (!MONITOR_IPS.includes(parsed.ip)) return { state: before, lines: [{ kind: "warn", text: MSG.notListed }], used: false };
+    if (rows.some(r => r.ip === parsed.ip)) return { state: before, lines: [{ kind: "warn", text: MSG.duplicate }], used: false };
     const result: AttemptResult = key.inject2.malicious.includes(parsed.ip) ? "caught" : "cleared";
     const created = await tx.r2BlockAttempt.create({ data: { teamId, sessionStartsAt: row.startsAt!, seq: rows.length + 1, ip: parsed.ip, result, createdAt: new Date(now) } });
     await audit(tx, teamId, "terminal-block", { seq: created.seq, ip: parsed.ip, result });

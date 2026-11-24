@@ -14,7 +14,8 @@ export type I1 = {
 };
 /** One Kill Switch monitor row (Inject 2 document). Deliberately carries no classification. */
 export type KConn = { n: number; ip: string; process: string; country: string; sent: string; received: string; time: string; ticket: string; description: string };
-export type Ticket = { id: string; title: string; process?: string; details: string[]; created: string; status: string };
+/** One IT ticket exactly as the case document words it: a single description line, when it was created, its status. */
+export type Ticket = { id: string; text: string; created: string; status: string };
 export type I2 = { kind: "i2"; snapshot: string; brief: string; connections: KConn[]; tickets: Ticket[]; ticketFooter: string; maxAttempts: number; paper: string[] };
 export type I3 = {
   kind: "i3";

@@ -33,6 +33,17 @@ npx next start -H 0.0.0.0 -p 3000
 ```
 Run it under `systemd` or `tmux` so it survives the SSH session. Open the port in `ufw` (`sudo ufw allow from <lab subnet> to any port 3000`) only for the lab subnet. Team provisioning on Ubuntu: `node scripts/provision-teams.mjs` (reads `DATABASE_URL`; see `scripts/provision-lib.mjs`). The PowerShell wrappers do not run on Ubuntu; the commands above are what they wrap.
 
+## Before the event: three things the scripts do NOT do for you
+1. **Install the private answer key** at `<repo>\private\round2-key-v2.json` (the folder the server is started from) or point `GHOST_R2_KEY_FILE` at it. It is re-read at most every 30 s, so no restart is needed. Check `/admin/round2` -> "Kill Switch · terminal review" says "Answer key installed (approved)". Without it the Kill Switch terminal is offline for every team and consumes no attempts. Never commit or e-mail the file.
+2. **Migrations**: `prepare-lab.ps1` (or `npx prisma migrate deploy`) must apply, in order, `20261125000000_round2_paper_marks` and `20261126000000_insider_wall_pairs`. Both are additive. Back up first.
+3. **Insider physical fragments**: use "Prepare pair code sheets" in `/admin/insider-kit` once for the three-pair Evidence Wall (teams with no pairs issued fall back to the old two-fragment gate).
+
+## Dry run on the lab server (what to do tomorrow)
+Start the server (`start-lab.ps1`), then: organizer signs in -> start Round 1 with the synthetic teams -> **Stop round** -> `/admin#qualification`. NOTE: if more than 10 teams are tied on the same Round 1 score at 10th place (all synthetic teams with 0 points are), the system will not choose; tick the open places yourself, then **Confirm Top 10 and Advance to Round 2** -> `/admin/round2` shows 10 qualified teams -> **Start Round 2** -> "Yes, start the 60-minute investigation". Sign in as a qualified team PC: dashboard shows "Enter Round 2" -> Kill Switch. Try one typo, one wrong block and one refresh. Use only synthetic team accounts; each team gets four blocks per Round 2 session, so reset by using a fresh database for the real event.
+
+## What was and was NOT verified (2026-11-25)
+Verified on the development PC with a disposable database: the whole organizer-to-player flow (14 steps, real private key read at runtime), a production `next start` bound to `0.0.0.0` with the variables below and the key at its default path, reached through this PC's own LAN address, and that every browser request goes only to the server (no external service). NOT verified: a second PC, the college network, firewall/Wi-Fi isolation, lab browsers, the lab server itself, projector hardware, Ubuntu. Do not read this as a LAN test.
+
 ## Origin and cookie settings (plain HTTP on a closed LAN)
 - Leave `APP_ORIGIN` unset: the CSRF check then compares the browser's `Origin` with the request `Host`, so the LAN IP, a hostname and `localhost` all work consistently.
 - `GHOST_LAN_HTTP=1` turns off only the cookie `Secure` flag, and only while `APP_ORIGIN` is not https. Never set it on a hosted (https) deployment.
@@ -41,7 +52,7 @@ Run it under `systemd` or `tmux` so it survives the SSH session. Open the port i
 ## Round 2 on event day
 1. After Round 1, organizer opens `/admin#qualification` ("Review Top 10 Teams"), resolves any tie at 10th place, and presses **Confirm Top 10 and Advance to Round 2** (this enrolls the finalists and does not start Round 2). Check `/admin/round2` shows 10 qualified teams.
 2. Open `/admin/projector` on the projector machine (signed in as organizer; full screen with F11). It changes scenes by itself. Print `/admin/round2/print` (answer sheets, rubrics, script).
-3. **Start investigation** only when every finalist PC shows the "Stand by" screen. The clock cannot be paused; **End now** (reason required) closes every chapter immediately.
+3. Press **Start Round 2** (then "Yes, start the 60-minute investigation") only when every finalist PC shows "Qualified for Round 2 - Waiting for Organizer" / "Stand by". The clock cannot be paused; **End now** (reason required) closes every chapter immediately.
 4. After pens down: jury marks in `/admin/round2#marking`, then **Publish results**. Round 1 standings / finalist names on the projector are switched in `/admin/leaderboard`.
 5. A server restart mid-round keeps the same chapter and countdown (the clock is the stored start time). The restart itself costs real time: the chapter keeps counting while the server is down.
 

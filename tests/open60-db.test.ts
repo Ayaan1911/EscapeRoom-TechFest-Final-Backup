@@ -93,9 +93,19 @@ describe.skipIf(process.env.GHOST_DB_TEST !== "1")("Round 2 (60 minutes) and the
     await asTeam("T06");
     for (const ip of [W1, W2, W3]) expect((await run(`block ${ip}`)).body.used).toBe(true);
     const last = await run(`block ${W4}`);
-    expect(texts(last.body)).toContain("[FAIL] Out of attempts. Terminal locked. See a volunteer."); expect(texts(last.body)).toContain("CALL THE VOLUNTEERS . ASAP , IT IS EATING THE DATABASE !!");
+    expect(texts(last.body)).toContain("[FAIL] Out of attempts. Terminal locked. See a volunteer."); expect(texts(last.body)).not.toContain("CALL THE VOLUNTEERS"); // the preliminary-prompt extra line is not part of the approved wording
     expect(last.body.state).toMatchObject({ remaining: 0, locked: true, lockReason: "exhausted" });
     expect(texts((await run(`block ${T1}`)).body)).toBe("Terminal locked."); expect(await db.r2BlockAttempt.count({ where: { teamId: "T06" } })).toBe(4);
+  });
+  it("help and clear are free; a locked terminal answers EVERY command (even a typo) with 'Terminal locked.'", async () => {
+    await asTeam("T10"); const before = await db.r2BlockAttempt.count({ where: { teamId: "T10" } });
+    const help = await run("help"); expect(help.body.used).toBe(false); expect(texts(help.body)).toContain("BLOCK <ip address>"); expect(texts(help.body)).toContain("use no attempt");
+    const clear = await run("  CLEAR "); expect(clear.body.used).toBe(false); expect(clear.body.clear).toBe(true); expect(clear.body.lines).toEqual([]);
+    expect(await db.r2BlockAttempt.count({ where: { teamId: "T10" } })).toBe(before); // nothing stored, nothing consumed
+    await asTeam("T06"); // exhausted in the previous test
+    for (const line of ["BLOK 1.2.3.4", "BLOCK", "BLOCK abc", "BLOCK 8.8.8.8", `block ${W1}`, "BLOCK 1.1.1.1 2.2.2.2"]) { const r = await run(line); expect(texts(r.body), line).toBe("Terminal locked."); expect(r.body.used).toBe(false); }
+    term.resetRateLimit(); // (7 commands in a row would legitimately hit the 6-per-10-s limit)
+    expect((await run("help")).body.used).toBe(false); expect(await db.r2BlockAttempt.count({ where: { teamId: "T06" } })).toBe(4);
   });
   it("concurrent requests from many tabs cannot exceed four attempts; refresh and re-login keep the history and its messages", async () => {
     await asTeam("T07");

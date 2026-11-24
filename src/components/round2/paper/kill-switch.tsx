@@ -2,15 +2,15 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { I2, KConn, TerminalState } from "@/lib/round2/paper/types";
 import { PaperNote } from "./paper-note";
+import { attemptsLabel, BANNER as BANNER_TEXT, HELP_LINES, MSG, PROMPT } from "@/lib/round2/paper/killswitch-text";
 
 // Kill Switch (Round 2, Inject 2): connection map + table + inspector + IT ticket log + simulated NEXUS SOC terminal.
 // Evidence is neutral; a row only changes appearance after the team itself has blocked it (the server tells us the outcome).
 type Line = { kind: "ok" | "bad" | "warn" | "info" | "fail" | "in" | "sys" | "wait"; text: string; fresh?: boolean };
 type Outcome = Record<string, "caught" | "cleared">;
-const PROMPT = "ghost@nexus:~$";
-const BANNER: Line[] = [{ kind: "sys", text: "NEXUS SOC TERMINAL v2.1" }, { kind: "sys", text: "KILL SWITCH ACCESS GRANTED" }, { kind: "info", text: "Type BLOCK IP_ADDRESS to cut a connection." }, { kind: "info", text: "You have 4 attempts. Choose carefully." }];
-const HELP: Line[] = [{ kind: "info", text: "BLOCK <ip address>   cut one connection (uses 1 of 4 attempts, right or wrong)" }, { kind: "info", text: "help                 show this help" }, { kind: "info", text: "clear                clear the screen (attempts and history are kept)" }, { kind: "info", text: "Typos, IPs not on the list and repeats use no attempt." }];
-const CLOSING = { contained: [{ kind: "ok" as const, text: "[OK] Both threats contained. Terminal locked." }], exhausted: [{ kind: "fail" as const, text: "[FAIL] Out of attempts. Terminal locked. See a volunteer." }, { kind: "bad" as const, text: "CALL THE VOLUNTEERS . ASAP , IT IS EATING THE DATABASE !!" }] };
+const BANNER: Line[] = BANNER_TEXT.map((text, i) => ({ kind: i < 2 ? "sys" as const : "info" as const, text }));
+const HELP: Line[] = HELP_LINES.map(text => ({ kind: "info" as const, text }));
+const CLOSING = { contained: [{ kind: "ok" as const, text: MSG.contained }], exhausted: [{ kind: "fail" as const, text: MSG.exhausted }] };
 const reduced = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
 /* ---------------- map ---------------- */
@@ -48,7 +48,7 @@ function linesFromState(st: TerminalState): Line[] {
   const out: Line[] = st.attempts.flatMap(a => [{ kind: "in" as const, text: `BLOCK ${a.ip}` }, { kind: a.result === "caught" ? "ok" as const : "bad" as const, text: a.message }]);
   return [...out, ...(st.lockReason === "contained" ? CLOSING.contained : st.lockReason === "exhausted" ? CLOSING.exhausted : [])];
 }
-export function Terminal({ demo, maxAttempts, insert, onState }: { demo?: boolean; maxAttempts: number; insert: { ip: string; nonce: number } | null; onState: (st: TerminalState) => void }) {
+export function Terminal({ demo, maxAttempts, insert, onState, ips }: { demo?: boolean; maxAttempts: number; insert: { ip: string; nonce: number } | null; onState: (st: TerminalState) => void; ips: readonly string[] }) {
   const empty: TerminalState = { open: true, max: maxAttempts, remaining: maxAttempts, locked: false, lockReason: "none", contained: 0, attempts: [] };
   const [st, setSt] = useState<TerminalState>(empty), [lines, setLines] = useState<Line[]>([]), [cmd, setCmd] = useState(""), [busy, setBusy] = useState(false), [loaded, setLoaded] = useState(!!demo), [flash, setFlash] = useState("");
   const input = useRef<HTMLInputElement>(null), log = useRef<HTMLOListElement>(null);
@@ -67,19 +67,20 @@ export function Terminal({ demo, maxAttempts, insert, onState }: { demo?: boolea
     setCmd("");
     if (/^help$/i.test(line)) { push({ kind: "in", text: line }, ...HELP); return; }
     if (/^clear$/i.test(line)) { setLines([]); return; } // screen only: attempts and history stay on the server
-    if (st.locked) { push({ kind: "in", text: line }, { kind: "warn", text: "Terminal locked." }); return; }
+    if (st.locked) { push({ kind: "in", text: line }, { kind: "warn", text: MSG.locked }); return; }
     const m = /^\s*block\s+(\S+)\s*$/i.exec(line);
     push({ kind: "in", text: line });
     setBusy(true);
     const started = performance.now(), wait = (ms: number) => new Promise(r => setTimeout(r, ms));
     try {
-      if (m) push({ kind: "wait", text: `BLOCKING ${m[1].slice(0, 40)}` });
+      const real = !!m && ips.includes(m[1]) && !st.attempts.some(a => a.ip === m[1]); // BLOCKING... only for a monitored IP not blocked before
+      if (real) push({ kind: "wait", text: `BLOCKING ${m![1]}` });
       // The request goes out immediately; the ~1 s "BLOCKING…" pause is presentation only and never delays recording.
       let body: { state?: TerminalState; lines?: Line[]; error?: string; used?: boolean; result?: string | null };
       if (demo) {
         const parts = line.trim().split(/\s+/);
         body = parts[0].toLowerCase() !== "block" || parts.length !== 2
-          ? { lines: [{ kind: "warn", text: parts[0].toLowerCase() !== "block" ? "Unknown command. Usage: BLOCK <ip address>" : parts.length === 1 ? "Missing IP address. Usage: BLOCK <ip address>" : "Too many arguments. Usage: BLOCK <ip address>" }] }
+          ? { lines: [{ kind: "warn", text: parts[0].toLowerCase() !== "block" ? MSG.unknown : parts.length === 1 ? MSG.missing : MSG.tooMany }] }
           : await fetch("/api/round2/admin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "demo-block", ip: parts[1], previous: st.attempts.map(a => a.ip) }) }).then(r => r.json());
         if (body.result) { // demo: keep the history in this tab only
           const attempts = [...st.attempts, { seq: st.attempts.length + 1, ip: parts[1], result: body.result as "caught" | "cleared", message: body.lines?.[0]?.text ?? "", at: new Date().toISOString() }];
@@ -91,18 +92,24 @@ export function Terminal({ demo, maxAttempts, insert, onState }: { demo?: boolea
         const r = await fetch("/api/round2/terminal", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ command: line }) });
         body = await r.json(); if (!r.ok && !body.lines) body.lines = [{ kind: "warn", text: body.error ?? "Command refused. No attempt was used." }];
       }
-      if (m) { const left = 950 - (performance.now() - started); if (left > 0 && !reduced()) await wait(left); }
+      if (real) { const left = 950 - (performance.now() - started); if (left > 0 && !reduced()) await wait(left); }
       setLines(x => x.filter(y => y.kind !== "wait"));
       if (body.state) apply(body.state);
       push(...(body.lines ?? []));
       const first = body.lines?.[0]?.kind; if (first === "ok") pulse("ok"); else if (first === "bad") pulse("bad");
-    } catch { setLines(x => x.filter(y => y.kind !== "wait")); push({ kind: "warn", text: "Connection lost. Nothing was recorded; try again." }); }
+    } catch { // the answer was lost: the server may or may not have recorded the block, so never retry blindly. Ask it.
+      setLines(x => x.filter(y => y.kind !== "wait"));
+      try {
+        const r = await fetch("/api/round2/terminal", { cache: "no-store" }); if (!r.ok) throw new Error();
+        const s: TerminalState = await r.json(); apply(s); setLines([...linesFromState(s), { kind: "warn", text: "Connection interrupted. The terminal was reloaded from the server: the history above is what was recorded.", fresh: true }]);
+      } catch { push({ kind: "warn", text: "Connection lost. Do not retype the command: reload this page to see what the server recorded." }); }
+    }
     finally { setBusy(false); setTimeout(() => input.current?.focus(), 0); }
   }
   const level = st.locked ? "locked" : st.remaining >= 3 ? "ok" : st.remaining === 2 ? "warn" : "bad";
   return <section className={`ks-term ${flash ? `flash-${flash}` : ""} ${st.locked ? "is-locked" : ""}`} aria-label="Kill Switch terminal">
     <header className="ks-bar"><span className="ks-dots" aria-hidden="true"><i /><i /><i /></span><b>NEXUS SOC TERMINAL v2.1</b>
-      <span className={`ks-att is-${level}`} role="img" aria-label={`${st.remaining} of ${st.max} attempts left`}>{Array.from({ length: st.max }, (_, i) => <i key={i} className={i < st.remaining ? "is-left" : ""} />)}<em>{st.remaining} / {st.max}</em></span></header>
+      <span className={`ks-att is-${level}`} role="img" aria-label={`${st.remaining} of ${st.max} attempts left`}>{Array.from({ length: st.max }, (_, i) => <i key={i} className={i < st.remaining ? "is-left" : ""} />)}<em>{attemptsLabel(st.remaining, st.max)}</em></span></header>
     {st.lockReason === "contained" && <p className="ks-banner is-ok" role="status">THREATS CONTAINED · terminal locked · write the IPs on your answer sheet</p>}
     {st.lockReason === "exhausted" && <p className="ks-banner is-bad" role="status">OUT OF ATTEMPTS · terminal locked · call a volunteer</p>}
     {st.lockReason === "closed" && !demo && <p className="ks-banner is-warn" role="status">ROUND 2 IS NOT RUNNING · terminal locked</p>}
@@ -139,7 +146,7 @@ export function Inject2({ c, demo }: { c: I2; demo?: boolean }) {
         <section className="ij-panel ks-tablewrap" aria-label="Live connections"><table className="ij-table ks-conns"><thead><tr><th scope="col">#</th><th scope="col">IP address</th><th scope="col">Process</th><th scope="col">Country</th><th scope="col">Sent</th><th scope="col">Received</th><th scope="col">Time</th></tr></thead>
           <tbody>{c.connections.map(x => <tr key={x.n} className={`${sel === x.n ? "is-sel" : ""} ${outcome[x.ip] ? `is-${outcome[x.ip]}` : ""}`} onClick={() => setSel(x.n)}><td>{x.n}</td><td className="ij-mono"><button type="button" className="ks-rowbtn" aria-pressed={sel === x.n} onClick={e => { e.stopPropagation(); setSel(x.n); }}>{x.ip}<span className="rp-sr"> inspect connection {x.n}</span></button></td><td className="ij-mono">{x.process}</td><td>{x.country}</td><td>{x.sent}</td><td>{x.received}</td><td className="ij-mono">{x.time}</td></tr>)}</tbody></table></section>
         <section className="ij-panel ks-tickets" aria-label="IT ticket log"><button type="button" className="ks-toggle" aria-expanded={tickets} onClick={() => setTickets(t => !t)}><b>IT ticket log</b><span>{c.tickets.length} tickets · {tickets ? "hide" : "show"}</span></button>
-          {tickets && <><ol className="ks-ticketlist">{c.tickets.map(t => <li key={t.id} id={`ks-${t.id}`} className={k?.ticket === t.id ? "is-sel" : ""}><header><b className="ij-mono">{t.id}</b><span>{t.title}</span><em>{t.status}</em></header>{t.process && <p className="ij-mono">{t.process}</p>}<ul>{t.details.map(d => <li key={d}>{d}</li>)}</ul><small>Created: {t.created}</small></li>)}</ol><p className="ij-note">{c.ticketFooter}</p></>}</section>
+          {tickets && <><ol className="ks-ticketlist">{c.tickets.map(t => <li key={t.id} id={`ks-${t.id}`} className={k?.ticket === t.id ? "is-sel" : ""}><header><b className="ij-mono">{t.id}</b><em>{t.status}</em></header><p className="ks-tk-text">{t.text}</p><small>Created: {t.created}</small></li>)}</ol><p className="ij-note">{c.ticketFooter}</p></>}</section>
       </div>
       <div className="ij-stack ij-sticky">
         {k ? <section className="ij-panel ks-inspect" aria-label={`Inspect connection ${k.n}`}><h3>Inspect · connection {k.n}</h3>
@@ -148,7 +155,7 @@ export function Inject2({ c, demo }: { c: I2; demo?: boolean }) {
           <p className="ks-desc">{k.description}</p>
           <button type="button" className="ij-btn" onClick={() => setInsert({ ip: k.ip, nonce: Date.now() })}>Copy IP into the terminal <span className="ij-sub">(does not run it)</span></button></section>
           : <p className="ij-panel ij-empty">Select a connection on the map or in the table to inspect it.</p>}
-        <Terminal demo={demo} maxAttempts={c.maxAttempts} insert={insert} onState={setSt} />
+        <Terminal demo={demo} maxAttempts={c.maxAttempts} insert={insert} onState={setSt} ips={c.connections.map(x => x.ip)} />
         <PaperNote items={c.paper} />
       </div>
     </div>

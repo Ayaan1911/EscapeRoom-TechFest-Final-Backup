@@ -53,11 +53,11 @@ test("all four injects are open together, free navigation, paper only except the
 test("Kill Switch: inspect, tickets, help/clear, wrong and right blocks, duplicates, then early success lock (screenshots)", async ({ page }) => {
   test.setTimeout(120_000);
   await team(page, "P5-03"); await page.goto("/round2"); await inject(page, 2);
-  await expect(term(page)).toContainText("NEXUS SOC TERMINAL v2.1"); await expect(term(page)).toContainText("KILL SWITCH ACCESS GRANTED"); await expect(term(page)).toContainText("You have 4 attempts. Choose carefully.");
+  await expect(term(page)).toContainText("NEXUS SOC TERMINAL v2.1"); await expect(term(page)).toContainText("KILL SWITCH ACCESS GRANTED"); await expect(term(page)).toContainText("You have 4 attempts. Choose carefully."); await expect(term(page)).toContainText("Type BLOCK <ip address> to cut a connection."); await expect(term(page)).toContainText("ATTEMPTS LEFT: 4/4");
   await shot(page, "1-initial");
   await page.getByRole("button", { name: /inspect connection 6$/ }).click();
-  await expect(page.getByRole("region", { name: "Inspect connection 6" })).toContainText("One small packet every 60 seconds");
-  await page.getByRole("button", { name: /IT-4518 · open in ticket log/ }).click(); await expect(page.locator("#ks-IT-4518")).toContainText("Created by service account svc-sync.");
+  await expect(page.getByRole("region", { name: "Inspect connection 6" })).toContainText("One tiny packet every 60 seconds");
+  await page.getByRole("button", { name: /IT-4518 · open in ticket log/ }).click(); await expect(page.locator("#ks-IT-4518")).toContainText("created by svc-sync (service account)"); await expect(page.locator("#ks-IT-4518")).toContainText("Tonight 02:31");
   await expect(page.getByText("Standard laptop software needs no ticket: mail-sync.exe.")).toBeVisible();
   await page.getByRole("region", { name: "Inspect connection 6" }).screenshot({ path: `${SHOTS}/2-selected-connection.png` });
   await page.getByRole("region", { name: "IT ticket log" }).screenshot({ path: `${SHOTS}/3-ticket-log.png` });
@@ -72,6 +72,7 @@ test("Kill Switch: inspect, tickets, help/clear, wrong and right blocks, duplica
   await cmd(page, `block ${W1}`); await expect(term(page)).toContainText("Already blocked."); await expect(term(page).getByRole("img", { name: "3 of 4 attempts left" })).toBeVisible();
   await cmd(page, `BLOCK ${T1}`); await expect(term(page)).toContainText(`[OK] ${T1} BLOCKED. Suspicious traffic stopped. 1 of 2 threats contained.`); await shot(page, "5-correct-block");
   await expect(page.locator(".ks-node.is-caught")).toHaveCount(1); await expect(page.locator(".ks-node.is-cleared")).toHaveCount(1); // only the team's own attempts are marked
+  await expect(page.locator(".ks-node.is-cleared circle:not(.ks-hit)").first()).toHaveCSS("stroke", "rgb(138, 147, 138)"); // a blocked legitimate service is GREY, not red
   await cmd(page, "clear"); await expect(term(page).locator(".ks-log li.is-ok")).toHaveCount(0); // screen only
   await page.reload(); await inject(page, 2); await expect(term(page).getByRole("img", { name: "2 of 4 attempts left" })).toBeVisible(); // the server kept everything
   await expect(term(page)).toContainText(`[OK] ${T1} BLOCKED.`);
@@ -88,7 +89,7 @@ test("Kill Switch: one attempt left turns red, exhaustion locks with the volunte
   await expect(term(second).getByRole("img", { name: "2 of 4 attempts left" })).toBeVisible(); await cmd(second, `block ${W3}`);
   await page.reload(); await inject(page, 2); await expect(term(page).getByRole("img", { name: "1 of 4 attempts left" })).toBeVisible(); await expect(term(page).locator(".ks-att.is-bad")).toHaveCount(1);
   await shot(page, "6-one-attempt-left");
-  await cmd(page, `block ${W4}`); await expect(term(page)).toContainText("[FAIL] Out of attempts. Terminal locked. See a volunteer."); await expect(term(page)).toContainText("CALL THE VOLUNTEERS . ASAP , IT IS EATING THE DATABASE !!");
+  await cmd(page, `block ${W4}`); await expect(term(page)).toContainText("[FAIL] Out of attempts. Terminal locked. See a volunteer."); await expect(term(page)).not.toContainText("CALL THE VOLUNTEERS");
   await shot(page, "7-out-of-attempts");
   const direct = await page.request.post("/api/round2/terminal", { headers: { Origin: "http://127.0.0.1:3000" }, data: { command: `block ${T1}` } }); expect((await direct.json()).lines[0].text).toBe("Terminal locked.");
   expect(await prisma.r2BlockAttempt.count({ where: { teamId: "P5-04" } })).toBe(4);
