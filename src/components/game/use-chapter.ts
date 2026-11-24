@@ -7,7 +7,7 @@ export type Attempts = { used: number; cap: number; remaining: number };
 export type TaskRow = { id: string; title: string; earned: number; max: number; attempts?: Attempts | null };
 export type ChapterState = {
   progress: Progress; score: number; current: number; status: string; chapterHints: string[][]; serverNow: number; round: { deadline: string | null };
-  policy?: string; insiderUnlocked?: boolean; insiderPairs?: { A: boolean; B: boolean; C: boolean } | null; unlocked: boolean[]; unlockThresholds: readonly number[]; tasks: TaskRow[][];
+  policy?: string; insiderUnlocked?: boolean; insiderPairs?: { A: boolean; B: boolean; C: boolean } | null; insiderGroup?: { group: "A" | "B" | "C"; solved: boolean } | null; unlocked: boolean[]; unlockThresholds: readonly number[]; tasks: TaskRow[][];
 };
 export type SubmitResult = { duplicate?: boolean; improved?: boolean; tasks?: TaskRow[]; task: string | null; awarded: number; taskEarned: number | null; taskMax: number | null; chapterRaw: number; chapterMax: number; accepted: boolean; unlocked: number[]; tamperAwarded: boolean; demo?: boolean };
 
@@ -62,7 +62,7 @@ export function useChapter(chapter: 0 | 1 | 2 | 3 | 4, initialState: ChapterStat
       const body = await response.json();
       if (action !== "hint") setRetryAt(Date.now() + (body.retryAfter ?? 3) * 1000);
       if (!response.ok) throw new Error(body.error ?? "Unable to save. Retry when the connection returns.");
-      if (action === "unlock") setFeedback(body.pairMode ? (body.matched ? (body.unlocked ? "EVIDENCE SET RECONSTRUCTED — 3/3. The whole dossier is open." : body.already ? `Evidence ${body.pair} was already open.` : `Match confirmed: Evidence ${body.pair} is open.`) : "These two fragments do not fit together. Compare the identifiers on both again.") : body.unlocked ? "Dossier unlocked and saved." : "These fragments do not unlock this dossier. Check both printed pieces.");
+      if (action === "unlock") setFeedback(body.pairMode ? (body.groupMode && body.matched ? (body.already ? `Group ${body.pair} was already matched. The dossier is open.` : `Match confirmed: Group ${body.pair} fragments fit. The dossier is open.`) : body.matched ? (body.unlocked ? "EVIDENCE SET RECONSTRUCTED — 3/3. The whole dossier is open." : body.already ? `Evidence ${body.pair} was already open.` : `Match confirmed: Evidence ${body.pair} is open.`) : "These two fragments do not fit together. Compare the identifiers on both again.") : body.unlocked ? "Dossier unlocked and saved." : "These fragments do not unlock this dossier. Check both printed pieces.");
       else if (action === "hint") setFeedback("Hint released and saved.");
       else {
         setResult({ ...body, at: Date.now() });

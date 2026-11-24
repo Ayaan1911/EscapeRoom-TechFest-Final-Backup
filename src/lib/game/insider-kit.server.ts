@@ -2,7 +2,7 @@ import "server-only";
 import { session } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { insiderWallStation, newInsiderFragments } from "./insider-fragments.server";
-import { ensureTeamPairs, ensureWallCards, PAIRS, VARIANTS } from "./evidence-wall.server";
+import { groupSummary, PAIRS, prepareGroups } from "./evidence-wall.server";
 
 export async function insiderPrintData(part: "A" | "B", teamIds?: string[]) {
   if (!await session("admin")) return null;
@@ -15,13 +15,22 @@ export async function insiderPrintData(part: "A" | "B", teamIds?: string[]) {
   return cards.sort((a, b) => a.station.localeCompare(b.station) || a.teamId.localeCompare(b.teamId));
 }
 
-/** Organizer-only CODE SHEETS for the three-pair Evidence Wall (not the final physical pack). Idempotent: a reprint never changes an issued code. */
-export async function insiderPairSheets(teamIds?: string[]) {
+/** Organizer-only: the group summary (read-only, never creates anything). */
+export async function insiderGroupOverview() {
   if (!await session("admin")) return null;
-  await ensureWallCards();
-  const teams = await db.team.findMany({ where: teamIds ? { id: { in: teamIds } } : {}, select: { id: true, variant: true }, orderBy: { id: "asc" } });
-  const slips = [];
-  for (const team of teams) for (const pair of await db.$transaction(tx => ensureTeamPairs(tx, team.id))) slips.push({ teamId: team.id, variant: team.variant, pair: pair.pair, code: pair.privateCode });
-  const wall = await db.insiderWallCard.findMany({ orderBy: [{ variant: "asc" }, { pair: "asc" }, { role: "asc" }, { code: "asc" }] });
-  return { slips, wall, pairs: PAIRS, variants: VARIANTS };
+  return groupSummary();
+}
+
+/** Organizer-only CODE SHEETS for the one-group-per-team Evidence Wall (not the final physical pack). Idempotent: a reprint never changes an assignment or an issued code.
+ *  `teamIds` limits PREPARATION; the sheets always list every prepared team so the wall stays complete. */
+export async function insiderGroupSheets(teamIds?: string[], options: { prepare?: boolean } = {}) {
+  if (!await session("admin")) return null;
+  if (options.prepare ?? true) await db.$transaction(tx => prepareGroups(tx, teamIds), { isolationLevel: "Serializable" });
+  const [summary, teams, pairs, cards] = await Promise.all([groupSummary(), db.team.findMany({ select: { id: true, name: true, variant: true } }), db.insiderPair.findMany({ orderBy: { teamId: "asc" } }), db.insiderWallCard.findMany({ orderBy: { code: "asc" } })]);
+  const byTeam = new Map(teams.map(t => [t.id, t])), perTeam = new Map<string, number>();
+  for (const p of pairs) perTeam.set(p.teamId, (perTeam.get(p.teamId) ?? 0) + 1);
+  const slips = pairs.filter(p => perTeam.get(p.teamId) === 1).map(p => ({ teamId: p.teamId, teamName: byTeam.get(p.teamId)?.name ?? "", variant: byTeam.get(p.teamId)?.variant ?? "", group: p.pair, code: p.privateCode }))
+    .sort((a, b) => a.group.localeCompare(b.group) || a.teamId.localeCompare(b.teamId));
+  const wall = cards.filter(c => c.teamId !== null || c.variant === "*").map(c => ({ code: c.code, group: c.pair, role: c.role, teamId: c.teamId }));
+  return { summary, slips, wall, groups: PAIRS };
 }

@@ -19,6 +19,7 @@ model Team {
   drafts ChapterDraft[]
   r2Finalist R2Finalist?
   insiderPairs InsiderPair[]
+  wallCards InsiderWallCard[]
 }
 model InsiderAccess {
   teamId String @id
@@ -27,7 +28,8 @@ model InsiderAccess {
   fragmentB String @unique
   unlockedAt DateTime?
 }
-// Evidence Wall (Insider chapter), three independent pairs per team: a PRIVATE slip (team-specific code, in the team's envelope) fits exactly one
+// Evidence Wall (Insider chapter). CURRENT DESIGN ("group mode"): exactly ONE InsiderPair row per team = its assigned group A/B/C (10/10/10 for 30 teams), solved by its private slip + its own public wall card (InsiderWallCard.teamId).
+// LEGACY three-pair mode (three rows per team) and the older two-fragment gate (no rows) stay readable and working. Earlier design note, three independent pairs per team: a PRIVATE slip (team-specific code, in the team's envelope) fits exactly one
 // PUBLIC wall card of the team's variant. A solved pair opens its evidence folder; all three solved sets InsiderAccess.unlockedAt.
 // No row for a team = legacy two-fragment unlock (InsiderAccess.fragmentA/B), unchanged.
 model InsiderPair {
@@ -44,7 +46,10 @@ model InsiderWallCard {
   variant String
   pair String
   role String // "match" | "decoy"
+  teamId String? // group mode: the one team this match card belongs to (decoys and legacy variant-level cards: null)
+  team Team? @relation(fields: [teamId], references: [id], onDelete: Cascade)
   @@index([variant, pair])
+  @@index([teamId])
 }
 model TeamSession {
   tokenHash String @id

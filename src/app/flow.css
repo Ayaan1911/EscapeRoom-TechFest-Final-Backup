@@ -157,3 +157,33 @@
 .ew-hint { margin: 8px 0 0; font-size: 13px; color: var(--obs-sage); } .ew-status { min-height: 1.4em; margin: 8px 0 0; }
 @media (max-width: 900px) { .ew-slots { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { .ew, .ew-slots li.is-open { animation: none; } .ew-meter i { transition: none; } }
+
+/* Trail event feed (under the timeline): one page scroll, no inner scrollbars */
+.tf { margin: var(--s4, 16px) 0; }
+.tf-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 16px; margin-bottom: 8px; }
+.tf-head p { margin: 0; font-size: 13px; color: var(--obs-sage); } .tf-head b { color: var(--obs-ivory); }
+.tf-hour { position: static; margin: 14px 0 6px; font: 600 12px/1.4 var(--font-mono, monospace); letter-spacing: .06em; color: var(--obs-brass); text-transform: uppercase; }
+.tf-hour small { margin-left: 8px; color: var(--obs-sage); font-weight: 400; text-transform: none; letter-spacing: 0; }
+.tf-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.tf-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: stretch; border: 1px solid var(--obs-line); border-radius: 8px; background: rgba(17, 21, 17, .72); }
+.tf-row:hover { border-color: var(--obs-line-2); }
+.tf-row.is-pinned { border-left: 3px solid var(--obs-brass); }
+.tf-row.is-selected { border-color: var(--obs-brass); background: rgba(197, 164, 119, .09); box-shadow: inset 3px 0 0 var(--obs-brass); }
+.tf-main { display: grid; grid-template-columns: 72px 140px 112px minmax(0, 1fr) 112px; grid-template-areas: "time type out who src" ". desc desc ids ids"; gap: 4px 12px; align-items: center; padding: 8px 12px; border: 0; background: transparent; color: var(--obs-ivory); text-align: left; font: inherit; font-size: 13px; cursor: pointer; border-radius: 8px; min-width: 0; }
+.tf-main:focus-visible, .tf-inspect:focus-visible { outline: 2px solid var(--obs-brass); outline-offset: 1px; }
+.tf-time { grid-area: time; color: var(--obs-sage); } .tf-type { grid-area: type; font-weight: 600; overflow-wrap: anywhere; } .tf-main .k-badge { grid-area: out; justify-self: start; }
+.tf-who { grid-area: who; overflow-wrap: anywhere; word-break: normal; } .tf-src { grid-area: src; } .tf-desc { grid-area: desc; color: var(--obs-sage); overflow-wrap: anywhere; }
+.tf-ids { grid-area: ids; font-size: 11px; color: var(--obs-sage); overflow-wrap: anywhere; }
+.tf-inspect { align-self: center; margin-right: 8px; }
+.tf-more { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+@media (max-width: 700px) { .tf-main { grid-template-columns: 64px minmax(0, 1fr); grid-template-areas: "time type" "out out" "who who" "src src" "desc desc" "ids ids"; } }
+.ew-badge { display: grid; justify-items: center; gap: 2px; } .ew-badge b { display: grid; place-items: center; width: 54px; height: 54px; border-radius: 50%; border: 2px solid var(--obs-brass); color: var(--obs-brass); font: 700 26px var(--font-mono, monospace); }
+.ew-badge small { font: 600 11px var(--font-mono, monospace); letter-spacing: .08em; color: var(--obs-sage); }
+.ew-group .ew-badge b { background: rgba(197, 164, 119, .08); }
+.tf-key { margin: 0 0 4px; font-size: 13px; color: var(--obs-sage); } .tf-key b { color: var(--obs-ivory); }
+
+/* Trail: the event feed sits directly under the timeline in the left column; the tasks column spans both rows (wide screens only, as in workbench.css) */
+@media (min-width: 1200px) {
+  .cn-chapter[data-chapter="2"] .pg-main > .tf { grid-column: 1; }
+  .cn-chapter[data-chapter="2"] .pg-main > section.pg-tasks:not(.cn-ops) { grid-row: span 2; }
+}

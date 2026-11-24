@@ -9,7 +9,7 @@ import { ActivityTimeline } from "./case-visuals";
 import { OsDesktop, ToolWindow, useOs } from "@/components/os/os-windows";
 import { FolderSearch } from "lucide-react";
 import type { InsiderDossier, InsiderRecord } from "@/types/insider";
-import { EvidenceReconstruction } from "./evidence-reconstruction";
+import { EvidenceReconstruction, GroupMatch } from "./evidence-reconstruction";
 import { FOLDERS, PAIRS } from "@/lib/game/evidence-wall-meta";
 
 const KIND: Record<InsiderRecord["kind"], { label: string; icon: string; tone: "info" | "amber" | "alert" | "ok" | "neutral" }> = {
@@ -25,7 +25,7 @@ function InsiderWorkspace({ initialDossier, initialState, initialDrafts }: { ini
   const [dossier, setDossier] = useState(initialDossier), [loadError, setLoadError] = useState("");
   const [suspect, setSuspect] = useState(""), [kind, setKind] = useState(""), [search, setSearch] = useState(""), [selected, setSelected] = useState(""), [copyStatus, setCopyStatus] = useState("");
   const pinned = f.arr("insider.corroboration", "supportingEvidenceIds");
-  const sealed = !state.insiderUnlocked, pairs = state.insiderPairs ?? null, solvedKey = pairs ? PAIRS.filter(p => pairs[p]).join("") : "";
+  const sealed = !state.insiderUnlocked, pairs = state.insiderPairs ?? null, group = state.insiderGroup ?? null, solvedKey = pairs ? PAIRS.filter(p => pairs[p]).join("") : "";
   useEffect(() => { // legacy teams load the dossier once; teams on the three-pair wall reload it each time a folder opens
     if (!state.insiderUnlocked && !solvedKey) return;
     if (!pairs && dossier) return;
@@ -53,8 +53,9 @@ function InsiderWorkspace({ initialDossier, initialState, initialDrafts }: { ini
   const countFor = (id: string) => dossier?.records.filter(r => r.employees.includes(id)).length ?? 0;
 
   return <DeskFrame chapter={2} title="Insider" caseId="PHYSICAL + DIGITAL" state={state} remaining={remaining} drafts={drafts} result={result} connection={connection} objective="Who deliberately weakened the controls? Access shows opportunity, not intent." banner={<><StateBanner state={state} chapter={2} /><ConnectionBanner text={connection || loadError} next="/play/insider" /></>}>
+    {group && <GroupMatch group={group.group} solved={!sealed} onMatch={unlock} disabled={!editable || busy || retrySeconds > 0} feedback={feedback} />}
     {pairs && <EvidenceReconstruction pairs={pairs} onMatch={unlock} disabled={!editable || busy || retrySeconds > 0} feedback={feedback} opened={opened} />}
-    {!pairs && sealed && <section className="pg-gate-card k-gate" aria-labelledby="gate-h">
+    {!pairs && !group && sealed && <section className="pg-gate-card k-gate" aria-labelledby="gate-h">
       <div><span className="k-eyebrow">DOSSIER SEALED</span><h2 id="gate-h">Combine your two physical fragments</h2><p>Fragment A: your registration envelope. Fragment B: your team’s card on the Evidence Wall. Ask a volunteer if one is missing.</p></div>
       <form onSubmit={unlock}><fieldset disabled={!editable || busy || retrySeconds > 0}><div className="pg-fields">
         <label>Fragment A<input name="fragmentA" required maxLength={64} autoComplete="off" spellCheck={false} /></label>

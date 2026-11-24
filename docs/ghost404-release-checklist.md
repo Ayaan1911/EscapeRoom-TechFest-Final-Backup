@@ -36,6 +36,12 @@ Tick every line on the day. Any unchecked **MUST** is a no-go. Evidence for what
 - [ ] **Publish results** only when every finalist is complete (reason + confirmation). Publishing locks marks and puts the ranking on the projector.
 - [ ] Projector content: Round 1 standings and finalist names are hidden until switched on in `/admin/leaderboard` (audited).
 
+## Added by the targeted changes (2026-11-25)
+- [ ] **MUST** back up, then apply migration `20261127000000_insider_group_assignment` (additive: one nullable column on `InsiderWallCard`).
+- [ ] Once the FINAL 30 team accounts exist: `/admin/insider-kit` -> "Prepare group assignment (all teams)" ONCE; the summary must read A 10 / B 10 / C 10 and "Final split complete". Print the private fragments (envelopes) and the public wall cards (by group) from the read-only views; keep the organizer code map private. Never re-create teams after printing.
+- [ ] Chapter 1 no longer needs a QR card: do NOT print `/admin/inbox-kit`. Players use the "Open Forensic Snapshot" button.
+- [ ] Projector: sign in as organizer on the projector PC, `/admin/projector`; the Top 12 appears only after "Round 1 standings" (or finalist names) is switched on in `/admin/leaderboard`.
+
 ## No-go triggers
 - Server cannot be reached from a second PC on the lab network.
 - Any team can open another team's page or the organizer pages (should be impossible; stop and investigate).

@@ -1,5 +1,6 @@
 "use client";
 import { useRef, useState, type KeyboardEvent } from "react";
+import { useSearchParams } from "next/navigation";
 import { useChapter, type ChapterState } from "./use-chapter";
 import { useDrafts, type ServerDraft } from "./use-drafts";
 import { ChainDiagram, ConnectionBanner, DeskFrame, HintBox, ResultStrip, StateBanner, TaskPanel, fieldApi, isEditable, taskOf } from "./workspace";
@@ -48,7 +49,7 @@ function LinkInspector({ emails, onPick }: { emails: Email[]; onPick: (id: strin
 
 function InboxWorkspace({ evidence, initialState, initialDrafts }: { evidence: Omit<InboxEvidence, "snapshot">; initialState: ChapterState; initialDrafts: ServerDraft[] }) {
   const { state, busy, feedback, result, connection, send, submitTask, remaining, retrySeconds } = useChapter(0, initialState);
-  const editable = isEditable(state, 0), demo = useDemo(), os = useOs();
+  const editable = isEditable(state, 0), demo = useDemo(), os = useOs(), variantParam = useSearchParams().get("v"), qs = variantParam ? `?v=${encodeURIComponent(variantParam)}` : "";
   const drafts = useDrafts(0, initialDrafts, editable), f = fieldApi(drafts);
   const [selectedId, setSelectedId] = useState(evidence.emails[0].id);
   const [read, setRead] = useState([evidence.emails[0].id]);
@@ -90,7 +91,7 @@ function InboxWorkspace({ evidence, initialState, initialDrafts }: { evidence: O
           <strong>{item.sender}</strong><span className="k-mail-subject">{item.subject}</span>
           <span className="k-mail-flags">{marked === item.id && <Badge tone="amber">★ Breach email</Badge>}{item.attachments.length > 0 && <Badge>📎 {item.attachments.length}</Badge>}{!read.includes(item.id) && <Badge tone="info">Unread</Badge>}</span>
         </button>)}
-        <div className="pg-qr"><strong>QR forensic snapshot</strong><span>Printed card → capture ID.</span>{demo ? <a className="k-btn k-btn-primary k-btn-sm" href="/admin/inbox-kit" target="_blank" rel="noopener">Open the printed card kit ↗</a> : <a className="k-btn k-btn-primary k-btn-sm" href="/clue/inbox" target="_blank" rel="noopener">Open QR forensic snapshot ↗</a>}</div>
+        <div className="pg-qr"><strong>Forensic Snapshot</strong><span>Open the archived forensic capture and inspect the evidence.</span><a className="k-btn k-btn-primary k-btn-sm" href={demo ? `/admin/demo/round1/inbox/snapshot${qs}` : "/clue/inbox"}>Open Forensic Snapshot</a></div>
       </aside>
 
       <article className="k-viewer" aria-label="Selected email" key={email.id}>

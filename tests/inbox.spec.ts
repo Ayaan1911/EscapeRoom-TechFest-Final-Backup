@@ -25,7 +25,7 @@ test("organizer starts a waiting round and prints a scannable phone QR", async (
   const context = await browser.newContext();
   const organizer = await context.newPage();
   await login(organizer, "admin");
-  await organizer.getByRole("link", { name: "Print Chapter 1 evidence kit" }).click();
+  await organizer.getByRole("link", { name: "Chapter 1 evidence kit" }).click();
   await expect(organizer.locator("main").getByRole("alert")).toContainText("Loopback");
   await organizer.getByLabel("Application origin").fill("https://event.nexus.example");
   await organizer.getByRole("button", { name: "Generate printable QR" }).click();
@@ -79,14 +79,16 @@ for (const variant of ["A", "B", "C"] as const) test(`team ${variant} investigat
   await expect(page.getByRole("tab", { name: "Headers" })).toHaveAttribute("aria-selected", "true");
   await page.getByRole("tab", { name: "Message" }).click();
   await expect(page.getByRole("article", { name: "Selected email" }).locator('a[href^="https:"]')).toHaveCount(0);
-  const [snapshot] = await Promise.all([page.waitForEvent("popup"), page.getByRole("link", { name: "Open QR forensic snapshot" }).click()]);
-  await expect(snapshot.getByRole("heading", { name: "Captured authentication page" })).toBeVisible();
-  await expect(snapshot.locator("body")).toContainText(`CAP-${variant}-17`);
-  await expect(snapshot.locator("input, form, iframe")).toHaveCount(0);
-  await expect(snapshot.locator('a[href^="https:"]')).toHaveCount(0);
-  await snapshot.goto(`/clue/inbox?variant=${variant === "A" ? "B" : "A"}`);
-  await expect(snapshot.locator("body")).toContainText(`CAP-${variant}-17`);
-  await snapshot.close();
+  await page.getByRole("link", { name: "Open Forensic Snapshot" }).click(); // direct in-app button: same tab, no QR card, no phone
+  await expect(page.getByRole("heading", { name: "Captured authentication page" })).toBeVisible();
+  await expect(page.locator("body")).toContainText(`CAP-${variant}-17`);
+  await expect(page.locator("input, form, iframe")).toHaveCount(0);
+  await expect(page.locator('a[href^="https:"]')).toHaveCount(0);
+  await expect(page.locator("body")).not.toContainText(/scan|QR/i);
+  await page.goto(`/clue/inbox?variant=${variant === "A" ? "B" : "A"}`); // a query string cannot select another variant
+  await expect(page.locator("body")).toContainText(`CAP-${variant}-17`);
+  await page.getByRole("link", { name: /Return to Inbox/ }).click();
+  await expect(page.getByRole("heading", { name: "The Inbox", exact: true })).toBeVisible();
   await page.locator("summary", { hasText: "Hints" }).click();
   await page.getByRole("button", { name: /Reveal hint 1/ }).click();
   await expect(page.locator(".pg-hints ol li")).toHaveCount(1);

@@ -4,7 +4,8 @@ import { useChapter, type ChapterState } from "./use-chapter";
 import { useDrafts, type ServerDraft } from "./use-drafts";
 import { ChainDiagram, ConnectionBanner, DeskFrame, HintBox, ResultStrip, StateBanner, TaskPanel, fieldApi, isEditable, taskOf } from "./workspace";
 import { Badge } from "@/components/ui/kit";
-import { ActivityTimeline } from "./case-visuals";
+import { ActivityTimeline, type TLWindow } from "./case-visuals";
+import { TrailFeed } from "./trail-feed";
 import { useDemo } from "@/components/demo/demo-context";
 import { OsDesktop, ToolWindow, useOs } from "@/components/os/os-windows";
 import { FolderOpen, SearchCheck, Table2 } from "lucide-react";
@@ -29,9 +30,13 @@ function TrailWorkspace({ evidence, initialState, initialDrafts }: { evidence: T
   const drafts = useDrafts(1, initialDrafts, editable), f = fieldApi(drafts);
   const [filters, setFilters] = useState(emptyTrailFilters), [page, setPage] = useState(0), [selectedId, setSelectedId] = useState(evidence.rows[0].id), [copied, setCopied] = useState("");
   const [tamper, setTamper] = useState({ eventId: "", field: "", technique: "" });
+  const [win, setWin] = useState<TLWindow>(null), [reveal, setReveal] = useState({ id: "", n: 0 });
   const selected = evidence.rows.find(row => row.id === selectedId)!;
-  const select = (id: string) => { setSelectedId(id); os.open("inspector"); }; // picking an event anywhere opens the inspector window
+  const select = (id: string) => { setSelectedId(id); setReveal(r => ({ id, n: r.n + 1 })); os.open("inspector"); }; // a marker or console row: select it, show its feed row and open the inspector window
+  const pick = (id: string) => setSelectedId(id); // a feed row: highlights its marker only (Inspect opens the window)
   const filtered = useMemo(() => filterTrailRows(evidence.rows, filters), [evidence.rows, filters]);
+  const feedRows = useMemo(() => win ? filtered.filter(r => { const t = Date.parse(r.timestamp); return t >= win.from && (t < win.to || win.last); }) : filtered, [filtered, win]);
+  const rangeLabel = win ? `${new Date(win.from).toISOString().slice(11, 16)}–${new Date(win.to).toISOString().slice(11, 16)} UTC slice` : "whole night";
   const pages = Math.max(1, Math.ceil(filtered.length / PAGE)), visible = filtered.slice(page * PAGE, (page + 1) * PAGE);
   const pinned = f.arr("trail.corroboration", "supportingEvidenceIds");
   const active = Object.entries(filters).filter(([k, v]) => k !== "descending" && v).length;
@@ -60,7 +65,7 @@ function TrailWorkspace({ evidence, initialState, initialDrafts }: { evidence: T
         {!demo && <a className="k-btn k-btn-sm" href="/api/game/trail/csv">Download CSV</a>}
       </div>
       <ActivityTimeline label="Activity timeline" items={filtered.map(r => ({ id: r.id, at: r.timestamp, lane: r.eventType, tone: OUTCOME[r.result].tone, hint: OUTCOME[r.result].text, mark: OUTCOME[r.result].mark }))} legend={Object.values(OUTCOME).map(o => ({ tone: o.tone, label: o.text, mark: o.mark }))} selectedId={selectedId} marked={pinned}
-        highlight={sameSession} linked={sameSession} onSelect={select} note="Select a marker to open it in the Event inspector. Lines join the selected event's session. Ringed = pinned. The raw records are in the Event console." />
+        highlight={sameSession} linked={sameSession} onSelect={select} onWindow={setWin} note="Select a marker to open it in the Event inspector; the list below shows the same events. Lines join the selected event's session. Ringed = pinned. The raw records are in the Event console." />
       <div className="k-filterbar">
         {filterField("Search", <input aria-label="Search records" value={filters.search} onChange={e => updateFilters({ search: e.target.value })} placeholder="ID, session, device, text" />)}
         {filterField("User", <select aria-label="Filter by user" value={filters.account} onChange={e => updateFilters({ account: e.target.value })}><option value="">All</option>{choices("account").map(v => <option key={v}>{v}</option>)}</select>)}
@@ -72,6 +77,8 @@ function TrailWorkspace({ evidence, initialState, initialDrafts }: { evidence: T
         {filterField("To (UTC)", <input type="time" aria-label="To time" value={filters.to} onChange={e => updateFilters({ to: e.target.value })} />)}
       </div>
     </section>
+
+    <TrailFeed rows={feedRows} total={evidence.rows.length} selectedId={selectedId} pinned={pinned} reveal={reveal} rangeLabel={rangeLabel} onSelect={pick} onInspect={select} />
 
     <ToolWindow id="console" title="Event console" icon={Table2} size={{ w: 760, h: 580 }}>
     <div className="k-tablecard" role="region" aria-label="Authentication events"><div className="k-tablescroll" tabIndex={0} aria-label="Event table, scrollable"><table className="k-table pg-table"><caption className="k-sr">Authentication events. Select a row to inspect it.</caption>

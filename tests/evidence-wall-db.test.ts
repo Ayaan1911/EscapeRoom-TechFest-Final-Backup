@@ -3,163 +3,152 @@ import { createTempDatabase } from "../scripts/pg-temp.mjs";
 import { hashPassword } from "../src/lib/password.mjs";
 import { initialProgress } from "../src/lib/game/engine";
 
-// Three-pair Evidence Wall (Insider chapter). Disposable local PostgreSQL only (GHOST_DB_TEST=1).
+// Evidence Wall GROUP MODE: one assigned group A/B/C per team (30 teams -> 10/10/10). Disposable local PostgreSQL only (GHOST_DB_TEST=1).
 const jar = vi.hoisted(() => new Map<string, string>());
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: (key: string) => jar.has(key) ? { value: jar.get(key) } : undefined, set: (key: string, value: string) => jar.set(key, value), delete: (key: string) => jar.delete(key) }) }));
 
-describe.skipIf(process.env.GHOST_DB_TEST !== "1")("Evidence Wall: three public/private pairs (PostgreSQL)", { timeout: 180_000 }, () => {
+describe.skipIf(process.env.GHOST_DB_TEST !== "1")("Evidence Wall: one assigned group per team (PostgreSQL)", { timeout: 180_000 }, () => {
   let temp: Awaited<ReturnType<typeof createTempDatabase>>;
-  let db: typeof import("../src/lib/db").db, auth: typeof import("../src/lib/auth"), svc: typeof import("../src/lib/game/service"), kit: typeof import("../src/lib/game/insider-kit.server"), wall: typeof import("../src/lib/game/evidence-wall.server");
+  let db: typeof import("../src/lib/db").db, auth: typeof import("../src/lib/auth"), svc: typeof import("../src/lib/game/service"), kit: typeof import("../src/lib/game/insider-kit.server");
   let route: typeof import("../src/app/api/game/insider/route"), dossierOf: typeof import("../src/lib/game/insider.server").insiderDossier, demo: typeof import("../src/lib/demo/demo.server");
   const code = "temporary-test-access-only";
-  const teams: [string, string][] = [["E01", "A"], ["E02", "A"], ["E03", "B"], ["E04", "C"], ["L01", "A"], ["L02", "A"]];
-  type Sheets = NonNullable<Awaited<ReturnType<typeof kit.insiderPairSheets>>>;
+  const ids = Array.from({ length: 30 }, (_, i) => `G${String(i + 1).padStart(2, "0")}`);
+  const variantOfIndex = (i: number) => ["A", "B", "C"][i % 3];
+  type Sheets = NonNullable<Awaited<ReturnType<typeof kit.insiderGroupSheets>>>;
   let sheets: Sheets;
   const asTeam = async (id: string) => { await auth.logout(); expect(await auth.login("team", id, code)).toBe(true); };
   const asAdmin = async () => { await auth.logout(); expect(await auth.login("admin", "organizer", code)).toBe(true); };
-  const slip = (team: string, pair: string) => sheets.slips.find(s => s.teamId === team && s.pair === pair)!.code;
-  const card = (variant: string, pair: string, role = "match", n = 0) => sheets.wall.filter(c => c.variant === variant && c.pair === pair && c.role === role)[n].code;
-  const variantOf = (id: string) => teams.find(t => t[0] === id)![1];
-  /** One unlock attempt as the team. The 3-second spacing rule is real; the test backdates its own submissions instead of sleeping. */
-  async function attempt(team: string, payload: unknown) { await db.submission.updateMany({ where: { teamId: team }, data: { createdAt: new Date(Date.now() - 10_000) } }); return svc.mutateTeam(team, 2, "unlock", payload) as Promise<{ unlocked?: boolean; matched?: boolean; pair?: string; already?: boolean; error?: string }>; }
-  const solvedOf = async (team: string) => (await svc.teamState(team)).insiderPairs;
+  const slip = (team: string) => sheets.slips.find(s => s.teamId === team)!;
+  const matchCard = (team: string) => sheets.wall.find(c => c.teamId === team && c.role === "match")!;
+  const decoy = (group: string, n = 0) => sheets.wall.filter(c => c.group === group && c.role === "decoy")[n];
+  async function attempt(team: string, payload: unknown) { await db.submission.updateMany({ where: { teamId: team }, data: { createdAt: new Date(Date.now() - 10_000) } }); return svc.mutateTeam(team, 2, "unlock", payload) as Promise<{ unlocked?: boolean; matched?: boolean; pair?: string; already?: boolean; groupMode?: boolean; error?: string }>; }
   const progressOf = async (team: string) => (await db.team.findUniqueOrThrow({ where: { id: team } })).progress;
-  const dossierFor = async (team: string) => { await asTeam(team); const r = await route.GET(); return { code: r.status, body: await r.json() as { unlocked?: boolean; pairs?: unknown; dossier: null | { suspects: unknown[]; records: { id: string; kind: string }[] } } }; };
+  const dossierFor = async (team: string) => { await asTeam(team); const r = await route.GET(); return { code: r.status, body: await r.json() as { unlocked?: boolean; pairs?: unknown; group?: { group: string; solved: boolean }; dossier: null | { suspects: unknown[]; records: { id: string; kind: string }[] } } }; };
+  const mkTeam = async (id: string, variant: string) => { const p = initialProgress(); p.chapters[0].score = 15; p.chapters[0].unlockedAt = Date.now() - 500_000; p.chapters[1].score = 25; p.chapters[1].unlockedAt = Date.now() - 400_000; p.chapters[2].unlockedAt = Date.now() - 300_000; await db.team.create({ data: { id, name: `Team ${id}`, participants: "[]", codeHash: hashPassword(code), variant, progress: JSON.stringify(p) } }); };
 
   beforeAll(async () => {
-    temp = await createTempDatabase("wall");
+    temp = await createTempDatabase("wallgroups");
     process.env.DATABASE_URL = temp.url; process.env.DIRECT_URL = temp.url; process.env.ADMIN_ACCESS_HASH = hashPassword(code); process.env.APP_ORIGIN = "http://127.0.0.1:3000";
-    ({ db } = await import("../src/lib/db")); auth = await import("../src/lib/auth"); svc = await import("../src/lib/game/service"); kit = await import("../src/lib/game/insider-kit.server"); wall = await import("../src/lib/game/evidence-wall.server");
+    ({ db } = await import("../src/lib/db")); auth = await import("../src/lib/auth"); svc = await import("../src/lib/game/service"); kit = await import("../src/lib/game/insider-kit.server");
     route = await import("../src/app/api/game/insider/route"); dossierOf = (await import("../src/lib/game/insider.server")).insiderDossier; demo = await import("../src/lib/demo/demo.server");
     await db.gameSession.create({ data: { id: 1, startsAt: new Date(Date.now() - 600_000), deadline: new Date(Date.now() + 3_000_000), scoringPolicy: "best-v1" } });
-    for (const [id, variant] of teams) { const p = initialProgress(); p.chapters[0].score = 15; p.chapters[0].unlockedAt = Date.now() - 500_000; p.chapters[1].score = 25; p.chapters[1].unlockedAt = Date.now() - 400_000; p.chapters[2].unlockedAt = Date.now() - 300_000; await db.team.create({ data: { id, name: `Team ${id}`, participants: "[]", codeHash: hashPassword(code), variant, progress: JSON.stringify(p) } }); }
-    // legacy rows exactly as before this feature: fragments known, L01 already unlocked, no pair rows
-    await db.insiderAccess.create({ data: { teamId: "L01", fragmentA: "A-111111-222222-333333-444444", fragmentB: "B-555555-666666-777777-888888", unlockedAt: new Date() } });
-    await db.insiderAccess.create({ data: { teamId: "L02", fragmentA: "A-AAAAAA-BBBBBB-CCCCCC-DDDDDD", fragmentB: "B-EEEEEE-FFFFFF-000000-111111" } });
-    await asAdmin(); sheets = (await kit.insiderPairSheets(["E01", "E02", "E03", "E04"]))!;
+    for (const [i, id] of ids.entries()) await mkTeam(id, variantOfIndex(i));
+    await asAdmin(); sheets = (await kit.insiderGroupSheets())!;
   });
   afterAll(async () => { await db?.$disconnect(); await temp?.drop(); });
 
-  it("organizer code sheets: 3 private slips per team, 1 match + 2 decoys per pair per variant, stable on reprint, organizer-only", async () => {
-    expect(sheets.slips).toHaveLength(12); expect(new Set(sheets.slips.map(s => s.code)).size).toBe(12);
-    expect(sheets.wall).toHaveLength(27); expect(sheets.wall.filter(c => c.role === "match")).toHaveLength(9); expect(sheets.wall.filter(c => c.role === "decoy")).toHaveLength(18);
-    for (const v of ["A", "B", "C"]) for (const p of ["A", "B", "C"]) { expect(card(v, p, "match")).toMatch(/^W-/); expect(sheets.wall.filter(c => c.variant === v && c.pair === p && c.role === "match")).toHaveLength(1); }
-    expect(sheets.slips.every(s => /^P-(?:[A-F0-9]{6}-){3}[A-F0-9]{6}$/.test(s.code))).toBe(true);
-    const again = (await kit.insiderPairSheets(["E01", "E02", "E03", "E04"]))!; expect(again.slips.map(s => s.code)).toEqual(sheets.slips.map(s => s.code)); expect(again.wall.map(c => c.code)).toEqual(sheets.wall.map(c => c.code));
-    await auth.logout(); expect(await kit.insiderPairSheets()).toBeNull(); await asTeam("E01"); expect(await kit.insiderPairSheets()).toBeNull();
-    expect(await db.insiderPair.count()).toBe(12); // no pairs for teams that were not prepared
+  it("30 teams are split exactly 10 / 10 / 10, each team holds ONE private fragment and has ONE matching public card", async () => {
+    const count = (g: string) => sheets.slips.filter(s => s.group === g).length;
+    expect([count("A"), count("B"), count("C")]).toEqual([10, 10, 10]);
+    expect(sheets.slips).toHaveLength(30); expect(new Set(sheets.slips.map(s => s.teamId)).size).toBe(30); expect(await db.insiderPair.count()).toBe(30);
+    expect(sheets.summary).toMatchObject({ teams: 30, prepared: 30, unassigned: 0, counts: { A: 10, B: 10, C: 10 }, final: true, balanced: true });
+    const matches = sheets.wall.filter(c => c.role === "match");
+    expect(matches).toHaveLength(30); expect(new Set(matches.map(c => c.teamId)).size).toBe(30); // exactly one counterpart per team
+    for (const s of sheets.slips) expect(matchCard(s.teamId).group).toBe(s.group); // the counterpart sits in the team's own group
+    expect(sheets.wall.filter(c => c.role === "decoy")).toHaveLength(6); // two lookalikes per group, shared; no hundreds of cards
+    const all = [...sheets.slips.map(s => s.code), ...sheets.wall.map(c => c.code)]; expect(new Set(all).size).toBe(all.length);
+    expect(sheets.slips.every(s => /^P-(?:[A-F0-9]{6}-){3}[A-F0-9]{6}$/.test(s.code))).toBe(true); expect(sheets.wall.every(c => /^W-(?:[A-F0-9]{6}-){3}[A-F0-9]{6}$/.test(c.code))).toBe(true);
   });
 
-  it("every evidence folder is non-empty for every variant (each reveal has a real purpose) and the three folders partition the dossier", () => {
-    for (const v of ["A", "B", "C"]) {
-      const d = dossierOf(v), by = (pair: "A" | "B" | "C") => d.records.filter(r => wall.FOLDERS[pair].kinds.includes(r.kind));
-      for (const p of ["A", "B", "C"] as const) expect(by(p).length, `variant ${v} folder ${p}`).toBeGreaterThan(0);
-      expect(by("A").length + by("B").length + by("C").length).toBe(d.records.length);
-    }
+  it("the assignment is not a team-ID pattern, is saved once, and is unchanged by re-running preparation or reprinting", async () => {
+    const byId = ids.map(id => slip(id).group);
+    expect(byId.join("")).not.toBe(ids.map((_, i) => "ABC"[i % 3]).join("")); expect(byId.join("")).not.toBe("A".repeat(10) + "B".repeat(10) + "C".repeat(10)); // shuffled, not round-robin or blocks
+    const again = (await kit.insiderGroupSheets())!; await asAdmin();
+    expect(again.slips).toEqual(sheets.slips); expect(again.wall).toEqual(sheets.wall); // same groups, same codes, same decoys
+    const reprint = (await kit.insiderGroupSheets(undefined, { prepare: false }))!; expect(reprint.slips).toEqual(sheets.slips);
+    expect(await db.insiderPair.count()).toBe(30); expect(await db.insiderWallCard.count()).toBe(36);
+    await auth.logout(); expect(await kit.insiderGroupSheets()).toBeNull(); expect(await kit.insiderGroupOverview()).toBeNull(); await asTeam("G01"); expect(await kit.insiderGroupSheets()).toBeNull(); // organizer-only
   });
 
-  it("correct pairing A, B and C each open their own folder, one at a time", async () => {
-    await asTeam("E01");
-    expect(await solvedOf("E01")).toEqual({ A: false, B: false, C: false });
-    expect(await attempt("E01", { privateCode: slip("E01", "A"), publicCode: card("A", "A") })).toMatchObject({ matched: true, pair: "A", unlocked: false });
-    expect(await solvedOf("E01")).toEqual({ A: true, B: false, C: false });
-    expect(await attempt("E01", { privateCode: slip("E01", "B"), publicCode: card("A", "B") })).toMatchObject({ matched: true, pair: "B", unlocked: false });
-    expect(await solvedOf("E01")).toEqual({ A: true, B: true, C: false });
+  it("the correct private fragment + its own public card opens the whole dossier at once, with no other pair required", async () => {
+    await asTeam("G01"); const t = slip("G01"), before = await progressOf("G01"), scoreBefore = (await svc.teamState("G01")).score;
+    const state0 = await svc.teamState("G01"); expect(state0.insiderGroup).toEqual({ group: t.group, solved: false }); expect(state0.insiderPairs).toBeNull(); expect(state0.insiderUnlocked).toBe(false);
+    const r = await attempt("G01", { privateCode: t.code, publicCode: matchCard("G01").code });
+    expect(r).toMatchObject({ matched: true, unlocked: true, pair: t.group, groupMode: true, already: false });
+    const s = await svc.teamState("G01"); expect(s.insiderUnlocked).toBe(true); expect(s.insiderGroup).toEqual({ group: t.group, solved: true });
+    const d = await dossierFor("G01"); expect(d.code).toBe(200); expect(d.body.unlocked).toBe(true); expect(d.body.dossier!.records).toHaveLength(dossierOf(s.variant).records.length); // every folder, not one third
+    expect(d.body.dossier!.suspects.length).toBeGreaterThan(0); expect(d.body.group).toEqual({ group: t.group, solved: true }); expect(d.body.pairs).toBeUndefined();
+    expect(await progressOf("G01")).toBe(before); expect(s.score).toBe(scoreBefore); // the match scores nothing and changes no chapter state
+    expect(await db.auditLog.count({ where: { actor: "G01", action: "dossier-unlock" } })).toBe(1);
   });
 
-  it("each solved pair opens ONLY its own folder in the participant API (staff profiles after the first)", async () => {
-    const d = await dossierFor("E01"); expect(d.code).toBe(200); expect(d.body.unlocked).toBe(false);
-    const kinds = new Set(d.body.dossier!.records.map(r => r.kind)); expect([...kinds].sort()).toEqual(["access", "approval", "custody", "policy"]); // A + B folders only
-    expect(kinds.has("message")).toBe(false); expect(kinds.has("timeline")).toBe(false); expect(d.body.dossier!.suspects.length).toBeGreaterThan(0);
+  it("progress persists across a refresh, a new session and a re-login; a repeat is harmless", async () => {
+    for (let i = 0; i < 2; i++) { const d = await dossierFor("G01"); expect(d.body.unlocked).toBe(true); expect(d.body.group?.solved).toBe(true); expect(d.body.dossier).not.toBeNull(); }
+    const t = slip("G01"), audits = await db.auditLog.count({ where: { actor: "G01", action: "pair-solve" } });
+    expect(await attempt("G01", { privateCode: t.code, publicCode: matchCard("G01").code })).toMatchObject({ unlocked: true }); // already unlocked: no error, no duplicate audit
+    expect(await db.auditLog.count({ where: { actor: "G01", action: "pair-solve" } })).toBe(audits);
   });
 
-  it("wrong combinations never validate: A+B, A+C, B+A, a decoy, a card from another variant, garbage", async () => {
-    await asTeam("E02");
-    for (const [priv, pub, why] of [[slip("E02", "A"), card("A", "B"), "A+B"], [slip("E02", "A"), card("A", "C"), "A+C"], [slip("E02", "B"), card("A", "A"), "B+A"], [slip("E02", "C"), card("A", "A"), "C+A"],
-      [slip("E02", "A"), card("A", "A", "decoy", 0), "decoy of A"], [slip("E02", "A"), card("A", "A", "decoy", 1), "second decoy"], [slip("E02", "A"), card("B", "A"), "match of ANOTHER variant"], [slip("E02", "A"), "W-000000-000000-000000-000000", "unknown wall code"],
-      ["not a code", card("A", "A"), "malformed"], [slip("E02", "A"), slip("E02", "A"), "slip typed as wall card"]]) {
-      const r = await attempt("E02", { privateCode: priv, publicCode: pub }); expect(r.matched, why).toBe(false); expect(r.unlocked, why).toBe(false);
-    }
-    expect(await attempt("E02", { privateCode: slip("E02", "A"), publicCode: card("A", "A"), extra: 1 })).toMatchObject({ matched: false }); // strict payload
-    expect(await solvedOf("E02")).toEqual({ A: false, B: false, C: false });
-    expect(await db.submission.count({ where: { teamId: "E02", reason: "fragment-rejected" } })).toBeGreaterThanOrEqual(10); // rejections are recorded, never counted as progress
+  it("wrong combinations never validate: letter only, a decoy, another team's card, another group's card, someone else's fragment, garbage, extra fields", async () => {
+    await asTeam("G02"); const t = slip("G02"), mine = matchCard("G02").code;
+    const sameGroupOther = ids.find(id => id !== "G02" && slip(id).group === t.group)!, otherGroup = ids.find(id => slip(id).group !== t.group)!;
+    for (const [priv, pub, why] of [
+      [t.code, t.group, "group letter only"], [t.group, mine, "letter as slip"], [t.code, decoy(t.group, 0).code, "decoy"], [t.code, decoy(t.group, 1).code, "second decoy"],
+      [t.code, matchCard(sameGroupOther).code, "another team's card, same group"], [t.code, matchCard(otherGroup).code, "a card of another group"],
+      [slip(sameGroupOther).code, mine, "another team's fragment with my own card"], [t.code, "W-000000-000000-000000-000000", "unknown card"], ["not a code", mine, "malformed"], [t.code, t.code, "slip typed as wall card"],
+    ] as const) { const r = await attempt("G02", { privateCode: priv, publicCode: pub }); expect(r.matched, why).toBe(false); expect(r.unlocked, why).toBe(false); }
+    expect(await attempt("G02", { privateCode: t.code, publicCode: mine, extra: 1 })).toMatchObject({ matched: false }); // strict payload
+    const s = await svc.teamState("G02"); expect(s.insiderUnlocked).toBe(false); expect(s.insiderGroup?.solved).toBe(false);
+    expect((await dossierFor("G02")).body.dossier).toBeNull();
+    expect(await db.submission.count({ where: { teamId: "G02", reason: "fragment-rejected" } })).toBeGreaterThanOrEqual(11);
   });
 
-  it("the same answer in a different format still matches (case, spaces, hyphens), and a repeat is harmless", async () => {
-    const loose = (c: string) => c.toLowerCase().replace(/-/g, " ");
-    const first = await attempt("E02", { privateCode: loose(slip("E02", "C")), publicCode: ` ${card("A", "C").toLowerCase()} ` }); expect(first).toMatchObject({ matched: true, pair: "C", already: false });
-    const auditBefore = await db.auditLog.count({ where: { actor: "E02", action: "pair-solve" } });
-    const again = await attempt("E02", { privateCode: slip("E02", "C"), publicCode: card("A", "C") }); expect(again).toMatchObject({ matched: true, pair: "C", already: true });
-    expect(await db.auditLog.count({ where: { actor: "E02", action: "pair-solve" } })).toBe(auditBefore); // no duplicate record
-    expect(await solvedOf("E02")).toEqual({ A: false, B: false, C: true });
+  it("the same answer in another format (case, spaces, hyphens) matches", async () => {
+    await asTeam("G02"); const loose = (c: string) => c.toLowerCase().replace(/-/g, " ");
+    expect(await attempt("G02", { privateCode: loose(slip("G02").code), publicCode: ` ${matchCard("G02").code.toLowerCase()} ` })).toMatchObject({ matched: true, unlocked: true });
   });
 
-  it("progress survives a refresh: state is read from the server every time", async () => {
-    expect(await solvedOf("E01")).toEqual({ A: true, B: true, C: false });
-    const again = await dossierFor("E01"); expect(again.body.pairs).toEqual({ A: true, B: true, C: false });
+  it("team isolation: team B cannot use team A's fragment or card, and nothing changes for either", async () => {
+    await asTeam("G03"); const a = ids.find(id => id !== "G03" && slip(id).group === slip("G03").group && id !== "G01" && id !== "G02")!;
+    expect((await attempt("G03", { privateCode: slip(a).code, publicCode: matchCard(a).code })).matched).toBe(false); // both of A's pieces
+    expect((await attempt("G03", { privateCode: slip("G03").code, publicCode: matchCard(a).code })).matched).toBe(false);
+    expect((await svc.teamState(a)).insiderGroup?.solved).toBe(false); expect((await svc.teamState("G03")).insiderGroup?.solved).toBe(false);
   });
 
-  it("a team cannot unlock another team's evidence: its own wall card with someone else's slip fails and changes nothing", async () => {
-    await asTeam("E02");
-    const r = await attempt("E02", { privateCode: slip("E01", "C"), publicCode: card("A", "C") }); expect(r.matched).toBe(false); // E01's slip, correct card
-    expect(await solvedOf("E01")).toEqual({ A: true, B: true, C: false }); expect(await solvedOf("E02")).toEqual({ A: false, B: false, C: true });
+  it("scored tasks stay sealed until the match; the existing task flow opens afterwards", async () => {
+    await asTeam("G04"); const early = await svc.mutateTeam("G04", 2, "submit", { employeeId: "EMP-A-01" }, "insider.suspect") as { error?: string }; expect(early.error).toMatch(/Unlock the dossier/);
+    await attempt("G04", { privateCode: slip("G04").code, publicCode: matchCard("G04").code });
+    await db.submission.updateMany({ where: { teamId: "G04" }, data: { createdAt: new Date(Date.now() - 10_000) } });
+    const ok = await svc.mutateTeam("G04", 2, "submit", { employeeId: "EMP-A-01" }, "insider.suspect") as { error?: string }; expect(ok.error ?? "").not.toMatch(/Unlock the dossier/);
   });
 
-  it("different teams solving at the same moment do not interfere", async () => {
-    const [x, y] = await Promise.all([attempt("E03", { privateCode: slip("E03", "A"), publicCode: card("B", "A") }), attempt("E04", { privateCode: slip("E04", "B"), publicCode: card("C", "B") })]);
-    expect(x).toMatchObject({ matched: true, pair: "A" }); expect(y).toMatchObject({ matched: true, pair: "B" });
-    expect(await solvedOf("E03")).toEqual({ A: true, B: false, C: false }); expect(await solvedOf("E04")).toEqual({ A: false, B: true, C: false });
-    expect((await attempt("E03", { privateCode: slip("E03", "A"), publicCode: card("C", "A") })).matched).toBe(false); // variant C's card is not E03's (variant B)
-  });
-
-  it("scored submissions stay sealed until all three folders are open; no progress or chapter state changes while matching", async () => {
-    const before = await progressOf("E01");
-    await asTeam("E01"); const early = await svc.mutateTeam("E01", 2, "submit", { employeeId: "EMP-A-01" }, "insider.suspect") as { error?: string }; expect(early.error).toMatch(/Unlock the dossier/);
-    expect(await progressOf("E01")).toBe(before); // matching and the refused submission touched no score, hint or chapter unlock
-    const state = await svc.teamState("E01"); expect(state.insiderUnlocked).toBe(false); expect(state.unlocked[2]).toBe(true);
-  });
-
-  it("completion at 3/3 opens the whole dossier once, without submitting anything or changing the score", async () => {
-    const before = await progressOf("E01"), scoreBefore = (await svc.teamState("E01")).score;
-    const r = await attempt("E01", { privateCode: slip("E01", "C"), publicCode: card("A", "C") });
-    expect(r).toMatchObject({ matched: true, pair: "C", unlocked: true });
-    expect(await solvedOf("E01")).toEqual({ A: true, B: true, C: true }); expect((await svc.teamState("E01")).insiderUnlocked).toBe(true);
-    expect(await progressOf("E01")).toBe(before); expect((await svc.teamState("E01")).score).toBe(scoreBefore);
-    expect(await db.auditLog.count({ where: { actor: "E01", action: "dossier-unlock" } })).toBe(1);
-    const d = await dossierFor("E01"); expect(d.body.unlocked).toBe(true); expect(d.body.dossier!.records).toHaveLength(dossierOf("A").records.length);
-    await db.submission.updateMany({ where: { teamId: "E01" }, data: { createdAt: new Date(Date.now() - 10_000) } });
-    const ok = await svc.mutateTeam("E01", 2, "submit", { employeeId: "EMP-A-01" }, "insider.suspect") as { error?: string }; expect(ok.error ?? "").not.toMatch(/Unlock the dossier/); // the existing task flow is now reachable
-  });
-
-  it("direct access without a solved pair gets no evidence; anonymous and locked-chapter callers are refused", async () => {
-    await auth.logout(); expect((await route.GET()).status).toBe(401);
-    const none = await dossierFor("E04"); expect(none.code).toBe(200); expect(none.body.dossier).not.toBeNull(); // E04 solved one pair: only that folder
-    expect([...new Set(none.body.dossier!.records.map(r => r.kind))].sort()).toEqual(wall.FOLDERS.B.kinds.slice().sort());
-    await db.team.create({ data: { id: "E05", name: "No pairs solved", participants: "[]", codeHash: hashPassword(code), variant: "A", progress: JSON.stringify(Object.assign(initialProgress(), { chapters: initialProgress().chapters.map((c, i) => i < 2 ? { ...c, score: i === 0 ? 15 : 25, unlockedAt: 1 } : { ...c, unlockedAt: 1 }) })) } });
-    await asAdmin(); await kit.insiderPairSheets(["E05"]); await asTeam("E05"); const blank = await route.GET(); expect(blank.status).toBe(200); expect((await blank.json()).dossier).toBeNull(); // issued, nothing solved: nothing shown
-    const locked = await dossierFor("L02"); expect(locked.body.dossier).toBeNull();
-  });
-
-  // note: round2.role in the team state is the unrelated Round 2 eligibility flag, hence the precise pattern below
-  it("no solution leaks through participant responses: no slip code, wall code, pairing or card role", async () => {
+  it("no solution leaks through participant responses: no code, no card role, no other team's group", async () => {
     const all = [...sheets.slips.map(s => s.code), ...sheets.wall.map(c => c.code)];
-    for (const team of ["E01", "E02", "E03", "E04"]) {
+    for (const team of ["G05", "G06"]) {
       await asTeam(team);
-      const bodies = [JSON.stringify(await svc.teamState(team)), await (await route.GET()).text(), JSON.stringify(await attempt(team, { privateCode: slip(team, "A"), publicCode: card(variantOf(team), "B") }))];
-      for (const body of bodies) { for (const c of all) expect(body).not.toContain(c); expect(body).not.toMatch(/"role":"(?:match|decoy)"|decoy|privateCode|publicCode|wallCard|insiderWall|insiderPair/i); }
+      const bodies = [JSON.stringify(await svc.teamState(team)), await (await route.GET()).text(), JSON.stringify(await attempt(team, { privateCode: slip(team).code, publicCode: decoy(slip(team).group).code }))];
+      for (const body of bodies) { for (const c of all) expect(body).not.toContain(c); expect(body).not.toMatch(/"role":"(?:match|decoy)"|decoy|privateCode|publicCode|wallCard|insiderWall/i); }
     }
   });
 
-  it("legacy compatibility: a team with no pairs keeps its unlocked dossier and the two-fragment unlock; pair teams cannot use it as a bypass", async () => {
-    await asTeam("L01"); const done = await dossierFor("L01"); expect(done.body.unlocked).toBe(true); expect(done.body.pairs).toBeUndefined(); /* legacy response shape is unchanged */ expect(done.body.dossier!.records).toHaveLength(dossierOf("A").records.length); // already unlocked stays unlocked
-    expect(await attempt("L02", { fragmentA: "A-111111-222222-333333-444444", fragmentB: "B-EEEEEE-FFFFFF-000000-111111" })).toMatchObject({ unlocked: false }); // wrong pair
-    expect(await attempt("L02", { fragmentA: "A-AAAAAA-BBBBBB-CCCCCC-DDDDDD", fragmentB: "B-EEEEEE-FFFFFF-000000-111111" })).toMatchObject({ unlocked: true });
-    const legacy = await db.insiderAccess.findUniqueOrThrow({ where: { teamId: "E02" } }); // E02 has pairs; its legacy fragments exist but must not open anything
-    const r = await attempt("E02", { fragmentA: legacy.fragmentA, fragmentB: legacy.fragmentB }); expect(r.unlocked).toBe(false); expect((await svc.teamState("E02")).insiderUnlocked).toBe(false);
+  it("legacy data stays safe: a three-pair team and a two-fragment team keep working and are not converted by preparation", async () => {
+    await mkTeam("T3", "A"); await mkTeam("L1", "A"); await mkTeam("L2", "B");
+    // an earlier three-pair team (rows exactly as the previous release wrote them) with its variant-level cards
+    await db.insiderAccess.create({ data: { teamId: "T3", fragmentA: "A-333333-333333-333333-333333", fragmentB: "B-333333-333333-333333-333333" } });
+    await db.insiderPair.createMany({ data: (["A", "B", "C"] as const).map(pair => ({ teamId: "T3", pair, privateCode: `P-${pair.repeat(6)}-${pair.repeat(6)}-${pair.repeat(6)}-${pair.repeat(6)}`.replace(/[^A-F0-9P-]/g, "A") })) });
+    const cardA = "W-AAAAAA-AAAAAA-AAAAAA-AAAAAA"; await db.insiderWallCard.create({ data: { code: cardA, variant: "A", pair: "A", role: "match" } });
+    await db.insiderAccess.create({ data: { teamId: "L1", fragmentA: "A-111111-222222-333333-444444", fragmentB: "B-555555-666666-777777-888888", unlockedAt: new Date() } });
+    await db.insiderAccess.create({ data: { teamId: "L2", fragmentA: "A-AAAAAA-BBBBBB-CCCCCC-DDDDDD", fragmentB: "B-EEEEEE-FFFFFF-000000-111111" } });
+    await asAdmin(); const after = (await kit.insiderGroupSheets(["G01", "G02"]))!; // preparing selected teams touches nobody else
+    expect(after.slips).toHaveLength(30); expect(await db.insiderPair.count({ where: { teamId: { in: ["L1", "L2"] } } })).toBe(0); expect(await db.insiderPair.count({ where: { teamId: "T3" } })).toBe(3);
+    const o = (await kit.insiderGroupOverview())!; expect(o).toMatchObject({ teams: 33, prepared: 30, unassigned: 2, legacy: 1, final: false }); // demonstration roster is labelled, not "final"
+    // three-pair team: one solved pair opens only its folder (as before), the legacy API shape is unchanged
+    await asTeam("T3"); expect((await svc.teamState("T3")).insiderPairs).toEqual({ A: false, B: false, C: false }); expect((await svc.teamState("T3")).insiderGroup).toBeNull();
+    expect(await attempt("T3", { privateCode: "P-AAAAAA-AAAAAA-AAAAAA-AAAAAA", publicCode: cardA })).toMatchObject({ matched: true, pair: "A", unlocked: false });
+    expect((await dossierFor("T3")).body.pairs).toEqual({ A: true, B: false, C: false });
+    // two-fragment teams: unchanged gate
+    const l1 = await dossierFor("L1"); expect(l1.body.unlocked).toBe(true); expect(l1.body.pairs).toBeUndefined(); expect(l1.body.group).toBeUndefined();
+    expect(await attempt("L2", { fragmentA: "A-111111-222222-333333-444444", fragmentB: "B-EEEEEE-FFFFFF-000000-111111" })).toMatchObject({ unlocked: false });
+    expect(await attempt("L2", { fragmentA: "A-AAAAAA-BBBBBB-CCCCCC-DDDDDD", fragmentB: "B-EEEEEE-FFFFFF-000000-111111" })).toMatchObject({ unlocked: true });
+    // a group team cannot use its legacy fragments as a bypass
+    const legacy = await db.insiderAccess.findUniqueOrThrow({ where: { teamId: "G07" } }); const r = await attempt("G07", { fragmentA: legacy.fragmentA, fragmentB: legacy.fragmentB }); expect(r.unlocked).toBe(false); expect((await svc.teamState("G07")).insiderUnlocked).toBe(false);
+    // preparing all teams later assigns the two-fragment teams but never touches the three-pair team
+    await asAdmin(); const full = (await kit.insiderGroupSheets())!; expect(full.slips.some(s => s.teamId === "T3")).toBe(false); expect(full.slips.some(s => s.teamId === "L1") && full.slips.some(s => s.teamId === "L2")).toBe(true);
+    expect(full.summary.balanced).toBe(true); for (const id of ids) expect(full.slips.find(s => s.teamId === id)!.group).toBe(slip(id).group); // the 30 earlier assignments did not move
   });
 
-  it("Demo Mode stays isolated: its simulated chapter state has no pairs and the kit/solve code never ran for it", async () => {
-    const s = demo.demoChapterState() as { insiderUnlocked?: boolean; insiderPairs?: unknown }; expect(s.insiderUnlocked).toBe(true); expect(s.insiderPairs ?? null).toBeNull();
-    const pairsBefore = await db.insiderPair.count(), wallBefore = await db.insiderWallCard.count(); void demo.demoChapterState(); expect(await db.insiderPair.count()).toBe(pairsBefore); expect(await db.insiderWallCard.count()).toBe(wallBefore);
+  it("Demo Mode stays isolated: its simulated chapter state has no group and nothing is written", async () => {
+    const s = demo.demoChapterState() as { insiderUnlocked?: boolean; insiderGroup?: unknown }; expect(s.insiderUnlocked).toBe(true); expect(s.insiderGroup ?? null).toBeNull();
+    const pairs = await db.insiderPair.count(), cards = await db.insiderWallCard.count(); void demo.demoChapterState(); expect(await db.insiderPair.count()).toBe(pairs); expect(await db.insiderWallCard.count()).toBe(cards);
   });
 });

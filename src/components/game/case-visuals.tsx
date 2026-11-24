@@ -2,17 +2,19 @@
 /* Evidence visuals shared by the chapter desks. Presentation only: every input is data the player can already see, or a choice the player made.
    Nothing here decides what is correct; links are drawn only between records the player pinned/selected. */
 import type { ReactNode } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 export type Tone = "ok" | "alert" | "amber" | "info" | "neutral";
 export type TLItem = { id: string; at: string; lane: string; tone?: Tone; hint?: string; mark?: string };
 export type TLLegend = { tone: Tone; label: string; mark?: string }[];
+/** The zoomed time slice (epoch ms, `last` = upper bound inclusive), or null for the whole night. */
+export type TLWindow = { from: number; to: number; last: boolean } | null;
 const BUCKETS = 24;
 
 /** Event explorer: an activity overview (events per time slice; select a slice to zoom), then one lane per event type where every
  *  marker is one real event at its real timestamp (shape + colour from the legend). The connector joins only the `linked` ids. */
-export function ActivityTimeline({ label, items, selectedId, marked = [], linked = [], highlight = [], onSelect, note, legend }: {
-  label: string; items: TLItem[]; selectedId?: string; marked?: readonly string[]; linked?: readonly string[]; highlight?: readonly string[]; onSelect: (id: string) => void; note?: ReactNode; legend?: TLLegend;
+export function ActivityTimeline({ label, items, selectedId, marked = [], linked = [], highlight = [], onSelect, note, legend, onWindow }: {
+  onWindow?: (w: TLWindow) => void; label: string; items: TLItem[]; selectedId?: string; marked?: readonly string[]; linked?: readonly string[]; highlight?: readonly string[]; onSelect: (id: string) => void; note?: ReactNode; legend?: TLLegend;
 }) {
   const [zoom, setZoom] = useState<number | null>(null);
   const model = useMemo(() => {
@@ -22,10 +24,12 @@ export function ActivityTimeline({ label, items, selectedId, marked = [], linked
     for (const r of all) buckets[Math.min(BUCKETS - 1, Math.floor((r.t - min) / width))].n++;
     return { all, min, max, buckets, top: Math.max(1, ...buckets.map(x => x.n)) };
   }, [items]);
-  if (model.all.length === 0) return <p className="k-empty">No events to plot.</p>;
   const win = zoom === null ? null : model.buckets[zoom] ?? null;
   const lo = win ? win.from : model.min, hi = win ? win.to : model.max, span = hi - lo;
   const rows = model.all.filter(r => !win || (r.t >= win.from && (r.t < win.to || zoom === BUCKETS - 1)));
+  const wFrom = win?.from, wTo = win?.to, wLast = zoom === BUCKETS - 1;
+  useEffect(() => { onWindow?.(wFrom === undefined || wTo === undefined ? null : { from: wFrom, to: wTo, last: wLast }); }, [wFrom, wTo, wLast, onWindow]);
+  if (model.all.length === 0) return <p className="k-empty">No events to plot.</p>;
   const lanes = [...new Set(model.all.map(r => r.lane))].sort();
   const pos = (t: number) => (span ? ((t - lo) / span) * 100 : 50);
   const hh = (t: number) => new Date(t).toISOString().slice(11, 16);

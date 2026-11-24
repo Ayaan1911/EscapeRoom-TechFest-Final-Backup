@@ -2,7 +2,7 @@ import Link from "next/link";
 import { OsHeader } from "@/components/ui/os-header";
 
 const CHAPTERS = [
-  { n: "01", name: "Inbox", points: 15, what: "Six recovered emails, gateway and sign-in records and a printed QR capture. Find the one message that caused the first unauthorized export, and prove it.", tags: ["Phishing", "QR evidence", "Email headers"] },
+  { n: "01", name: "Inbox", points: 15, what: "Six recovered emails, gateway and sign-in records and an archived forensic capture. Find the one message that caused the first unauthorized export, and prove it.", tags: ["Phishing", "QR evidence", "Email headers"] },
   { n: "02", name: "Trail", points: 25, what: "A 144-event identity-provider log. Separate the real stolen session from VPNs, failed attempts and approved maintenance.", tags: ["Log analysis", "Session correlation"] },
   { n: "03", name: "Insider", points: 25, what: "Combine two physical fragments to unlock the Evidence Wall. Six staff, messages, policy changes and approvals: who deliberately weakened the controls?", tags: ["Physical clues", "Suspect profiles"] },
   { n: "04", name: "Containment", points: 20, what: "Reconstruct seven incident events in order, choose scoped urgent actions and build a recovery plan. Everything is a simulated decision.", tags: ["Timeline", "Response plan"] },
