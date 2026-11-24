@@ -71,6 +71,7 @@ test("Verdict: records live in the evidence board window; the case file is a win
 const r2 = async (page: Page, unit: number, title: string) => { await page.goto(`/admin/demo/round2?unit=${unit}`); await expect(page.locator(".rp-head h1")).toHaveText(title); await page.waitForLoadState("networkidle"); };
 
 test("Round 2 Kill Switch: map, table and inspector share one selection; nothing is colour-coded by suspicion; no overflow on a phone", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" }); // compare settled colours, not mid-transition frames
   await r2(page, 2, "Kill Switch");
   await expect(page.locator(".ks-node")).toHaveCount(10);
   await page.getByRole("button", { name: /^Connection 3, / }).click();

@@ -101,7 +101,7 @@
 @keyframes ks-ok { 0% { box-shadow: 0 0 0 2px rgba(0, 255, 156, .8), 0 0 50px rgba(0, 255, 156, .35); } 100% { box-shadow: 0 20px 60px rgba(0, 0, 0, .5); } }
 .ks-term.flash-bad { animation: ks-bad .5s steps(5); }
 @keyframes ks-bad { 0% { transform: translateX(0); box-shadow: 0 0 0 2px rgba(224, 106, 98, .8); } 20% { transform: translateX(-3px); } 40% { transform: translateX(3px); } 60% { transform: translateX(-2px); } 100% { transform: none; } }
-@media (prefers-reduced-motion: reduce) { .ks-term.flash-ok, .ks-term.flash-bad, .ks-cursor, .ks-dotsanim { animation: none !important; } .ks-dotsanim { width: 3ch; } }
+@media (prefers-reduced-motion: reduce) { .ks-term.flash-ok, .ks-term.flash-bad, .ks-cursor, .ks-dotsanim { animation: none !important; } .ks-dotsanim { width: 3ch; } .ks-node circle, .ks-att i { transition: none !important; } }
 
 /* organizer terminal review + rules */
 .rc-table { width: 100%; border-collapse: collapse; font-size: 13px; }
