@@ -131,3 +131,21 @@ Details: `docs/ghost404-round2-open60.md`.
 | Hybrid scoring (15 terminal points, portal-computed) + organizer/volunteer review + printables | Done; untouched-terminal +5 flagged for the owner |
 | Volunteer correct-IP slips (print), no digital reveal, no reset | Done |
 | SOC terminal visual design (banner, cursor, BLOCKING sequence, attempt colours, flashes, reduced motion) | Done, screenshots in `D:\Ghost404-TestWorkspace\shots\ks` |
+
+## Player-experience pass (scrolling, visualizations, motion)
+Guard: `tests/phase5-scroll.spec.ts` counts independently scrolling regions per screen at 1366x768 (tool windows and the Kill Switch terminal output excluded) and wheels the mouse over the workspace. Baseline before this pass: Inbox 3 (mail list, reader, tasks), Trail 1, Insider 1, Containment 2 (snapshot, phase panel). After: 0 on all nine screens; the wheel always moves the page. Screenshots: `D:/Ghost404-TestWorkspace/shots/ux-1366`, `ux-1366f`, `ux-r2`.
+
+| Screen | Problem | Fix |
+|---|---|---|
+| Inbox | three nested scrollers; unexplained auth dots | one page scroll; compact sticky mailbox that fits 768 px; SPF/DKIM/DMARC dot legend; reader is the main content |
+| Trail | 144 indistinguishable dots | event explorer: activity overview (events per time slice, select to zoom, "Show the whole night"), legend with shape + colour (allowed/denied/challenged), per-lane counts, time ticks; all events kept |
+| Insider | spaghetti graph | focus model: lines faint until a person or record type is selected; only its links light up with counts; link inspector lists record types with "Open N"; legend; table view kept |
+| Containment | two inner scrollers | phase panel and snapshot in the page flow; phase switch animates |
+| Final Verdict | unexplained dashed circles; duplicate text strip | board legend (dashed = not chosen, solid = your draft pick, VERDICT READY when all filled); every slot opens its step; duplicate strip hidden |
+| R2 Inject 1 | plain tabs | evidence-source tiles with counts |
+| R2 Inject 3 | eight long claim cards beside the evidence | claim navigator (8 buttons, neutral confidence) + one focused claim with previous/next |
+| R2 Inject 4 | everything stacked | three calls + public statement as a fourth focused panel; status strip always visible |
+| R2 shell | sticky column could become a second scroller | single page scroll; compact header |
+| Motion | none purposeful | scroll-driven section reveal (no JS, no scroll-jacking), evidence/inspector fade-in, phase and claim transitions; all off under prefers-reduced-motion |
+
+Not done in this pass: a deeper Kill Switch layout change (kept as built: map, table, inspector, tickets, terminal); per-window animation tuning; a human playtest.

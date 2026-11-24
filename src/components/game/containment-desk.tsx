@@ -17,7 +17,7 @@ export function ContainmentDesk({ evidence, initialCctv, initialState, initialDr
   const { state, busy, feedback, result, connection, send, submitTask, remaining, retrySeconds } = useChapter(3, initialState);
   const editable = isEditable(state, 3), demo = useDemo();
   const drafts = useDrafts(3, initialDrafts, editable), f = fieldApi(drafts);
-  const [phase, setPhase] = useState(1), [cctvOpen, setCctvOpen] = useState(false);
+  const [phase, setPhase] = useState(1), [cctvOpen, setCctvOpen] = useState(true);
   useEffect(() => { const on = (e: Event) => setPhase(Number((e as CustomEvent<number>).detail) || 1); window.addEventListener("task-open", on); return () => window.removeEventListener("task-open", on); }, []);
   const [more, setMore] = useState<string[]>([]), [movement, setMovement] = useState(""), [dragging, setDragging] = useState<string | null>(null), [cctv, setCctv] = useState(initialCctv), [copyStatus, setCopyStatus] = useState("");
   const knownEvents = new Set(evidence.events.map(e => e.id));

@@ -41,8 +41,8 @@ export function ActivityTimeline({ label, items, selectedId, marked = [], linked
       <div className="gx-tl-zoom">{win ? <><span>Zoomed to <b className="k-mono">{hh(win.from)}–{hh(win.to)} UTC</b> · {rows.length} of {model.all.length} events</span><button type="button" className="k-btn k-btn-sm" onClick={() => setZoom(null)}>Show the whole night</button></>
         : <span>{model.all.length} events · bars show how busy each slice was · select a bar to zoom</span>}</div>
     </div>
-    {legend && <ul className="gx-legend-row" aria-label="Marker legend">{legend.map(l => <li key={l.label}><span className={`ds-tl-dot gx-key is-${l.tone}`} aria-hidden="true">{l.mark}</span>{l.label}</li>)}
-      {marked.length > 0 && <li><span className="ds-tl-dot gx-key is-neutral is-marked" aria-hidden="true" />pinned by you</li>}{linked.length > 1 && <li><span className="gx-key-line" aria-hidden="true" />joined in time order</li>}</ul>}
+    {legend && <ul className="gx-legend-row" aria-label="Marker legend">{legend.map(l => <li key={l.label}><span className={`gx-key is-${l.tone}`} aria-hidden="true">{l.mark}</span>{l.label}</li>)}
+      {marked.length > 0 && <li><span className="gx-key is-neutral is-marked" aria-hidden="true" />pinned by you</li>}{linked.length > 1 && <li><span className="gx-key-line" aria-hidden="true" />joined in time order</li>}</ul>}
     <div className="ds-tl-body">
       <div className="ds-tl-lanes" aria-hidden="true">{lanes.map(l => <span key={l}>{l} <small>{rows.filter(r => r.lane === l).length}</small></span>)}</div>
       <div className="ds-tl-track" style={{ height: lanes.length * 36 }}>

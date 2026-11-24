@@ -71,6 +71,7 @@ test("a stale-looking UI never claims points the server did not award, and respo
 test("drafts: autosave, refresh, re-login, long values and offline retry", async ({ page }) => {
   await login(page, "P2-FRESH-A");
   await page.goto("/play/trail").catch(() => undefined);
+  await page.waitForLoadState("networkidle").catch(() => undefined); // let the locked-chapter redirect finish before navigating again
   await page.goto("/play/inbox");
   const long = "X".repeat(50) + "-long-evidence-identifier"; // 75 chars, within the 80-char field limit
   await page.getByLabel("Capture ID").fill(long);

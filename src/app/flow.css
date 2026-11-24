@@ -53,7 +53,9 @@
 .gx-tl-zoom b { color: var(--obs-ivory); }
 .gx-legend-row { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0 0 8px; padding: 0; list-style: none; font-size: 12px; color: var(--obs-sage); }
 .gx-legend-row li { display: inline-flex; align-items: center; gap: 6px; }
-.gx-key { position: static !important; margin: 0 !important; display: inline-grid !important; opacity: 1 !important; }
+.gx-key { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--obs-sage); background: #111511; font: 700 9px/1 var(--font-sans, sans-serif); color: var(--obs-ivory); }
+.gx-key.is-ok { border-color: var(--ok); } .gx-key.is-alert { border-color: var(--alert); } .gx-key.is-amber { border-color: var(--amber); } .gx-key.is-info { border-color: var(--evidence); }
+.gx-key.is-marked { box-shadow: 0 0 0 3px var(--amber); }
 .gx-key-line { display: inline-block; width: 18px; height: 2px; background: var(--evidence); }
 .gx-tl .ds-tl-dot { width: 16px; height: 16px; margin: -8px 0 0 -8px; display: grid; place-items: center; font: 700 9px/1 var(--font-sans, sans-serif); color: var(--obs-ivory); }
 .gx-tl .ds-tl-dot.is-selected { width: 22px; height: 22px; margin: -11px 0 0 -11px; color: #0B0D0B; }

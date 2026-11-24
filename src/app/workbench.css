@@ -52,7 +52,7 @@ main:has(.cn-chapter) > .back-link { margin: 6px 0 0 28px; padding-bottom: 2px; 
 .cn-chapter .pg-unlock { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; }
 .cn-chapter .pg-unlock-copy p { color: var(--obs-sage); }
 .cn-chapter .pg-unlock-actions { display: flex; gap: 8px; align-items: center; }
-.cn-chapter .pg-unlock-actions .k-btn-ghost { display: none; }
+.cn-chapter .pg-unlock-actions .k-btn-ghost { font-size: 12.5px; padding: 0 8px; }
 .cn-chapter .pg-unlock-actions .k-btn { min-height: 34px; padding: 0 14px; font-size: 13px; }
 
 /* Trail: toolbar first (filters), then the activity timeline */
