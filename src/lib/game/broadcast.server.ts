@@ -8,6 +8,7 @@ import { progressSchema, status } from "./engine";
 import { buildBoard, type BoardRow } from "./projector";
 import { BROADCAST_KEYS, sceneOf, type BroadcastKey, type R2Phase, type Scene } from "./broadcast";
 import { qualificationReport } from "./qualification.server";
+import { competitorWhere } from "./roster";
 
 // Organizer-controlled publication flags, stored as audited events (AuditLog): the latest on/off entry wins. Default OFF.
 export async function broadcastFlags(): Promise<Record<BroadcastKey, boolean>> {
@@ -51,7 +52,7 @@ export async function broadcast(): Promise<BroadcastPayload | null> {
     const results = r2 === "complete" ? await publishedResults() : null, taunt = r2 !== "not_started" ? (await paperTiming()).taunt : null, qualified = !!q?.confirmation && q.roundStatus === "finished";
     let standings: BoardRow[] | null = null;
     if (flags.standings) {
-      const teams = await db.team.findMany({ select: { id: true, name: true, progress: true } });
+      const teams = await db.team.findMany({ where: competitorWhere, select: { id: true, name: true, progress: true } });
       standings = buildBoard(teams.map(t => ({ id: t.id, name: t.name, progress: progressSchema.parse(JSON.parse(t.progress)) })));
     }
     cache = { at: Date.now(), value: {

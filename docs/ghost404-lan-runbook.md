@@ -40,6 +40,9 @@ Run it under `systemd` or `tmux` so it survives the SSH session. Open the port i
 4. **Chapters 1 and 4 need no printed material**: Chapter 1 uses the in-app "Open Forensic Snapshot" button (do not print `/admin/inbox-kit`); Chapter 4 shows its security-room evidence on screen (the CCTV kit is retired).
 5. **Projector** (`/admin/projector`, organizer signed in): shows the Top 12 only after the organizer switches on "Round 1 standings" (or finalist names) in `/admin/leaderboard`.
 
+## Final credentials on the lab server
+Install the SAME encrypted bundle that was printed (never regenerate): back up, `npx prisma migrate deploy`, then `node scripts/credentials.mjs preflight|import|verify` exactly as in `ghost404-credential-provisioning.md`. Do NOT run `prepare-lab.ps1 -Teams`, `npm run db:seed` or `npm run teams:provision` on the event database. A normal restart (`start-lab.ps1`) never changes an account.
+
 ## Dry run on the lab server (what to do tomorrow)
 Start the server (`start-lab.ps1`), then: organizer signs in -> start Round 1 with the synthetic teams -> **Stop round** -> `/admin#qualification`. NOTE: if more than 10 teams are tied on the same Round 1 score at 10th place (all synthetic teams with 0 points are), the system will not choose; tick the open places yourself, then **Confirm Top 10 and Advance to Round 2** -> `/admin/round2` shows 10 qualified teams -> **Start Round 2** -> "Yes, start the 60-minute investigation". Sign in as a qualified team PC: dashboard shows "Enter Round 2" -> Kill Switch. Try one typo, one wrong block and one refresh. Use only synthetic team accounts; each team gets four blocks per Round 2 session, so reset by using a fresh database for the real event.
 

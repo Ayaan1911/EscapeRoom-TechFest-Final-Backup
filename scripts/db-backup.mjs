@@ -12,8 +12,9 @@ import { createHash } from "node:crypto";
 const [command, a] = process.argv.slice(2);
 const flag = name => process.argv.includes(name);
 const url = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
-const TABLES = ["team", "insiderAccess", "teamSession", "gameSession", "submission", "auditLog", "loginAttempt"];
-const dateKeys = new Set(["unlockedAt", "expiresAt", "startsAt", "deadline", "endedAt", "createdAt", "windowStart"]);
+// NOTE: this logical tool covers the core tables only. For the EVENT database use pg_dump -Fc (docs/ghost404-credential-provisioning.md): it also keeps the roster, Insider group/code tables, scores and Round 2 data.
+const TABLES = ["team", "teamProvision", "insiderAccess", "insiderGroupCode", "insiderGroupMember", "teamSession", "gameSession", "submission", "auditLog", "loginAttempt"];
+const dateKeys = new Set(["provisionedAt", "activatedAt", "withdrawnAt", "assignedAt", "solvedAt", "unlockedAt", "expiresAt", "startsAt", "deadline", "endedAt", "createdAt", "windowStart"]);
 const revive = rows => rows.map(row => Object.fromEntries(Object.entries(row).map(([k, v]) => [k, dateKeys.has(k) && typeof v === "string" ? new Date(v) : v])));
 const need = () => { if (!url) throw new Error("Set DIRECT_URL or DATABASE_URL."); return new PrismaClient({ datasourceUrl: url }); };
 

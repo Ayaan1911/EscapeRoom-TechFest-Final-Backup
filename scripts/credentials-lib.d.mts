@@ -1,0 +1,11 @@
+export type Group = "A" | "B" | "C";
+export type BundleTeam = { id: string; slot: number; kind: "primary" | "reserve"; name: string; password: string; group: Group | null; variant: Group };
+export type Bundle = { format: string; version: number; bundleId: string; eventId: string; createdAt: string; teams: BundleTeam[]; fragments: Record<Group, { private: string; public: string }> };
+export const BUNDLE_FORMAT: string; export const BUNDLE_VERSION: number; export const PRIMARY_COUNT: number; export const RESERVE_COUNT: number; export const TOTAL_TEAMS: number;
+export const GROUPS: Group[]; export const VARIANTS: Group[]; export const PASSWORD_RE: RegExp; export const TEAM_ID_RE: RegExp; export const PRIVATE_CODE_RE: RegExp; export const PUBLIC_CODE_RE: RegExp; export const MIN_PASSPHRASE: number;
+export function teamIdOf(slot: number): string; export function slotOf(id: string): number;
+export function generatePassword(rand?: (max: number) => number): string; export function generateSharedCode(prefix: "P" | "W", rand?: (max: number) => number): string;
+export function generateBundle(options?: { rand?: (max: number) => number; now?: Date; eventId?: string }): Bundle;
+export function validateBundle(bundle: unknown): Bundle; export function fingerprint(bundle: Bundle): string;
+export function encryptBundle(bundle: Bundle, passphrase: string): string; export function decryptBundle(text: string, passphrase: string): Bundle;
+export function renderCardsHtml(bundle: Bundle, options?: { include?: "primary" | "reserve" | "all"; activations?: Record<string, { group: Group }> }): string;

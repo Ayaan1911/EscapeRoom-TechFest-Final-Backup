@@ -95,7 +95,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           <ul className="cc-links">
             <li><Link href="/admin/projector">Projector broadcast</Link><span>Full-screen event scenes for the hall screen</span></li>
             <li><Link href="/admin/round2/print">Round 2 printables</Link><span>Answer sheets, slips, score sheet</span></li>
-            <li><a href="/admin/inbox-kit">Chapter 1 evidence kit</a><span>Optional legacy QR card (no longer needed: players open the snapshot in-app)</span></li>
+            <li><a href="/admin/credentials">Team credentials</a><span>Roster status, reserve replacement (no passwords shown)</span></li>
             <li><a href="/admin/insider-kit">Insider Evidence Wall kit</a><span>Envelope fragments and wall cards</span></li>
           </ul>
         </Panel>

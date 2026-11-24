@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { inboxEvidence, inboxSolution, inboxValidator } from "../src/lib/game/inbox.server";
-import { inboxQr, inboxQrTarget } from "../src/lib/game/inbox-qr.server";
 import { inboxAnswers, tamperAnswer } from "./fixtures/inbox";
 
 describe.each(["A", "B", "C"] as const)("Inbox variant %s", variant => {
@@ -68,10 +67,7 @@ it("uses different compromise positions and refuses unknown server variants", ()
   expect(readFileSync("src/components/game/inbox-desk.tsx", "utf8")).not.toContain("inbox.server");
 });
 
-it("generates a local PNG QR for a phone-reachable app origin with a fixed authenticated path", async () => {
-  const result = await inboxQr("https://escape.nexus.example");
-  expect(result.target).toBe("https://escape.nexus.example/clue/inbox");
-  expect(result.image).toMatch(/^data:image\/png;base64,/);
-  expect(inboxQrTarget("http://192.168.1.25:3000")).toBe("http://192.168.1.25:3000/clue/inbox");
-  for (const origin of ["http://localhost:3000", "https://localhost.", "https://127.0.0.1", "https://[::1]", "https://[::]", "https://user:secret@event.example", "http://event.example", "https://event.example/path", "https://event.example/?variant=B", "javascript:alert(1)", ""]) expect(() => inboxQrTarget(origin)).toThrow();
+it("the Chapter 1 QR kit is retired: no QR module, no QR route content", () => {
+  expect(existsSync("src/lib/game/inbox-qr.server.ts")).toBe(false);
+  expect(readFileSync("src/app/admin/inbox-kit/page.tsx", "utf8")).not.toMatch(/qrcode|toDataURL|Generate printable QR/);
 });

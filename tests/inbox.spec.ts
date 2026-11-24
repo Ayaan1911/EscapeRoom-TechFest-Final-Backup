@@ -1,6 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
 import { confirmDialog } from "./fixtures/admin-confirm";
-import jsQR from "jsqr";
 import { solveInbox } from "./fixtures/ui";
 
 test.skip(!process.env.GHOST_E2E_INBOX, "Run npm run test:e2e:inbox to use isolated temporary fixtures");
@@ -12,7 +11,7 @@ async function login(page: Page, variant: string | "admin") {
   await expect(page.getByRole("heading", { name: variant === "admin" ? "Event operations" : "Investigation dashboard", exact: true })).toBeVisible({ timeout: 30_000 });
 }
 
-test("organizer starts a waiting round and prints a scannable phone QR", async ({ page, browser }) => {
+test("organizer starts a waiting round (no QR kit exists any more)", async ({ page, browser }) => {
   test.setTimeout(75_000); // first request to each route compiles on the dev server
   await page.goto("/clue/inbox");
   await expect(page).toHaveURL(/\/login\?next=/);
@@ -25,20 +24,8 @@ test("organizer starts a waiting round and prints a scannable phone QR", async (
   const context = await browser.newContext();
   const organizer = await context.newPage();
   await login(organizer, "admin");
-  await organizer.getByRole("link", { name: "Chapter 1 evidence kit" }).click();
-  await expect(organizer.locator("main").getByRole("alert")).toContainText("Loopback");
-  await organizer.getByLabel("Application origin").fill("https://event.nexus.example");
-  await organizer.getByRole("button", { name: "Generate printable QR" }).click();
-  const image = organizer.getByAltText("Chapter 1 forensic snapshot QR code");
-  await expect(image).toBeVisible();
-  const pixels = await image.evaluate(async node => {
-    const image = node as HTMLImageElement;
-    await image.decode();
-    const canvas = document.createElement("canvas"); canvas.width = image.naturalWidth; canvas.height = image.naturalHeight;
-    const context = canvas.getContext("2d")!; context.drawImage(image, 0, 0);
-    return { data: Array.from(context.getImageData(0, 0, canvas.width, canvas.height).data), width: canvas.width, height: canvas.height };
-  });
-  expect(jsQR(new Uint8ClampedArray(pixels.data), pixels.width, pixels.height)?.data).toBe("https://event.nexus.example/clue/inbox");
+  await expect(organizer.getByRole("link", { name: /Chapter 1 evidence kit/ })).toHaveCount(0); // the QR card workflow is retired: players open the Forensic Snapshot in the game
+  await organizer.goto("/admin/inbox-kit"); await expect(organizer.getByRole("heading", { name: "Chapter 1 evidence kit: retired" })).toBeVisible(); await expect(organizer.locator("img, canvas")).toHaveCount(0);
   await organizer.goto("/admin");
   await organizer.getByRole("button", { name: "Start 60-minute round" }).click(); await confirmDialog(organizer);
   await expect(organizer.getByRole("button", { name: "Stop round" })).toBeEnabled();

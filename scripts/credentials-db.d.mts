@@ -1,0 +1,10 @@
+import type { PrismaClient } from "@prisma/client";
+import type { Bundle } from "./credentials-lib.mjs";
+export type Plan = { create: string[]; attach: string[]; verify: string[]; codes: string[]; members: string[] };
+export type Info = { database: string; schema: { ok: boolean; missingTables: string[]; missingMigrations: string[]; migrationTable: boolean }; bundleId: string; fingerprint: string; classification: "schema-missing" | "conflict" | "fresh" | "already-provisioned" | "partial"; conflicts: string[]; plan: Plan; teamCount?: number; existingBundleTeams?: number; round?: string; submissions?: number; taskScores?: number; insiderCodes?: number };
+export function describeUrl(url: string): { target: string; environment: string };
+export function schemaStatus(db: PrismaClient): Promise<Info["schema"]>;
+export function inspect(db: PrismaClient, bundle: Bundle): Promise<Info>;
+export function importBundle(db: PrismaClient, bundle: Bundle, options?: { apply?: boolean; confirmDatabase?: string }): Promise<{ status: "schema-missing" | "conflict" | "verified" | "dry-run" | "applied"; info: Info; written: boolean }>;
+export function verifyDatabase(db: PrismaClient, bundle: Bundle): Promise<{ ok: boolean; checked: number; passwordsOk: number; groups: Record<string, number>; problems: string[] }>;
+export function reserveActivations(db: PrismaClient, bundle: Bundle): Promise<Record<string, { group: "A" | "B" | "C" }>>;

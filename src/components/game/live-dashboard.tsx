@@ -6,7 +6,7 @@ import { Round2Entry, type Round2State } from "./round2-entry";
 import { CHAPTERS, formatClock } from "@/components/ui/kit";
 import { ChapterGlyph, Meter, PulseState, ScoreRing, StatusPill } from "@/components/ui/design";
 
-type Snapshot = { id: string; name: string; variant: string; participants: string[]; progress: Progress; score: number; hints: number; current: number; unlocked: boolean[]; unlockThresholds: number[]; tasks: { id: string; earned: number; max: number }[][]; status: string; serverNow: number; round: { deadline: string | null }; round2: Round2State };
+type Snapshot = { standby?: "reserve" | "replaced" | null; id: string; name: string; variant: string; participants: string[]; progress: Progress; score: number; hints: number; current: number; unlocked: boolean[]; unlockThresholds: number[]; tasks: { id: string; earned: number; max: number }[][]; status: string; serverNow: number; round: { deadline: string | null }; round2: Round2State };
 const ROUTES = ["/play/inbox", "/play/trail", "/play/insider", "/play/containment", "/play/verdict"];
 const FOCUS = ["Find the breach email and prove it", "Reconstruct the stolen session", "Unlock the Evidence Wall, name the insider", "Order the incident and plan the response", "Link the evidence and close the case"];
 
@@ -55,7 +55,8 @@ export function LiveDashboard() {
     {error && <p role="alert" className="k-banner k-banner-warn">{error} <a href="/login">Sign in</a></p>}
     <Round2Entry state={data.round2} />
     {closed && <CaseClosed teamId={data.id} teamName={data.name} progress={data.progress} />}
-    {waiting && <PulseState eyebrow="ROUND 1 · STANDING BY" title="Awaiting organizer start"><p>Keep this page open. Chapters open the moment the round starts. Check your team name above and have your printed envelope ready for Chapter 3.</p></PulseState>}
+    {data.standby && <PulseState eyebrow={data.standby === "reserve" ? "RESERVE ACCOUNT" : "TEAM SLOT REPLACED"} title={data.standby === "reserve" ? "This reserve account is not active" : "This slot is now played by a reserve account"}><p>{data.standby === "reserve" ? "You can stay signed in. If an organizer activates this account to replace a team, it starts working automatically. Ask an organizer if you were told to play with this card." : "An organizer replaced this team with a reserve account. Ask an organizer for help."}</p></PulseState>}
+    {waiting && !data.standby && <PulseState eyebrow="ROUND 1 · STANDING BY" title="Awaiting organizer start"><p>Keep this page open. Chapters open the moment the round starts. Check your team name above and have your printed envelope ready for Chapter 3.</p></PulseState>}
     <div className="gd-body"><aside className="gd-side" aria-label="Mission">
     {!waiting && !closed && <section className="gd-next" aria-labelledby="next-h">
       <div><span className="k-eyebrow">Next action</span><h2 id="next-h">Chapter {here + 1} — {titles[here]}</h2>

@@ -7,6 +7,7 @@ import { groupView, pairsView, solvePair, usesWall } from "./evidence-wall.serve
 import { attemptCap, POLICY_BEST } from "../attempts";
 import { answerHash } from "../round2/safe-json";
 import { round2Entry } from "../round2/access.server";
+import { competitorWhere, standbyOf } from "./roster";
 
 /** Scoring policy of a stored round. A round that started before policies existed (NULL) stays legacy union-v0 and is never silently upgraded; a round that has not started will get best-v1 when it starts. */
 export const roundPolicy = (round: { scoringPolicy: string | null; startsAt: Date | null }) => round.scoringPolicy === POLICY_BEST || (!round.scoringPolicy && !round.startsAt) ? POLICY_BEST : "union-v0";
@@ -20,16 +21,17 @@ export async function roundState() {
 }
 const attemptsView = (taskId: string, used: number) => { const cap = attemptCap(taskId); return { used, cap, remaining: Math.max(0, cap - used) }; };
 export async function teamState(id: string) {
-  const team = await db.team.findUniqueOrThrow({ where: { id }, include: { insiderAccess: { select: { unlockedAt: true } } } });
+  const team = await db.team.findUniqueOrThrow({ where: { id }, include: { insiderAccess: { select: { unlockedAt: true } }, provision: true } });
+  const standby = standbyOf(team.provision); // an inactive reserve / a replaced primary can sign in but never plays
   const progress = progressSchema.parse(JSON.parse(team.progress));
   const round = await roundState();
   const taskRows = await db.taskScore.findMany({ where: { teamId: id }, select: { taskId: true, earned: true, attempts: true } });
   const earned = new Map(taskRows.map(row => [row.taskId, row.earned])), usedBy = new Map(taskRows.map(row => [row.taskId, row.attempts])), policy = roundPolicy(round);
   const [round2, insiderPairs, insiderGroup] = await Promise.all([round2Entry(id), pairsView(id), groupView(id)]);
-  return { id: team.id, name: team.name, participants: JSON.parse(team.participants) as string[], variant: team.variant, progress, score: score(progress), hints: hints(progress), current: current(progress), round, status: status(round), serverNow: Date.now(), round2, insiderPairs, insiderGroup, chapterHints: progress.chapters.map((chapter, i) => validators[i]?.hints.slice(0, chapter.hints) ?? []), insiderUnlocked: !!team.insiderAccess?.unlockedAt, unlocked: points.map((_, i) => unlocked(progress, i)), unlockThresholds, policy, tasks: catalog.map(list => list.map(task => ({ id: task.id, title: task.title, earned: earned.get(task.id) ?? 0, max: taskMax(task), attempts: policy === POLICY_BEST ? attemptsView(task.id, usedBy.get(task.id) ?? 0) : null }))) };
+  return { id: team.id, name: team.name, participants: JSON.parse(team.participants) as string[], variant: team.variant, progress, score: score(progress), hints: hints(progress), current: current(progress), round, status: standby ? "waiting" as const : status(round), standby, serverNow: Date.now(), round2, insiderPairs, insiderGroup, chapterHints: progress.chapters.map((chapter, i) => validators[i]?.hints.slice(0, chapter.hints) ?? []), insiderUnlocked: !!team.insiderAccess?.unlockedAt, unlocked: points.map((_, i) => unlocked(progress, i)), unlockThresholds, policy, tasks: catalog.map(list => list.map(task => ({ id: task.id, title: task.title, earned: earned.get(task.id) ?? 0, max: taskMax(task), attempts: policy === POLICY_BEST ? attemptsView(task.id, usedBy.get(task.id) ?? 0) : null }))) };
 }
 export async function leaderboard() {
-  const teams = await db.team.findMany({ select: { id: true, name: true, progress: true, variant: true, participants: true } });
+  const teams = await db.team.findMany({ where: competitorWhere, select: { id: true, name: true, progress: true, variant: true, participants: true } });
   return ranking(teams.map(t => ({ ...t, progress: progressSchema.parse(JSON.parse(t.progress)) })));
 }
 export async function recentAudit() {
@@ -37,7 +39,8 @@ export async function recentAudit() {
 }
 export async function mutateTeam(id: string, chapter: number, action: "submit" | "hint" | "unlock", answer: unknown, task?: string) {
   return teamTx(id, async tx => {
-    const team = await tx.team.findUniqueOrThrow({ where: { id }, include: { insiderAccess: { select: { unlockedAt: true } } } });
+    const team = await tx.team.findUniqueOrThrow({ where: { id }, include: { insiderAccess: { select: { unlockedAt: true } }, provision: true } });
+    if (standbyOf(team.provision)) return { error: team.provision?.withdrawnAt ? "This team slot was taken over by a reserve account." : "This reserve account is not active. Ask an organizer." };
     const round = await tx.gameSession.findUniqueOrThrow({ where: { id: 1 } });
     const p = progressSchema.parse(JSON.parse(team.progress));
     const now = Date.now();

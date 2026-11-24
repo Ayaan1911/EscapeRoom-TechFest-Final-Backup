@@ -44,3 +44,6 @@ Real college LAN, a second PC, projector hardware. Full Playwright regression an
 | Containment | none |
 | Final Verdict | none |
 Round 2 keeps its approved paper answer sheets and jury marking.
+
+## Chapter 1 evidence kit removed (final credentials pass)
+The organizer dashboard no longer lists the "Chapter 1 evidence kit"; `/admin/inbox-kit` is an organizer-only "retired" notice and the QR generator module was deleted. The in-game Forensic Snapshot, the capture IDs, Demo Mode access and Chapter 1 scoring are unchanged.

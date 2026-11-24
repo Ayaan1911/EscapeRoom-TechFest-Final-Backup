@@ -14,6 +14,10 @@ test-results/
 
 # organizer-only generated credentials and backups
 /private/
+# final event credential bundle and printed card files must never be committed
+*.enc
+access-cards-*.html
+event-credentials*
 /backups/
 
 # local-only helper scripts and database snapshots

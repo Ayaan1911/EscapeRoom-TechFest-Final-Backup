@@ -5,6 +5,7 @@ import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import type { InsiderDossier, InsiderRecord } from "@/types/insider";
 import { newInsiderFragments } from "./insider-fragments.server";
+import { competitorWhere } from "./roster";
 
 // Evidence Wall, SHARED PAIRS (final design): exactly SIX fragments for the whole event: Private A/Public A, Private B/Public B, Private C/Public C. Each team is assigned ONE group once
 // (30 teams -> exactly 10/10/10) and all teams of a group share that group's pair. The team enters the private and the public code; the server decides.
@@ -115,7 +116,7 @@ export type GroupSummary = {
 /** Read-only organizer summary. `earlier` = teams on an earlier per-team or three-pair preparation (not counted as prepared); `convertible` = of those, teams with one per-team group
  *  that the explicit conversion can move to the shared pairs. `final` = the planned 30-team 10/10/10 split with all six codes in place. */
 export async function groupSummary(tx: Db = db): Promise<GroupSummary> {
-  const [teams, members, pairs, codes] = await Promise.all([tx.team.count(), tx.insiderGroupMember.findMany({ select: { teamId: true, group: true } }), tx.insiderPair.findMany({ select: { teamId: true } }), tx.insiderGroupCode.count()]);
+  const [teams, members, pairs, codes] = await Promise.all([tx.team.count({ where: competitorWhere }), tx.insiderGroupMember.findMany({ where: { team: competitorWhere }, select: { teamId: true, group: true } }), tx.insiderPair.findMany({ select: { teamId: true } }), tx.insiderGroupCode.count()]);
   const counts: Record<Pair, number> = { A: 0, B: 0, C: 0 }, memberIds = new Set(members.map(m => m.teamId));
   for (const m of members) counts[m.group as Pair]++;
   const perTeam = new Map<string, number>();
@@ -128,10 +129,10 @@ export async function groupSummary(tx: Db = db): Promise<GroupSummary> {
  *  split does not follow team-ID order) and each goes to the currently smallest group, so 30 teams always end exactly 10/10/10. The six codes are created once. Re-running changes nothing. */
 export async function prepareShared(tx: Prisma.TransactionClient, teamIds?: string[]) {
   const codes = await ensureGroupCodes(tx);
-  const teams = await tx.team.findMany({ where: teamIds ? { id: { in: teamIds } } : {}, select: { id: true }, orderBy: { id: "asc" } });
+  const teams = await tx.team.findMany({ where: { ...competitorWhere, ...(teamIds ? { id: { in: teamIds } } : {}) }, select: { id: true }, orderBy: { id: "asc" } });
   const taken = new Set([...(await tx.insiderGroupMember.findMany({ select: { teamId: true } })), ...(await tx.insiderPair.findMany({ select: { teamId: true } }))].map(r => r.teamId));
   const counts: Record<Pair, number> = { A: 0, B: 0, C: 0 };
-  for (const m of await tx.insiderGroupMember.findMany({ select: { group: true } })) counts[m.group as Pair]++;
+  for (const m of await tx.insiderGroupMember.findMany({ where: { team: competitorWhere }, select: { group: true } })) counts[m.group as Pair]++;
   const fresh = teams.filter(t => !taken.has(t.id));
   for (let i = fresh.length - 1; i > 0; i--) { const j = randomInt(i + 1); [fresh[i], fresh[j]] = [fresh[j], fresh[i]]; }
   for (const team of fresh) {

@@ -8,10 +8,11 @@ import { qualificationRows } from "./results";
 import { csvCell } from "@/lib/csv";
 import { enrollFromSnapshot } from "@/lib/round2/enrollment.server";
 import { selectTop, SelectionError, type Cand } from "./top10";
+import { competitorWhere } from "./roster";
 
 async function snapshot(tx: Prisma.TransactionClient) {
   const round = await tx.gameSession.findUnique({ where: { id: 1 } }) ?? { startsAt: null, deadline: null, endedAt: null };
-  const teams = await tx.team.findMany({ select: { id: true, name: true, variant: true, participants: true, progress: true } });
+  const teams = await tx.team.findMany({ where: competitorWhere, select: { id: true, name: true, variant: true, participants: true, progress: true } });
   const rows = qualificationRows(teams.map(team => ({ ...team, progress: progressSchema.parse(JSON.parse(team.progress)) })));
   const digest = createHash("sha256").update(JSON.stringify({ round, rows })).digest("hex");
   return { round, rows, digest, roundStatus: status(round) };

@@ -44,6 +44,15 @@ Tick every line on the day. Any unchecked **MUST** is a no-go. Evidence for what
 - [ ] Round 1 needs only ONE physical item per team (access card) plus the three public fragments in the building.
 - [ ] Projector: sign in as organizer on the projector PC, `/admin/projector`; the Top 12 appears only after "Round 1 standings" (or finalist names) is switched on in `/admin/leaderboard`.
 
+## Final credentials (see `ghost404-credential-provisioning.md`)
+- [ ] **ONE** encrypted credential bundle exists OUTSIDE the repository (`credentials generate`), the passphrase is stored separately from it, and a second copy of the file exists in another safe place.
+- [ ] Back up the event database (`pg_dump -Fc`), apply migrations (`20261128000000_insider_shared_pairs`, `20261129000000_team_provision`), run `credentials preflight` (classification `fresh` or `already-provisioned`, never `conflict`), then `credentials import --apply --confirm-database <name>`.
+- [ ] `credentials verify` says VERIFIED on the college LAN database (and on the Render preview if one is used): 32 of 32 passwords, groups 10/10/10, six shared codes.
+- [ ] `/admin/credentials` shows 32 prepared (30 primary, 2 reserve), A/B/C = 10/10/10, 3 of 3 pairs, "matches the expected provisioning set".
+- [ ] Print the cards ONLY after verify (`credentials print`), delete the HTML afterwards. Public A/B/C codes are printed separately (Insider Kit) and never on team cards.
+- [ ] Restart the server and sign in with one printed card (then with a reserve card). Never run `-Teams`/`db:seed`/`teams:provision` against the event database.
+- [ ] Chapter 1 kit: nothing to print (retired).
+
 ## No-go triggers
 - Server cannot be reached from a second PC on the lab network.
 - Any team can open another team's page or the organizer pages (should be impossible; stop and investigate).

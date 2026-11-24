@@ -13,7 +13,8 @@ export async function session(role: Role) {
   const found = raw ? await db.teamSession.findUnique({ where: { tokenHash: digest(raw) } }) : null;
   return authorized(found, role) ? found : null;
 }
-export async function login(role: Role, id: string, code: string) {
+export async function login(role: Role, typedId: string, code: string) {
+  const id = role === "team" && /^team-\d{2}$/i.test(typedId) ? typedId.toUpperCase() : typedId; // final event IDs are exactly TEAM-NN; the same letters typed in lower case still reach that account
   const key = digest(`${role}:${id}`);
   // Persistent throttling also covers unknown IDs; no credentials enter audit logs.
   const allowed = await serializable(async tx => {
@@ -26,7 +27,9 @@ export async function login(role: Role, id: string, code: string) {
   if (!allowed) return false;
   const team = role === "team" ? await db.team.findUnique({ where: { id } }) : null;
   const hash = role === "admin" ? process.env.ADMIN_ACCESS_HASH : team?.codeHash;
-  if (!hash || !await verifyPasswordAsync(code, hash)) return false;
+  // Event passwords are printed as XXX-XXX-XXX (uppercase): accept the same letters typed in lower case. Any other credential is compared exactly as before.
+  const supplied = role === "team" && /^[A-Za-z]{3}-[A-Za-z]{3}-[A-Za-z]{3}$/.test(code) ? code.toUpperCase() : code;
+  if (!hash || !await verifyPasswordAsync(supplied, hash)) return false;
   const raw = randomBytes(32).toString("hex");
   const jar = await cookies();
   const old = jar.get(cookieNames[role])?.value;

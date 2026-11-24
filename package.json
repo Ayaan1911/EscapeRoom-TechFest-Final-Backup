@@ -14,6 +14,7 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
     "teams:provision": "node --env-file=.env scripts/provision-teams.mjs",
+    "credentials": "node scripts/credentials.mjs",
     "load:round1": "node scripts/load-test.mjs",
     "db:backup": "node --env-file=.env scripts/db-backup.mjs backup backups",
     "db:test:up": "docker run -d --name ghost404-pg-test -e POSTGRES_PASSWORD=ghosttest -p 127.0.0.1:55432:5432 postgres:15-alpine",

@@ -21,6 +21,7 @@ model Team {
   insiderPairs InsiderPair[]
   wallCards InsiderWallCard[]
   groupMember InsiderGroupMember?
+  provision TeamProvision?
 }
 model InsiderAccess {
   teamId String @id
@@ -68,6 +69,20 @@ model InsiderGroupMember {
   solvedAt DateTime?
   assignedAt DateTime @default(now())
   @@index([group])
+}
+// Final event roster (credential provisioning). One row per provisioned team: 30 primary + 2 reserve. NO secrets: the password exists only as Team.codeHash.
+// A team WITHOUT a row (demo/test/earlier teams) is an ordinary competitor. An inactive reserve and a replaced (withdrawn) primary are excluded from every ranking.
+model TeamProvision {
+  teamId String @id
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  kind String // "primary" | "reserve"
+  slot Int // 1..32, the number in TEAM-NN
+  bundleId String // identifier of the canonical credential bundle this account came from (not secret)
+  provisionedAt DateTime @default(now())
+  activatedAt DateTime? // reserve: activated as a replacement
+  replacesTeamId String? // reserve: the primary whose competition slot it took
+  withdrawnAt DateTime? // primary: replaced by a reserve (kept as history, not deleted)
+  @@unique([replacesTeamId])
 }
 model TeamSession {
   tokenHash String @id

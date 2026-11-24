@@ -7,7 +7,7 @@ export type Attempts = { used: number; cap: number; remaining: number };
 export type TaskRow = { id: string; title: string; earned: number; max: number; attempts?: Attempts | null };
 export type ChapterState = {
   progress: Progress; score: number; current: number; status: string; chapterHints: string[][]; serverNow: number; round: { deadline: string | null };
-  policy?: string; insiderUnlocked?: boolean; insiderPairs?: { A: boolean; B: boolean; C: boolean } | null; insiderGroup?: { group: "A" | "B" | "C"; solved: boolean } | null; unlocked: boolean[]; unlockThresholds: readonly number[]; tasks: TaskRow[][];
+  standby?: "reserve" | "replaced" | null; policy?: string; insiderUnlocked?: boolean; insiderPairs?: { A: boolean; B: boolean; C: boolean } | null; insiderGroup?: { group: "A" | "B" | "C"; solved: boolean } | null; unlocked: boolean[]; unlockThresholds: readonly number[]; tasks: TaskRow[][];
 };
 export type SubmitResult = { duplicate?: boolean; improved?: boolean; tasks?: TaskRow[]; task: string | null; awarded: number; taskEarned: number | null; taskMax: number | null; chapterRaw: number; chapterMax: number; accepted: boolean; unlocked: number[]; tamperAwarded: boolean; demo?: boolean };
 

@@ -14,6 +14,7 @@ import { BROADCAST_LABEL, type BroadcastKey } from "@/lib/game/broadcast";
 import { buildBoard } from "@/lib/game/projector";
 import { progressSchema } from "@/lib/game/engine";
 import { markingBoard } from "@/lib/round2/paper/marking.server";
+import { competitorWhere } from "@/lib/game/roster";
 
 export const metadata: Metadata = { title: "Leaderboard | OPERATION GHOST_404", robots: { index: false, follow: false, nocache: true } };
 export const dynamic = "force-dynamic";
@@ -26,7 +27,7 @@ export default async function LeaderboardPage({ searchParams }: { searchParams: 
   if (!await session("admin")) redirect("/organizer/login");
   const params = await searchParams, view: View = (VIEWS.find(v => v[0] === params.view)?.[0]) ?? "r1";
   const [report, flags, marking, live, teams, finalists] = await Promise.all([qualificationReport(), broadcastFlags(), markingBoard(), broadcast(),
-    db.team.findMany({ select: { id: true, name: true, progress: true } }), db.r2Finalist.findMany({ select: { teamId: true, status: true } })]);
+    db.team.findMany({ where: competitorWhere, select: { id: true, name: true, progress: true } }), db.r2Finalist.findMany({ select: { teamId: true, status: true } })]);
   if (!report || !live) redirect("/organizer/login");
   const board = buildBoard(teams.map(t => ({ id: t.id, name: t.name, progress: progressSchema.parse(JSON.parse(t.progress)) })));
   const qualified = !!report.confirmation && report.roundStatus === "finished";

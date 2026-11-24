@@ -1,15 +1,11 @@
-import Image from "next/image";
 import { redirect } from "next/navigation";
 import { session } from "@/lib/auth";
-import { inboxQr } from "@/lib/game/inbox-qr.server";
-import { PrintButton } from "@/components/game/print-button";
 
-export default async function InboxKitPage({ searchParams }: { searchParams: Promise<{ origin?: string }> }) {
+/** RETIRED. Chapter 1 no longer uses a physical QR card: players open the Forensic Snapshot with the in-game button. The route remains only so old bookmarks do not break;
+ *  it is organizer-only and prints nothing. The participant page (/clue/inbox), the capture IDs and the Chapter 1 scoring are unchanged. */
+export default async function RetiredInboxKitPage() {
   if (!await session("admin")) redirect("/organizer/login");
-  const params = await searchParams;
-  const origin = params.origin ?? process.env.APP_ORIGIN ?? "";
-  let qr: Awaited<ReturnType<typeof inboxQr>> | undefined;
-  let error = "";
-  try { qr = await inboxQr(origin); } catch (reason) { error = reason instanceof Error ? reason.message : "Invalid application origin"; }
-  return <main className="dashboard-main kit-main"><div className="print-controls"><a className="back-link" href="/admin">← Event operations</a><h1>Chapter 1 · physical evidence kit</h1><p>Enter the origin where this application is reachable from participant phones. Use your deployed HTTPS address, or a private LAN address for an in-person demo. This generates the QR locally; no third-party QR service is contacted.</p><form><label>Application origin<input name="origin" type="url" required defaultValue={origin} placeholder="https://your-event-host.example" /></label><button className="button-primary">Generate printable QR</button></form>{error && <p role="alert">{error}</p>}{qr && <PrintButton />}</div>{qr && <section className="print-card"><span>NEXUS CORP / INCIDENT RESPONSE</span><h2>Evidence card 01 · The Inbox</h2><p>Scan to inspect the recovered authentication-page snapshot.</p><Image unoptimized src={qr.image} width={320} height={320} alt="Chapter 1 forensic snapshot QR code" /><p className="qr-target">{qr.target}</p><p>Cannot scan? Open the same application and enter <strong>/clue/inbox</strong>.</p><p>Sign in with your team account. The card resolves your team&apos;s assigned case. Evidence opens after the organizer starts Round 1.</p><small>READ-ONLY SIMULATION · NO CREDENTIAL COLLECTION<br />Organizer: verify this link from a participant phone before printing the kit.</small></section>}</main>;
+  return <main className="dashboard-main kit-main"><a className="back-link" href="/admin">← Event operations</a><h1>Chapter 1 evidence kit: retired</h1>
+    <p>Chapter 1 · Inbox is fully digital. Teams open the archived Forensic Snapshot with the &ldquo;Open Forensic Snapshot&rdquo; button inside the game; there is no QR card to print and no phone is needed.</p>
+    <p>Nothing else changed: the snapshot evidence, the capture IDs and the Chapter 1 scoring are exactly as before.</p></main>;
 }
