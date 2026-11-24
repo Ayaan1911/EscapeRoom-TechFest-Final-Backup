@@ -44,7 +44,7 @@ test("all four injects are open together, free navigation, paper only except the
   for (const n of [4, 1, 3, 2, 1]) await inject(page, n); // move freely in any order
   await expect(page.getByRole("heading", { name: "Alert at 2:14 AM", level: 1 })).toBeVisible(); await expect(page.locator(".ij-table tbody tr")).toHaveCount(13);
   await inject(page, 3); await expect(page.locator(".ij-claims li")).toHaveCount(8);
-  await inject(page, 4); await expect(page.locator(".ij-sentences li")).toHaveCount(6);
+  await inject(page, 4); await page.getByRole("button", { name: /Public statement/ }).click(); await expect(page.locator(".ij-sentences li")).toHaveCount(6);
   for (const n of [1, 3, 4]) { await inject(page, n); await expect(page.locator(".ij input, .ij textarea, .ij select")).toHaveCount(0); }
   await inject(page, 2); await expect(page.locator(".ij input")).toHaveCount(1);
   await expect(page.locator(".ks-node")).toHaveCount(10); await expect(page.locator(".ks-conns tbody tr")).toHaveCount(10);

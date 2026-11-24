@@ -98,3 +98,33 @@
 @media (min-width: 1200px) and (max-height: 640px) { .cn-chapter .k-inbox-grid.pg-bench > .k-mail-list { position: static; } }
 .gx-ticks-in span { white-space: nowrap; }
 .cn-chapter[data-chapter="5"] .pg-chain { display: none; } /* the reconstruction board shows the same picks */
+
+/* ================= Round 2 ================= */
+.ij-sticky { position: static !important; max-height: none !important; overflow: visible !important; } /* one page scroll; the terminal output is the only inner scroller */
+/* Inject 1: evidence sources as tiles */
+.ij-tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin: 0 0 12px; border-bottom: 0; }
+.ij-tiles button { display: grid; gap: 2px; text-align: left; padding: 10px 12px; border: 1px solid var(--obs-line); border-radius: 10px; background: rgba(11, 13, 11, .6); color: var(--obs-sage); transition: border-color .15s, background .15s, transform .15s; }
+.ij-tiles button b { font-size: 13.5px; color: var(--obs-ivory); } .ij-tiles button small { font-size: 11.5px; }
+.ij-tiles button:hover { transform: translateY(-1px); border-color: var(--obs-line-2); }
+.ij-tiles button[aria-selected="true"] { border-color: var(--obs-phos); background: rgba(168, 217, 180, .08); box-shadow: 0 0 0 1px var(--obs-phos); border-bottom-width: 1px; }
+@media (max-width: 1100px) { .ij-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .ij-tiles { grid-template-columns: 1fr 1fr; } }
+.ij-tabpanel { animation: gx-in .22s ease both; }
+/* Inject 3: claim navigator + one focused claim */
+.ij-claimnav { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 6px; margin: 0 0 10px; }
+.ij-claimnav button { display: grid; gap: 2px; justify-items: center; padding: 8px 4px; grid-template-columns: 1fr; }
+.ij-claimnav button b { font: 700 16px var(--font-mono, monospace); }
+.ij-claimnav .ij-conf { justify-self: center; font-size: 10px; padding: 0 6px; }
+@media (max-width: 700px) { .ij-claimnav { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.ij-claimcard { margin: 0 0 12px; padding: 14px 16px; border: 1px solid var(--obs-line-2); border-left: 3px solid var(--obs-brass); border-radius: 12px; background: rgba(8, 10, 8, .55); animation: gx-in .25s ease both; }
+.ij-claimcard header { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; margin-bottom: 6px; }
+.ij-claimcard p { margin: 0 0 10px; font-size: 16px; line-height: 1.5; }
+.ij-claimstep { display: flex; justify-content: space-between; gap: 8px; }
+.ij-conf { color: var(--obs-sage) !important; border-color: var(--obs-line-2) !important; background: none !important; } /* the AI's own score: deliberately neutral, never green */
+/* Inject 4 */
+.ij-statement .ij-sentences { margin-top: 6px; }
+.ij-calls button:last-child .ij-call-ic { font-size: 14px; }
+@media (prefers-reduced-motion: reduce) { .ij-tabpanel, .ij-claimcard { animation: none; } }
+.ij-shell .rp-head { gap: 0; padding: 0; } .ij-shell .rp-head h1 { font-size: clamp(24px, 2.4vw, 32px) !important; margin: 0; }
+.ij-shell .ij-tiles small, .ij-shell .ij-rail small { font-family: var(--font-sans, sans-serif); letter-spacing: 0; }
+.ij-shell .ij-incident { padding: 12px 16px; } .ij-shell .ij-device { width: 84px; }

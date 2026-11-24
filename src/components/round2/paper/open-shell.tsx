@@ -51,8 +51,8 @@ export function OpenShell({ initial, teamName, demo }: { initial: OpenStatus; te
     <nav className="ij-rail" aria-label="Injects">{injects!.map(x => <button key={x.n} type="button" aria-current={x.n === v.n ? "page" : undefined} className={`${x.n === v.n ? "is-active" : ""} ${x.n === suggested ? "is-suggested" : ""}`} onClick={() => pick(x.n)}>
       <b>{x.n}</b><span><strong>{x.title}</strong><small>{ROLE[x.n]} · suggested {x.pace.fromMin}–{x.pace.toMin} min</small></span></button>)}</nav>
     {offline && <p className="rp-offline" role="alert">Connection lost. The clock keeps running on the server. Retrying…</p>}
-    <p className="ij-rule"><span aria-hidden="true">✎</span> Every answer is written on paper. All four injects stay open until pens down. <b>Only Inject 2 accepts typed commands.</b></p>
     <div className="rp-head"><span className="rp-chnum">INJECT {v.n} OF 4 · {ROLE[v.n].toUpperCase()}</span><h1>{v.title}</h1></div>
+    <p className="ij-rule"><span aria-hidden="true">✎</span> Every answer is written on paper. All four injects stay open until pens down. <b>Only Inject 2 accepts typed commands.</b></p>
     <Body v={v} demo={!!demo} />
   </div>;
 }

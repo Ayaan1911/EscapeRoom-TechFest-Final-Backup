@@ -19,16 +19,17 @@ function NightStrip({ rows }: { rows: I1["network"] }) {
 const TABS1 = [["proc", "Processes"], ["logins", "Login history"], ["net", "Network activity"], ["mail", "Mail and downloads"], ["chat", "Chat transcript"]] as const;
 export function Inject1({ c }: { c: I1 }) {
   const [tab, setTab] = useState<(typeof TABS1)[number][0]>("proc"), base = useId();
+  const count: Record<(typeof TABS1)[number][0], string> = { proc: `${c.processes.length} processes at 02:14`, logins: `${c.logins.length} entries · 12 h`, net: `${c.network.length} events · 21:00–02:30`, mail: `${c.mail.length} items`, chat: `${c.chat.length} lines · recorded` };
   const table = (cols: string[], rows: string[][]) => <table className="ij-table"><thead><tr>{cols.map(h => <th key={h} scope="col">{h}</th>)}</tr></thead><tbody>{rows.map((r, i) => <tr key={i}>{r.map((v, j) => <td key={j} className={j === 0 ? "ij-mono" : undefined}>{v}</td>)}</tr>)}</tbody></table>;
   return <div className="ij ij-1">
     <section className="ij-incident" aria-label="Incident">
       <div className="ij-device" aria-hidden="true"><svg viewBox="0 0 64 44"><rect x="10" y="4" width="44" height="28" rx="2" /><rect x="14" y="8" width="36" height="20" className="ij-screen" /><path d="M4 36h56l-4 5H8z" /></svg><i className="ij-pulse" /></div>
       <div className="ij-incident-copy"><span className="ij-sev">{c.alert.severity}</span><h2>{c.alert.id} · {c.alert.host}</h2><p>User <b>{c.alert.user}</b> · {c.alert.observed}</p>
-        <p className="ij-objective">Decide the first response. Open each evidence tab, compare the records with what Ravi says, then write your choice on paper.</p></div>
+        <p className="ij-objective">Decide the first response. Pick an evidence source below, compare the records with what Ravi says, then write your choice on paper.</p></div>
     </section>
     <div className="ij-cols">
       <section className="ij-panel ij-evidence" aria-label="Evidence">
-        <div role="tablist" aria-label="Evidence tabs" className="ij-tabs">{TABS1.map(([id, label]) => <button key={id} role="tab" id={`${base}-${id}`} aria-selected={tab === id} aria-controls={`${base}-p`} onClick={() => setTab(id)}>{label}</button>)}</div>
+        <div role="tablist" aria-label="Evidence tabs" className="ij-tabs ij-tiles">{TABS1.map(([id, label]) => <button key={id} role="tab" id={`${base}-${id}`} aria-selected={tab === id} aria-controls={`${base}-p`} onClick={() => setTab(id)}><b>{label}</b><small>{count[id]}</small></button>)}</div>
         <div role="tabpanel" id={`${base}-p`} aria-labelledby={`${base}-${tab}`} className="ij-tabpanel">
           {tab === "proc" && <><p className="ij-note">Process snapshot taken at 02:14 on FIN-LAP-07.</p>{table(["PID", "Process", "User", "Started", "CPU"], c.processes.map(p => [p.pid, p.name, p.user, p.started, p.cpu]))}</>}
           {tab === "logins" && <><p className="ij-note">Authentication log for FIN-LAP-07, last 12 hours.</p>{table(["Time", "Account", "Type", "Result"], c.logins.map(l => [l.time, l.account, l.type, l.result]))}</>}
@@ -51,11 +52,13 @@ export function Inject3({ c }: { c: I3 }) {
   return <div className="ij ij-3">
     <p className="ij-brief"><b>SENTINEL-AI</b> filed this report with confidence scores. The scores are the AI&apos;s own; they are not evidence. Check every claim against the records.</p>
     <div className="ij-cols ij-cols-3">
-      <section className="ij-panel ij-report" aria-label="SENTINEL-AI report"><h3>SENTINEL-AI incident report</h3>
-        <ol className="ij-claims">{c.claims.map(x => <li key={x.n}><button type="button" aria-pressed={claim === x.n} onClick={() => setClaim(x.n)}><span className="ij-claim-n">Claim {x.n}</span><span className="ij-conf" aria-label={`AI confidence ${x.confidence}`}>AI confidence {x.confidence}</span><span className="ij-claim-t">{x.text}</span></button></li>)}</ol>
+      <section className="ij-panel ij-report" aria-label="SENTINEL-AI report"><h3>SENTINEL-AI incident report · 8 claims</h3>
+        <ol className="ij-claims ij-claimnav">{c.claims.map(x => <li key={x.n}><button type="button" aria-pressed={claim === x.n} onClick={() => setClaim(x.n)} aria-label={`Claim ${x.n}, AI confidence ${x.confidence}`}><b>{x.n}</b><span className="ij-conf">{x.confidence}</span></button></li>)}</ol>
+        <article key={claim} className="ij-claimcard" aria-live="polite"><header><span className="ij-claim-n">Claim {claim} of {c.claims.length}</span><span className="ij-conf">AI says: {c.claims[claim - 1].confidence} confident</span></header><p>{c.claims[claim - 1].text}</p>
+          <div className="ij-claimstep"><button type="button" className="ij-link" disabled={claim === 1} onClick={() => setClaim(claim - 1)}>← Previous claim</button><button type="button" className="ij-link" disabled={claim === c.claims.length} onClick={() => setClaim(claim + 1)}>Next claim →</button></div></article>
         <PaperNote items={c.paper} /></section>
       <section className="ij-panel ij-sticky ij-verify" aria-label="Evidence">
-        <div className="ij-focus" aria-live="polite"><span>Checking claim {claim}</span><p>{c.claims[claim - 1].text}</p></div>
+        <div className="ij-focus"><span>Checking claim {claim} against the evidence</span><p>{c.claims[claim - 1].text}</p></div>
         <div role="tablist" aria-label="Evidence views" className="ij-tabs"><button role="tab" id={`${base}-r`} aria-selected={view === "records"} aria-controls={`${base}-v`} onClick={() => setView("records")}>Case file extracts</button><button role="tab" id={`${base}-t`} aria-selected={view === "timeline"} aria-controls={`${base}-v`} onClick={() => setView("timeline")}>Night timeline (IST)</button></div>
         <div role="tabpanel" id={`${base}-v`} aria-labelledby={`${base}-${view === "records" ? "r" : "t"}`} className="ij-tabpanel">
           {view === "records" ? <>
@@ -71,20 +74,20 @@ export function Inject3({ c }: { c: I3 }) {
 
 /* ---------------- Inject 4 · The Three Calls ---------------- */
 export function Inject4({ c }: { c: I4 }) {
-  const [call, setCall] = useState(1), cur = c.calls[call - 1];
+  const [call, setCall] = useState(1), cur = c.calls[call - 1]; // call 4 = the public statement board
   const ring = (n: number): ReactNode => <span className="ij-call-ic" aria-hidden="true">{n === call ? "☎" : "✆"}</span>;
   return <div className="ij ij-4">
     <dl className="ij-status" aria-label="Incident status">{c.status.map(s => <div key={s.label}><dt>{s.label}</dt><dd>{s.value}</dd></div>)}</dl>
     <div className="ij-cols ij-cols-4">
-      <nav className="ij-calls" aria-label="CEO calls">{c.calls.map(x => <button key={x.n} type="button" aria-pressed={call === x.n} onClick={() => setCall(x.n)}>{ring(x.n)}<span><b>Call {x.n} · {x.title}</b><small>“{x.ceo}”</small></span></button>)}</nav>
-      <section key={cur.n} className="ij-panel ij-call" aria-label={`Call ${cur.n}: ${cur.title}`}>
+      <nav className="ij-calls" aria-label="CEO calls">{c.calls.map(x => <button key={x.n} type="button" aria-pressed={call === x.n} onClick={() => setCall(x.n)}>{ring(x.n)}<span><b>Call {x.n} · {x.title}</b><small>“{x.ceo}”</small></span></button>)}
+        <button type="button" aria-pressed={call === 4} onClick={() => setCall(4)}><span className="ij-call-ic" aria-hidden="true">✎</span><span><b>Public statement</b><small>pick two of six sentences</small></span></button></nav>
+      {call <= c.calls.length ? <section key={cur.n} className="ij-panel ij-call" aria-label={`Call ${cur.n}: ${cur.title}`}>
         <header><span className="ij-live">INCOMING · CEO</span><h3>Call {cur.n} · {cur.title}</h3><blockquote>“{cur.ceo}”</blockquote></header>
         <ol className="ij-opts">{cur.options.map(o => <li key={o.letter}><b>{o.letter}</b><span>{o.text}</span></li>)}</ol>
         <p className="ij-note"><span aria-hidden="true">✎</span> Write the letter and one line of reasoning on paper. Nothing here is selected or sent.</p>
-      </section>
+      </section> : <section className="ij-panel ij-call ij-statement" aria-label="Public statement"><header><span className="ij-live">DRAFT · PUBLIC STATEMENT</span><h3>Public statement draft board</h3></header><p className="ij-note">Pick two sentences for the public statement. Write their numbers on paper.</p>
+        <ol className="ij-sentences">{c.statements.map(s => <li key={s.n}><b>{s.n}</b><span>{s.text}</span></li>)}</ol></section>}
     </div>
-    <section className="ij-panel ij-statement" aria-label="Public statement"><h3>Public statement draft board</h3><p className="ij-note">Pick two sentences for the public statement. Write their numbers on paper.</p>
-      <ol className="ij-sentences">{c.statements.map(s => <li key={s.n}><b>{s.n}</b><span>{s.text}</span></li>)}</ol></section>
     <PaperNote items={c.paper} />
   </div>;
 }
