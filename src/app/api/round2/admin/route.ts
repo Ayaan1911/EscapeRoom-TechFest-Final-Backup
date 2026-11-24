@@ -6,9 +6,10 @@ import { enrollFinalists, inspectQualification, promoteStandby, readiness } from
 import { auditTrail } from "@/lib/round2/organizer.server";
 import { endPaper, paperTiming, startPaper } from "@/lib/round2/paper/service.server";
 import { demoClassify, terminalReview } from "@/lib/round2/paper/terminal.server";
+import { markingBoard, publishResults, saveMark } from "@/lib/round2/paper/marking.server";
 
 // Organizer-only. Authorization is enforced inside every service function (requireAdmin), not only here.
-const views: Record<string, () => Promise<unknown>> = { qualification: inspectQualification, readiness, timing: () => paperTiming(), terminal: () => terminalReview(), audit: () => auditTrail() };
+const views: Record<string, () => Promise<unknown>> = { qualification: inspectQualification, readiness, timing: () => paperTiming(), terminal: () => terminalReview(), marking: () => markingBoard(), audit: () => auditTrail() };
 export const GET = (req: NextRequest) => guarded(async () => {
   const view = req.nextUrl.searchParams.get("view") ?? "";
   if (!Object.hasOwn(views, view)) throw new R2Error(400, "Unknown view");
@@ -20,10 +21,13 @@ const action = z.discriminatedUnion("action", [
   z.object({ action: z.literal("start") }).strict(), // one format only: there is nothing to choose
   z.object({ action: z.literal("demo-block"), ip: z.string().max(60), previous: z.array(z.string().max(40)).max(4) }).strict(),
   z.object({ action: z.literal("end"), reason: z.string().max(500) }).strict(),
+  // Jury marks: Injects 1, 3, 4 only (validated again in saveMark). There is deliberately no action that writes the Inject 2 terminal score.
+  z.object({ action: z.literal("mark"), teamId: z.string().min(1).max(80), inject: z.union([z.literal(1), z.literal(3), z.literal(4)]), score: z.number().int().min(0).max(15).nullable(), marker: z.string().max(40) }).strict(),
+  z.object({ action: z.literal("publish"), reason: z.string().max(500) }).strict(),
 ]);
 export const POST = (req: NextRequest) => guarded(async () => {
   const parsed = action.safeParse(await readBody(req, 4096));
   if (!parsed.success) throw new R2Error(400, "Invalid request");
   const a = parsed.data;
-  return json(a.action === "enroll" ? await enrollFinalists() : a.action === "promote" ? await promoteStandby(a) : a.action === "start" ? await startPaper() : a.action === "demo-block" ? await demoClassify(a.ip, a.previous) : await endPaper(a.reason));
+  return json(a.action === "enroll" ? await enrollFinalists() : a.action === "promote" ? await promoteStandby(a) : a.action === "start" ? await startPaper() : a.action === "demo-block" ? await demoClassify(a.ip, a.previous) : a.action === "mark" ? await saveMark(a) : a.action === "publish" ? await publishResults(a.reason) : await endPaper(a.reason));
 });

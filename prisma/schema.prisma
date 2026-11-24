@@ -186,6 +186,17 @@ model R2Audit {
   createdAt DateTime @default(now())
   @@index([createdAt])
 }
+// Jury marks for the paper injects (1, 3, 4) of the 60-minute Round 2, per session. Inject 2 is never stored: the terminal computes it.
+// No row = pending (never zero). Every change is written to R2Audit with the previous value.
+model R2PaperMark {
+  teamId String
+  sessionStartsAt DateTime
+  inject Int
+  score Int
+  marker String
+  updatedAt DateTime @default(now())
+  @@id([teamId, sessionStartsAt, inject])
+}
 // Append-only acknowledgment that an organizer has seen an EXACT Round 2 tie (equal on all four ranking criteria) and accepts the shared rank.
 // It never changes a score, a rank or an order. `signature` fingerprints the tie group, so one group can be acknowledged once.
 model R2TieAck {

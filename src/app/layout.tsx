@@ -15,6 +15,7 @@ import "./workbench.css";
 import "./injects.css";
 import "./killswitch.css";
 import "./flow.css";
+import "./command.css";
 
 // Fonts ship inside the build (geist package, SIL OFL): no request to Google at build or run time, so the LAN event needs no internet.
 
