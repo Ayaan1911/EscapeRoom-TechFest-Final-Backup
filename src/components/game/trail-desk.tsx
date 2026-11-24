@@ -59,7 +59,7 @@ function TrailWorkspace({ evidence, initialState, initialDrafts }: { evidence: T
         <button type="button" className="k-btn k-btn-sm k-btn-primary" onClick={() => os.open("console")}>Open event console</button>
         {!demo && <a className="k-btn k-btn-sm" href="/api/game/trail/csv">Download CSV</a>}
       </div>
-      <ActivityTimeline label="Activity timeline" items={filtered.map(r => ({ id: r.id, at: r.timestamp, lane: r.eventType, tone: OUTCOME[r.result].tone, hint: OUTCOME[r.result].text }))} selectedId={selectedId} marked={pinned}
+      <ActivityTimeline label="Activity timeline" items={filtered.map(r => ({ id: r.id, at: r.timestamp, lane: r.eventType, tone: OUTCOME[r.result].tone, hint: OUTCOME[r.result].text, mark: OUTCOME[r.result].mark }))} legend={Object.values(OUTCOME).map(o => ({ tone: o.tone, label: o.text, mark: o.mark }))} selectedId={selectedId} marked={pinned}
         highlight={sameSession} linked={sameSession} onSelect={select} note="Select a marker to open it in the Event inspector. Lines join the selected event's session. Ringed = pinned. The raw records are in the Event console." />
       <div className="k-filterbar">
         {filterField("Search", <input aria-label="Search records" value={filters.search} onChange={e => updateFilters({ search: e.target.value })} placeholder="ID, session, device, text" />)}

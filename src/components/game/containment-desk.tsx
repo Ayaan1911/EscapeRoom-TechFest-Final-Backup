@@ -17,7 +17,7 @@ export function ContainmentDesk({ evidence, initialCctv, initialState, initialDr
   const { state, busy, feedback, result, connection, send, submitTask, remaining, retrySeconds } = useChapter(3, initialState);
   const editable = isEditable(state, 3), demo = useDemo();
   const drafts = useDrafts(3, initialDrafts, editable), f = fieldApi(drafts);
-  const [phase, setPhase] = useState(1);
+  const [phase, setPhase] = useState(1), [cctvOpen, setCctvOpen] = useState(false);
   useEffect(() => { const on = (e: Event) => setPhase(Number((e as CustomEvent<number>).detail) || 1); window.addEventListener("task-open", on); return () => window.removeEventListener("task-open", on); }, []);
   const [more, setMore] = useState<string[]>([]), [movement, setMovement] = useState(""), [dragging, setDragging] = useState<string | null>(null), [cctv, setCctv] = useState(initialCctv), [copyStatus, setCopyStatus] = useState("");
   const knownEvents = new Set(evidence.events.map(e => e.id));
@@ -48,7 +48,7 @@ export function ContainmentDesk({ evidence, initialCctv, initialState, initialDr
   async function checkCopy() {
     if (demo) { setCopyStatus("Demo: the accessible copy is shown above. Nothing is requested."); return; }
     setCopyStatus("Checking…");
-    try { const response = await fetch("/api/game/containment", { cache: "no-store" }); if (!response.ok) throw new Error(); const data = await response.json(); setCctv(data.fallbackCctv); setCopyStatus(data.fallbackCctv ? "Accessible copy loaded. No hint charge." : "No accessible copy granted. Ask the organizer."); }
+    try { const response = await fetch("/api/game/containment", { cache: "no-store" }); if (!response.ok) throw new Error(); const data = await response.json(); setCctv(data.fallbackCctv); if (data.fallbackCctv) setCctvOpen(true); setCopyStatus(data.fallbackCctv ? "Accessible copy loaded. No hint charge." : "No accessible copy granted. Ask the organizer."); }
     catch { setCopyStatus("Unable to check. Retry; nothing changed."); }
   }
   // Option wording is the evidence for the decision, so it stays one click away rather than being removed: the list shows titles, "Details" reveals the full text.
@@ -66,7 +66,7 @@ export function ContainmentDesk({ evidence, initialCctv, initialState, initialDr
       immediate={immediate.map(id => optionById(evidence.immediateOptions, id)).filter((o): o is Option => !!o)} recovery={recovery.map(id => optionById(evidence.recoveryOptions, id)).filter((o): o is Option => !!o)} />
     <PhaseTabs label="Response phases" active={phase} onPick={setPhase} phases={(["Reconstruct", "Identify", "Contain", "Recover and verify", "Preserve"] as const).map((label, i): Phase => { const row = taskOf(state, 3, Object.values(DRAFT)[i]), filled = [true, !!(f.str(DRAFT.identity, "account") && f.str(DRAFT.identity, "sessionId")), immediate.length > 0, recovery.length > 0, support.length >= 5][i];
       return { id: row.id, label, sub: `${row.earned}/${row.max}`, state: row.earned >= row.max ? "done" : row.earned > 0 ? "partial" : filled && i > 0 ? "filled" : "open"}; })} />
-    {cctv && <details className="cn-cctv" open><summary>Security-room snapshot</summary><div className="cn-cctv-body"><ContainmentCctv snapshot={cctv} /></div></details>}
+    {cctv && <details className="cn-cctv" open={cctvOpen} onToggle={e => setCctvOpen((e.currentTarget as HTMLDetailsElement).open)}><summary>Security-room snapshot <small>(evidence · open to view)</small></summary><div className="cn-cctv-body"><ContainmentCctv snapshot={cctv} /></div></details>}
 
     <section className="pg-tasks cn-ops" aria-label="Scored tasks" data-phase={phase}>
 

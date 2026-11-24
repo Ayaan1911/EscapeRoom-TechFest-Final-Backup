@@ -84,7 +84,7 @@ function InboxWorkspace({ evidence, initialState, initialDrafts }: { evidence: O
 
     <div className="k-inbox-grid pg-bench is-two">
       <aside className="k-mail-list" aria-label="Recovered emails" ref={list} onKeyDown={moveSelection}>
-        <div className="k-pane-head"><span className="k-eyebrow">MAILBOX · {evidence.emails.length}</span><small>{evidence.recipient}</small></div>
+        <div className="k-pane-head"><span className="k-eyebrow">MAILBOX · {evidence.emails.length}</span><small>{evidence.recipient}</small><small className="gx-legend"><span className="ds-dots" aria-hidden="true"><i className="ok" /><i className="mid" /><i className="bad" /></span> SPF · DKIM · DMARC header results: pass · other · fail</small></div>
         {evidence.emails.map(item => <button key={item.id} type="button" className={`k-mail-item ${read.includes(item.id) ? "is-read" : "is-unread"}`} aria-pressed={selectedId === item.id} onClick={() => select(item.id)}>
           <span className="k-mail-top"><span className="k-mono">{item.id}</span><AuthDots value={item.headers["Authentication-Results"] ?? ""} /><time dateTime={item.timestamp}>{time(item.timestamp)} UTC</time></span>
           <strong>{item.sender}</strong><span className="k-mail-subject">{item.subject}</span>

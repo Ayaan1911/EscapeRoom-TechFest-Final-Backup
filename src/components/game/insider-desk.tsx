@@ -71,9 +71,9 @@ function InsiderWorkspace({ initialDossier, initialState, initialDrafts }: { ini
       </section>
 
       <section className="pg-board cn-relboard" aria-label="Link board">
-        <h2 className="pg-h">Link board</h2><p className="pg-hint-line">Who appears in which kind of record. Pick a line to open those records. A line is not a verdict.</p>
+        <h2 className="pg-h">Link board</h2><p className="pg-hint-line"><span className="gx-k-dot" aria-hidden="true" /> person &nbsp;·&nbsp; <span className="gx-k-sq" aria-hidden="true" /> record type &nbsp;·&nbsp; line = appears in that kind of record (thicker = more) &nbsp;·&nbsp; select one to focus.</p>
         <RelationGraph staff={dossier.suspects} kinds={(Object.keys(KIND) as InsiderRecord["kind"][]).map(k => ({ key: k, label: KIND[k].label }))} count={(pid, k) => dossier.records.filter(r => r.kind === k && r.employees.includes(pid)).length}
-          selectedStaff={suspect} selectedKind={kind} onStaff={setSuspect} onCell={(pid, k) => { setSuspect(pid); setKind(k); os.open("dossier"); }} />
+          selectedStaff={suspect} selectedKind={kind} onStaff={id => { setSuspect(id); if (id) setKind(""); }} onKind={k => { setKind(k); if (k) setSuspect(""); }} onCell={(pid, k) => { setSuspect(pid); setKind(k); os.open("dossier"); }} />
         <details className="cn-tableview"><summary>Table view</summary>
 
         <div className="k-tablescroll"><table className="k-table pg-linkboard"><caption className="k-sr">Number of dossier records per staff member and record type. Each count opens the matching records.</caption>
@@ -89,7 +89,7 @@ function InsiderWorkspace({ initialDossier, initialState, initialDrafts }: { ini
           <label className="k-filter">Suspect profile<select value={suspect} onChange={e => setSuspect(e.target.value)}><option value="">All</option>{dossier.suspects.map(item => <option value={item.id} key={item.id}>{item.id} · {item.name}</option>)}</select></label>
           <label className="k-filter">Record type<select value={kind} onChange={e => setKind(e.target.value)}><option value="">All</option>{Object.keys(KIND).map(value => <option key={value}>{value}</option>)}</select></label></div>
         <div className="k-toolbar"><strong role="status">{records.length} of {dossier.records.length} records</strong><span className="k-spacer" /><button type="button" className="k-btn k-btn-sm" onClick={() => { setSearch(""); setKind(""); setSuspect(""); }}>Reset dossier filters</button><button type="button" className="k-btn k-btn-sm k-btn-primary" onClick={() => os.open("dossier")}>Open dossier explorer</button></div>
-        <ActivityTimeline label="Dossier timeline" items={records.map(r => ({ id: r.id, at: r.timestamp, lane: KIND[r.kind].label, tone: KIND[r.kind].tone }))} selectedId={record?.id} marked={pinned} linked={pinned}
+        <ActivityTimeline label="Dossier timeline" items={records.map(r => ({ id: r.id, at: r.timestamp, lane: KIND[r.kind].label, tone: KIND[r.kind].tone, mark: KIND[r.kind].icon }))} legend={(Object.keys(KIND) as InsiderRecord["kind"][]).map(k => ({ tone: KIND[k].tone, label: KIND[k].label, mark: KIND[k].icon }))} selectedId={record?.id} marked={pinned} linked={pinned}
           highlight={suspect ? records.filter(r => r.employees.includes(suspect)).map(r => r.id) : []} onSelect={pickRecord} note="Colour = record type. Ringed = pinned. Select a marker to open the record. The line joins only the records you pinned." />
       </section>
 
