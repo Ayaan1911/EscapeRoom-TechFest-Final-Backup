@@ -30,21 +30,24 @@ export async function inspectQualification() {
   const enrolled = await db.r2Finalist.findMany({ orderBy: { seed: "asc" } });
   return { digest: s.digest, confirmedAt: s.confirmedAt, top10: s.top10.map(id => ({ id, name: s.names.get(id) })), standby: s.standby.map(id => ({ id, name: s.names.get(id) })), enrolled: enrolled.map(f => ({ teamId: f.teamId, status: f.status, seed: f.seed, snapshotDigest: f.snapshotDigest })) };
 }
-/** Enroll finalists from the confirmed snapshot. Only before the round starts; idempotent for the same snapshot. */
+/** Enroll a confirmed snapshot as Round 2 finalists inside an open transaction. Idempotent for the same snapshot; refuses a different one. */
+export async function enrollFromSnapshot(tx: Tx, s: { digest: string; top10: string[]; standby: string[] }) {
+  const existing = await tx.r2Finalist.findMany();
+  if (existing.length) {
+    if (existing.every(f => f.snapshotDigest === s.digest)) return { enrolled: existing.length, unchanged: true };
+    throw new R2Error(409, "Finalists are already enrolled from a different qualification snapshot. Use standby promotion for changes.");
+  }
+  await tx.r2Finalist.createMany({ data: [...s.top10.map((teamId, i) => ({ teamId, status: "active", seed: i + 1, snapshotDigest: s.digest })), ...s.standby.map((teamId, i) => ({ teamId, status: "standby", seed: MAX_ACTIVE + i + 1, snapshotDigest: s.digest }))] });
+  await audit(tx, "organizer", "enroll", { digest: s.digest, active: s.top10, standby: s.standby });
+  return { enrolled: s.top10.length + s.standby.length, unchanged: false };
+}
+/** Enroll finalists from an already-confirmed snapshot (fallback for a confirmation that was recorded without advancing). Only before the round starts. */
 export async function enrollFinalists() {
   await requireAdmin();
   return serializable(async tx => {
     const { clock } = await clockNow(tx);
     if (clock.phase !== "not_started" || clock.startsAt) throw new R2Error(409, "Round 2 has started; use standby promotion for roster changes.");
-    const s = await confirmedSnapshot(tx);
-    const existing = await tx.r2Finalist.findMany();
-    if (existing.length) {
-      if (existing.every(f => f.snapshotDigest === s.digest)) return { enrolled: existing.length, unchanged: true };
-      throw new R2Error(409, "Finalists are already enrolled from a different qualification snapshot. Use standby promotion for changes.");
-    }
-    await tx.r2Finalist.createMany({ data: [...s.top10.map((teamId, i) => ({ teamId, status: "active", seed: i + 1, snapshotDigest: s.digest })), ...s.standby.map((teamId, i) => ({ teamId, status: "standby", seed: MAX_ACTIVE + i + 1, snapshotDigest: s.digest }))] });
-    await audit(tx, "organizer", "enroll", { digest: s.digest, active: s.top10, standby: s.standby });
-    return { enrolled: s.top10.length + s.standby.length, unchanged: false };
+    return enrollFromSnapshot(tx, await confirmedSnapshot(tx));
   });
 }
 /**
@@ -86,8 +89,8 @@ export async function readiness() {
     { id: "finalists-enrolled", ok: n("active") > 0, blocking: true, message: "Finalists enrolled from the confirmed snapshot" },
     { id: "content-complete", ok: content, blocking: true, message: "Content complete: Part A = 60, Part B = 40, every task has a grader" },
     { id: "round-not-started", ok: clock.phase === "not_started" && !clock.startsAt, blocking: true, message: "Round 2 has not already been started" },
-    { id: "ten-active", ok: n("active") === MAX_ACTIVE, blocking: false, message: `${n("active")} of ${MAX_ACTIVE} finalists active` },
+    { id: "ten-active", ok: n("active") === MAX_ACTIVE, blocking: false, message: n("active") === MAX_ACTIVE ? `${MAX_ACTIVE} qualified teams enrolled` : `Only ${n("active")} of ${MAX_ACTIVE} qualified teams are enrolled. Check the qualification review before starting.` },
     { id: "two-standby", ok: n("standby") === MAX_STANDBY, blocking: false, message: `${n("standby")} of ${MAX_STANDBY} standby teams` },
   ];
-  return { ready: checks.every(c => c.ok || !c.blocking), checks, active: n("active"), standby: n("standby"), withdrawn: n("withdrawn"), phase: clock.phase };
+  return { ready: checks.every(c => c.ok || !c.blocking), checks, active: n("active"), standby: n("standby"), withdrawn: n("withdrawn"), phase: clock.phase, confirmed: confirmed > 0, expected: MAX_ACTIVE };
 }

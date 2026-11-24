@@ -22,7 +22,7 @@ export const dynamic = "force-dynamic";
 const renderTime = () => Date.now();
 const R1_TONE = { waiting: "idle", active: "live", finished: "ok" } as const;
 
-export default async function AdminPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+export default async function AdminPage({ searchParams }: { searchParams: Promise<{ error?: string; notice?: string }> }) {
   if (!await session("admin")) redirect("/organizer/login");
   const report = await qualificationReport();
   if (!report) redirect("/organizer/login");
@@ -61,6 +61,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       </header>
       <StagePipeline stages={stages} />
       {params.error && <p role="alert" className="cc-alert">{params.error}</p>}
+      {params.notice && <p role="status" className="cc-notice">{params.notice}</p>}
 
       <div className="cc-grid">
         <Panel id="round-control" eyebrow={next ? `NOW · ${next.label.toUpperCase()}` : "EVENT COMPLETE"} title={state === "waiting" ? "Start Round 1" : state === "active" ? "Round 1 is running" : next ? next.status : "Results published"} className="cc-next">
@@ -71,8 +72,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
               <button className="k-btn k-btn-primary k-btn-lg">Start 60-minute round</button>
             </ConfirmForm></>
           : state === "active" ? <p className="cc-lede">Teams are working. Watch chapter progress beside this panel; the team table shows who is stuck. Stopping early is in the danger zone at the bottom.</p>
-          : <><p className="cc-lede">{next?.id === "qual" ? "Round 1 is closed. Review the candidate groups and record the confirmation." : next?.id === "mark" ? "Pens are down. Enter the jury's paper marks; the Kill Switch score comes from the terminal." : next ? "Round 2 is run from its own control room." : "Every stage is complete."}</p>
-            {next && <Link className="cc-btn cc-btn-primary cc-btn-lg" href={next.href}>{next.id === "qual" ? "Go to qualification review" : next.id === "mark" ? "Open jury marking" : next.id === "results" ? "Open leaderboard" : "Open Round 2 control"}</Link>}</>}
+          : <><p className="cc-lede">{next?.id === "qual" ? "Round 1 is closed and scores are saved. Review the Top 10, then confirm to advance them to Round 2. Round 2 starts separately." : next?.id === "mark" ? "Pens are down. Enter the jury's paper marks; the Kill Switch score comes from the terminal." : next ? "Round 2 is run from its own control room." : "Every stage is complete."}</p>
+            {next && <Link className="cc-btn cc-btn-primary cc-btn-lg" href={next.href}>{next.id === "qual" ? "Review Top 10 Teams" : next.id === "mark" ? "Open jury marking" : next.id === "results" ? "Open leaderboard" : "Open Round 2 control"}</Link>}</>}
           <div className="cc-actions"><a className="k-btn" href="/api/admin/scores">Export scores as CSV</a><Link className="k-btn" href="/admin/leaderboard">Leaderboard</Link></div>
         </Panel>
         <Panel id="r1-progress" eyebrow="ROUND 1 · LIVE PROGRESS" title="Chapter progress" aside={<span className="cc-legend"><i className="is-done" />completed{state === "active" && <><i className="is-now" />working on it now</>}</span>}>
@@ -87,7 +88,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         <TeamTable rows={teamRows} provisional={report.label === "PROVISIONAL"} live={state === "active"} />
       </Panel>
 
-      <QualificationBoard report={report} />
+      <QualificationBoard report={report} enrolled={enrolled} />
 
       <div className="cc-grid cc-grid-3">
         <Panel id="kits" eyebrow="EVENT MATERIALS" title="Kits and screens">

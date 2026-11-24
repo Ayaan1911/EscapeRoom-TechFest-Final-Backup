@@ -367,3 +367,24 @@ a.cc-btn { text-decoration: none; }
 .is-r2 .dm2-go { color: var(--obs-brass); }
 @media (prefers-reduced-motion: reduce) { .dm2-path li, .dm2-grid li { animation: none; } .dm2-mod { transition: none; } .dm2-mod:hover { transform: none; } }
 .rc2-term td:first-child, .rc2-mark td:first-child { white-space: nowrap; }
+
+/* ---- qualification and advancement ---- */
+.cc-notice { margin: 0; padding: 12px 16px; border-radius: 12px; border: 1px solid rgba(120, 183, 141, .6); background: rgba(120, 183, 141, .08); color: var(--obs-ivory); }
+.cc-flow { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 14px; padding: 0; counter-reset: step; }
+.cc-flow li { counter-increment: step; display: flex; align-items: center; gap: 8px; padding: 6px 12px; border: 1px solid var(--obs-line-2); border-radius: 999px; font-size: 13px; color: var(--obs-sage); }
+.cc-flow li::before { content: counter(step); display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid currentColor; font: 700 11px var(--font-mono, monospace); }
+.cc-flow li.is-done { color: var(--obs-green); border-color: rgba(120, 183, 141, .5); }
+.cc-flow li.is-done::before { content: "✓"; background: var(--obs-green); color: #0B0D0B; border-color: var(--obs-green); }
+.cc-flow li.is-now { color: var(--obs-phos); border-color: var(--obs-phos); background: rgba(168, 217, 180, .08); }
+.cc-tie { margin: 14px 0; padding: 14px; border: 1px solid rgba(197, 164, 119, .6); border-radius: 12px; background: rgba(197, 164, 119, .05); }
+.cc-tie legend { padding: 0 8px; font-weight: 600; color: var(--obs-brass); }
+.cc-tie-count { margin: 8px 0 0; font: 600 13px var(--font-mono, monospace); color: var(--obs-brass); }
+.cc-tie-count.is-ok { color: var(--obs-green); }
+.cc-adv-list { margin: 8px 0; padding-left: 22px; display: grid; gap: 2px; font-size: 14px; }
+.cc-adv-list small { color: var(--obs-sage); }
+
+/* ---- participant: this team's Round 2 state (Round 1 dashboard) ---- */
+.r2e { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; margin: 0 0 14px; padding: 16px 20px; border: 1px solid var(--obs-line-2); border-radius: 14px; background: rgba(17, 21, 17, .92); animation: cc-in .3s ease both; }
+.r2e h2 { margin: 2px 0 4px; font-size: 21px; } .r2e p { margin: 0; color: var(--obs-sage); max-width: 64ch; }
+.r2e.is-wait { border-color: rgba(197, 164, 119, .6); background: linear-gradient(120deg, rgba(197, 164, 119, .08), rgba(17, 21, 17, .92) 60%); }
+.r2e.is-go { border-color: var(--obs-phos); background: linear-gradient(120deg, rgba(168, 217, 180, .12), rgba(17, 21, 17, .92) 60%); }

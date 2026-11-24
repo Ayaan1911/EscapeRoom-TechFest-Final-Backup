@@ -5,6 +5,7 @@ import { taskDefs, validators } from "./validators";
 import { matchesInsiderFragments } from "./insider-fragments.server";
 import { attemptCap, POLICY_BEST } from "../attempts";
 import { answerHash } from "../round2/safe-json";
+import { round2Entry } from "../round2/access.server";
 
 /** Scoring policy of a stored round. A round that started before policies existed (NULL) stays legacy union-v0 and is never silently upgraded; a round that has not started will get best-v1 when it starts. */
 export const roundPolicy = (round: { scoringPolicy: string | null; startsAt: Date | null }) => round.scoringPolicy === POLICY_BEST || (!round.scoringPolicy && !round.startsAt) ? POLICY_BEST : "union-v0";
@@ -23,7 +24,8 @@ export async function teamState(id: string) {
   const round = await roundState();
   const taskRows = await db.taskScore.findMany({ where: { teamId: id }, select: { taskId: true, earned: true, attempts: true } });
   const earned = new Map(taskRows.map(row => [row.taskId, row.earned])), usedBy = new Map(taskRows.map(row => [row.taskId, row.attempts])), policy = roundPolicy(round);
-  return { id: team.id, name: team.name, participants: JSON.parse(team.participants) as string[], variant: team.variant, progress, score: score(progress), hints: hints(progress), current: current(progress), round, status: status(round), serverNow: Date.now(), chapterHints: progress.chapters.map((chapter, i) => validators[i]?.hints.slice(0, chapter.hints) ?? []), insiderUnlocked: !!team.insiderAccess?.unlockedAt, unlocked: points.map((_, i) => unlocked(progress, i)), unlockThresholds, policy, tasks: catalog.map(list => list.map(task => ({ id: task.id, title: task.title, earned: earned.get(task.id) ?? 0, max: taskMax(task), attempts: policy === POLICY_BEST ? attemptsView(task.id, usedBy.get(task.id) ?? 0) : null }))) };
+  const round2 = await round2Entry(id);
+  return { id: team.id, name: team.name, participants: JSON.parse(team.participants) as string[], variant: team.variant, progress, score: score(progress), hints: hints(progress), current: current(progress), round, status: status(round), serverNow: Date.now(), round2, chapterHints: progress.chapters.map((chapter, i) => validators[i]?.hints.slice(0, chapter.hints) ?? []), insiderUnlocked: !!team.insiderAccess?.unlockedAt, unlocked: points.map((_, i) => unlocked(progress, i)), unlockThresholds, policy, tasks: catalog.map(list => list.map(task => ({ id: task.id, title: task.title, earned: earned.get(task.id) ?? 0, max: taskMax(task), attempts: policy === POLICY_BEST ? attemptsView(task.id, usedBy.get(task.id) ?? 0) : null }))) };
 }
 export async function leaderboard() {
   const teams = await db.team.findMany({ select: { id: true, name: true, progress: true, variant: true, participants: true } });
