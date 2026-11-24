@@ -7,19 +7,18 @@ import { ConnectionBanner, DeskFrame, HintBox, ResultStrip, StateBanner, TaskPan
 import { Badge } from "@/components/ui/kit";
 import { PhaseTabs, type Phase } from "./phase-tabs";
 import { ResponseMap } from "./response-map";
-import { useDemo } from "@/components/demo/demo-context";
 import type { ContainmentCctv as Snapshot, ContainmentEvidence } from "@/types/containment";
 
 type Option = { id: string; title: string; detail: string };
 const DRAFT = { timeline: "containment.timeline", identity: "containment.identity", immediate: "containment.immediate", recovery: "containment.recovery", evidence: "containment.evidence" } as const;
 
-export function ContainmentDesk({ evidence, initialCctv, initialState, initialDrafts }: { evidence: ContainmentEvidence; initialCctv: Snapshot | null; initialState: ChapterState; initialDrafts: ServerDraft[] }) {
+export function ContainmentDesk({ evidence, cctv, initialState, initialDrafts }: { evidence: ContainmentEvidence; cctv: Snapshot; initialState: ChapterState; initialDrafts: ServerDraft[] }) {
   const { state, busy, feedback, result, connection, send, submitTask, remaining, retrySeconds } = useChapter(3, initialState);
-  const editable = isEditable(state, 3), demo = useDemo();
+  const editable = isEditable(state, 3);
   const drafts = useDrafts(3, initialDrafts, editable), f = fieldApi(drafts);
   const [phase, setPhase] = useState(1), [cctvOpen, setCctvOpen] = useState(true);
   useEffect(() => { const on = (e: Event) => setPhase(Number((e as CustomEvent<number>).detail) || 1); window.addEventListener("task-open", on); return () => window.removeEventListener("task-open", on); }, []);
-  const [more, setMore] = useState<string[]>([]), [movement, setMovement] = useState(""), [dragging, setDragging] = useState<string | null>(null), [cctv, setCctv] = useState(initialCctv), [copyStatus, setCopyStatus] = useState("");
+  const [more, setMore] = useState<string[]>([]), [movement, setMovement] = useState(""), [dragging, setDragging] = useState<string | null>(null);
   const knownEvents = new Set(evidence.events.map(e => e.id));
   const saved = f.arr(DRAFT.timeline, "eventOrder").filter(id => knownEvents.has(id));
   const eventOrder = saved.length === evidence.events.length ? saved : evidence.events.map(e => e.id);
@@ -45,12 +44,6 @@ export function ContainmentDesk({ evidence, initialCctv, initialState, initialDr
     const answer = task === DRAFT.timeline ? { eventOrder } : task === DRAFT.identity ? { account: f.str(task, "account").trim(), sessionId: f.str(task, "sessionId").trim() } : task === DRAFT.immediate ? { immediateActions: immediate } : task === DRAFT.recovery ? { recoveryOrder: recovery } : { supportingEvidenceIds: support };
     await submitTask(task, answer);
   }
-  async function checkCopy() {
-    if (demo) { setCopyStatus("Demo: the accessible copy is shown above. Nothing is requested."); return; }
-    setCopyStatus("Checking…");
-    try { const response = await fetch("/api/game/containment", { cache: "no-store" }); if (!response.ok) throw new Error(); const data = await response.json(); setCctv(data.fallbackCctv); if (data.fallbackCctv) setCctvOpen(true); setCopyStatus(data.fallbackCctv ? "Accessible copy loaded. No hint charge." : "No accessible copy granted. Ask the organizer."); }
-    catch { setCopyStatus("Unable to check. Retry; nothing changed."); }
-  }
   // Option wording is the evidence for the decision, so it stays one click away rather than being removed: the list shows titles, "Details" reveals the full text.
   const choice = (item: Option, picked: boolean, change: () => void, aria: string) => { const shown = more.includes(item.id);
     return <label key={item.id} className={`k-choice ${picked ? "is-picked" : ""}`}><input type="checkbox" checked={picked} disabled={!editable} onChange={change} aria-label={aria} /><span><strong>{item.id} · {item.title}</strong>{shown && <small>{item.detail}</small>}</span>
@@ -66,7 +59,7 @@ export function ContainmentDesk({ evidence, initialCctv, initialState, initialDr
       immediate={immediate.map(id => optionById(evidence.immediateOptions, id)).filter((o): o is Option => !!o)} recovery={recovery.map(id => optionById(evidence.recoveryOptions, id)).filter((o): o is Option => !!o)} />
     <PhaseTabs label="Response phases" active={phase} onPick={setPhase} phases={(["Reconstruct", "Identify", "Contain", "Recover and verify", "Preserve"] as const).map((label, i): Phase => { const row = taskOf(state, 3, Object.values(DRAFT)[i]), filled = [true, !!(f.str(DRAFT.identity, "account") && f.str(DRAFT.identity, "sessionId")), immediate.length > 0, recovery.length > 0, support.length >= 5][i];
       return { id: row.id, label, sub: `${row.earned}/${row.max}`, state: row.earned >= row.max ? "done" : row.earned > 0 ? "partial" : filled && i > 0 ? "filled" : "open"}; })} />
-    {cctv && <details className="cn-cctv" open={cctvOpen} onToggle={e => setCctvOpen((e.currentTarget as HTMLDetailsElement).open)}><summary>Security-room snapshot <small>(evidence · open to view)</small></summary><div className="cn-cctv-body"><ContainmentCctv snapshot={cctv} /></div></details>}
+    <details className="cn-cctv" open={cctvOpen} onToggle={e => setCctvOpen((e.currentTarget as HTMLDetailsElement).open)}><summary>Security-room snapshot <small>(evidence · on screen, nothing to collect)</small></summary><div className="cn-cctv-body"><ContainmentCctv snapshot={cctv} /></div></details>
 
     <section className="pg-tasks cn-ops" aria-label="Scored tasks" data-phase={phase}>
 
@@ -105,8 +98,6 @@ export function ContainmentDesk({ evidence, initialCctv, initialState, initialDr
     </section>
 
     <div className="pg-aux">
-      <details className="pg-hints"><summary>Security-room clue <span className="pg-chip">{evidence.cctvReference.id}</span></summary><p>{evidence.cctvReference.placement}</p>
-        <button type="button" className="k-btn k-btn-sm" onClick={() => void checkCopy()}>Check authorized CCTV copy</button><p role="status" className="pg-live">{copyStatus}</p></details>
       <HintBox chapter={3} state={state} editable={editable} busy={busy} onHint={() => void send("hint")} />
       <details className="pg-hints"><summary>Notes <span className="pg-chip">private to your team</span></summary><label>Scratchpad<textarea rows={4} maxLength={900} disabled={!editable} value={f.str("notes", "text")} onChange={e => f.set("notes", "text", e.target.value)} /></label></details>
     </div>

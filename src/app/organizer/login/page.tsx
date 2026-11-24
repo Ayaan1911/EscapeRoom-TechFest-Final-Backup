@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { PasswordField } from "@/components/ui/password-field";
 import { OsHeader } from "@/components/ui/os-header";
 import { session } from "@/lib/auth";
 import { signInOrganizer } from "./actions";
@@ -22,7 +23,7 @@ export default async function OrganizerLoginPage({ searchParams }: { searchParam
             <p className="k-muted">Enter the organizer access code.</p>
             {params.error && <p role="alert" className="k-banner k-banner-warn">Access denied. Check the code or try again later.</p>}
             <form action={signInOrganizer} className="k-form">
-              <label>Access code<input type="password" name="code" required minLength={12} maxLength={256} autoComplete="current-password" /></label>
+              <PasswordField label="Access code" name="code" required minLength={12} maxLength={256} />
               <button className="k-btn k-btn-primary k-btn-lg">Sign in</button>
             </form>
           </div>

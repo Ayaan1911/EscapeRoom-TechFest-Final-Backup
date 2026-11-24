@@ -115,3 +115,11 @@
 .k-continue .k-btn { min-width: 260px; }
 #case-closed { scroll-margin-top: var(--s5); }
 @media (max-width: 600px) { .k-continue .k-btn { width: 100%; min-width: 0; } }
+
+/* Password Show/Hide eye (PasswordField): the button floats over the right end of the input */
+.pw-field { position: relative; }
+.pw-field input { padding-right: 56px; }
+.pw-eye { position: absolute; right: 4px; bottom: 4px; width: 44px; height: 40px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--text, #EAE8DC); cursor: pointer; opacity: .85; }
+.pw-eye:hover { opacity: 1; background: rgba(168, 217, 180, .12); }
+.pw-eye:focus-visible { outline: 3px solid var(--amber, #C5A477); outline-offset: 1px; opacity: 1; }
+.pw-eye[aria-pressed="true"] { color: var(--amber, #C5A477); }

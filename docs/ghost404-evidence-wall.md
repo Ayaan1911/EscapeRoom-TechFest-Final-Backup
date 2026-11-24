@@ -1,38 +1,46 @@
-# Evidence Wall: one assigned group per team (Insider chapter)
+# Evidence Wall: three shared pairs (Insider chapter)
 
-**Contract:** 30 teams → 10 A / 10 B / 10 C → one private fragment per team → one matching public counterpart → dossier unlocked.
+**Final contract:** 30 teams → 10 per group → THREE unique private codes and THREE unique public codes (SIX unique fragments in all) → one pair required per team → dossier unlocked.
+
+| Group | Teams | Private fragment | Public fragment |
+|---|---|---|---|
+| A | 10 | the SAME Private A for all 10 | the SAME Public A |
+| B | 10 | the SAME Private B for all 10 | the SAME Public B |
+| C | 10 | the SAME Private C for all 10 | the SAME Public C |
+
+Team logins stay unique; only the fragment is shared within a group. There are no per-team codes, no 36 public cards and no decoys.
 
 ## History
-1. Original: per team one private fragment (A) and one public card (B) in `InsiderAccess`; both unlocked the dossier.
-2. Release 3293514 (superseded): three independent pairs per team (three folders).
-3. **Now (group mode):** each team is assigned ONE group A, B or C and solves ONE pair.
+1. Original: per team one private (A) and one public (B) code in `InsiderAccess`.
+2. Release 3293514: three pairs per team (three folders). Superseded, still readable.
+3. Release 89e52d4: one group per team but a unique code pair per team plus decoys. **Superseded: it misread the event design.** Still readable and convertible.
+4. **Now:** three shared pairs.
 
-## Group mode
-- **Assignment** (`prepareGroups`, organizer action in `/admin/insider-kit`): teams without any pair row are shuffled with a CSPRNG (so groups do not follow team-ID order) and each goes to the currently smallest group. 30 teams always end exactly 10/10/10; a roster of any other size is balanced to within one team and labelled "Demonstration roster". It runs in one serializable transaction, is persisted (`InsiderPair`), and is idempotent: re-running, restarting the server or reprinting never changes a group or a code. A team that already holds a pair row, in any mode, is never touched. Later additions go to the smallest group.
-- **Private fragment:** one `InsiderPair` row per team (`pair` = its group, `privateCode` unique, `solvedAt`).
-- **Public counterpart:** one `InsiderWallCard` `match` row per team (`teamId` = that team, `pair` = its group, random `W-...` code) = 30 matching cards for 30 teams, plus 2 shared lookalike decoys per group (6). 36 cards in all. Decoys carry `variant "*"`.
-- **Matching** (`solvePair`): the private code must be one of THIS team's rows; the wall code must be a `match` card whose `teamId` is this team and whose group is the team's group. Another team's fragment or card, a decoy, a card of another group, the bare letter, malformed or extra fields all give the same answer ("do not fit together"). The letter A/B/C only says where to look; it is never accepted as an answer.
-- **Unlock:** the one match sets `InsiderAccess.unlockedAt`, which already gates the scored tasks and opens the WHOLE dossier. No other fragment or folder is asked for. It is server-side, persisted, and survives refresh, a new tab and re-login. The match awards no points and changes no chapter state (tested); the existing Insider scoring and unlock rules are untouched.
-- **Participant UI:** "Match your Group X fragment" panel with the two inputs, then "GROUP X MATCHED - DOSSIER OPEN". The participant API exposes only the team's own letter and solved flag (`insiderGroup`); no code, card role or other team's group is in any response (tested).
-- **Organizer UI** (`/admin/insider-kit`): summary (teams registered, teams prepared, Group A/B/C counts, not yet assigned, earlier three-pair teams, state line, "final split complete" only for exactly 30 teams at 10/10/10); "Prepare group assignment (all teams)" / "Prepare selected teams"; read-only views: **Private fragments** (one card per team, only its own code, group letter, "do not post"), **Public wall cards** (per group section, codes only: no team, role or private code, decoys indistinguishable), **Organizer code map** (organizer-only table of who matches what; never print or post it). The old two-fragment sheets remain under a collapsed "earlier" section for teams that never get a group.
+## Physical contract
+- Every team gets ONE access card: its unique team ID, its unique password and its group's PRIVATE fragment (printed in the later credential phase; not generated here).
+- The three PUBLIC fragments are placed by the organizer at three building locations. Participants find their group's public fragment, return to the lab PC and enter both codes in Chapter 3.
+- Only Chapter 3 needs participants to leave the lab. Inbox, Trail, Containment and Final Verdict are fully digital (Round 2 keeps its approved paper answer sheets).
 
-## Data
-Additive migration `20261127000000_insider_group_assignment`: `InsiderWallCard.teamId` (nullable, indexed, FK to `Team` with cascade). No other schema change: group mode reuses `InsiderPair` with exactly one row per team. Rollback: drop the column; nothing else changed. Do not apply to a live database without a backup.
+## How it works
+- **Codes** (`InsiderGroupCode`, one row per group): `P-XXXX-XXXX` (private) and `W-XXXX-XXXX` (public) from an alphabet without 0, O, 1, I, L, random, created ONCE by the organizer's preparation and never regenerated or replaced (idempotent, concurrency-safe). They live only in the event database.
+- **Assignment** (`InsiderGroupMember`, one row per team): shuffled once with a CSPRNG and balanced so 30 teams end exactly 10/10/10 (any other size: within one team, labelled "Demonstration roster"). Persisted; re-running preparation, reprinting, restarting the server or logging out never changes a group or a code. Teams that already have an earlier pair row are never touched.
+- **Validation** (`solvePair`, server-side, per team transaction): authenticated team → its own group → the submitted private code equals THAT group's private code AND the public code equals THAT group's public code (constant-time compares, both always evaluated). The letter alone, one half, swapped or mixed halves, another group's pair, malformed or extra fields all give the same answer. A repeat is harmless.
+- **Unlock:** the one match sets `InsiderAccess.unlockedAt`, which already gates the scored tasks, and opens the WHOLE dossier. No other pair or folder is required. Persisted; survives refresh, re-login and restart. The match awards no points and changes no chapter state; Chapter 3 scoring and the unlock threshold are untouched.
+- **Participant exposure:** the participant API returns only the team's own group letter and solved flag. No code (not even the team's own) and no map is ever returned; the public code is not shown anywhere in the portal.
+- **Organizer** (`/admin/insider-kit`, organizer sign-in only): summary (teams per group, unique private/public/total fragments, distinction between unique definitions and physical copies), "Prepare shared fragments and groups", views: Public fragments (exactly 3 printable cards), Private fragments (3 cards), Organizer code map. A "Copies of each card" box prints extra copies of the SAME fragments. The map is organizer-only; never print or post it.
 
-## Compatibility with earlier data
+## Data and migration
+Additive migration `20261128000000_insider_shared_pairs` (new tables `InsiderGroupCode`, `InsiderGroupMember`). Earlier migrations (`20261126000000_insider_wall_pairs`, `20261127000000_insider_group_assignment`) are NOT rewritten.
+
 | Team has | Mode | Behaviour |
 |---|---|---|
-| 1 `InsiderPair` row | group | as above |
-| 3 `InsiderPair` rows (release 3293514) | earlier three-pair | unchanged: each solved pair opens its folder, all three open the dossier; `pairs` shape unchanged; variant-level match cards still honoured (`teamId` null) |
-| 0 rows | original two-fragment | unchanged; already-unlocked teams stay unlocked |
+| an `InsiderGroupMember` row | shared pairs | as above (always wins) |
+| one `InsiderPair` row + own card (89e52d4) | earlier per-team group | unchanged until converted |
+| three `InsiderPair` rows (3293514) | earlier three-pair | unchanged |
+| none | original two-fragment | unchanged; already-unlocked teams stay unlocked |
 
-Preparing all teams assigns groups only to teams with no rows; three-pair teams are left alone and shown as "earlier three-pair teams". Nobody is converted or made incomplete. A group team cannot use its legacy fragments as a bypass (tested).
-
-## Physical contract (print phase is separate; nothing final is generated here)
-- Private: ONE slip per team, carrying its code and the group letter, for the envelope.
-- Public: per group section, that group's matching cards (10 for a 30-team event) plus 2 decoys, each carrying its own code.
-- The clue artwork and wording are the owner's; the digital side checks only the codes. The wall sheet must not reveal which card is the match.
-- No permanent team accounts, passwords or print pack are created here.
+### Safe update of an already-prepared database
+1. Take a database backup (`pg_dump`). 2. Apply the migration. 3. Open `/admin/insider-kit`; if teams still carry per-team codes, a "Convert earlier preparation" box appears: tick the backup box, type `CONVERT`, press the button. It keeps each team's group letter and solved state, deletes nothing, ignores the old rows from then on, never touches three-pair or two-fragment teams, and is audited (`insider-shared-conversion`). An already-unlocked team stays unlocked; an unsolved team uses the shared pair from then on. 4. Press "Prepare shared fragments and groups" to assign any remaining teams. Printed per-team cards from the earlier release are invalid after conversion: reprint from the new views. Nothing runs automatically on any database.
 
 ## Tests
-`tests/evidence-wall-db.test.ts` (11): 30 teams = 10/10/10 with one slip and one card each, not a round-robin, idempotent and stable on reprint, organizer-only; correct pair opens the whole dossier with nothing else required; persistence; wrong combinations (letter only, decoys, another team's card, another group's card, someone else's fragment, garbage, extra fields); format tolerance; team isolation; sealed tasks until the match; no leakage; legacy compatibility (three-pair and two-fragment teams, selected-team preparation, demonstration roster not "final"); Demo Mode isolation. Browser: `tests/evidence-wall.spec.ts` (organizer preparation and print views, player journey at 1366x768, refresh, new tab, re-login, isolation).
+`tests/evidence-wall-db.test.ts` (11, PostgreSQL): six unique fragments and no per-team rows or decoys; 30 teams 10/10/10, ten teams share each pair, not ID order; stable on re-prepare, reprint and a fresh module load; a match opens the whole dossier and a team-mate unlocks with the same codes; persistence; wrong matches (other groups' pairs, letter, one half, swapped, mixed, garbage, extra fields); every group with its own pair and format tolerance; sealed tasks until the match; no code in any participant response; earlier-mode compatibility and the explicit conversion (idempotent, history kept); Demo Mode isolation. Browser: `tests/evidence-wall.spec.ts` (organizer preparation, exactly three public cards, copies, player journey, two teams of one group, another group refused).

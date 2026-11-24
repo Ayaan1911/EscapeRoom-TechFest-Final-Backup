@@ -97,7 +97,6 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             <li><Link href="/admin/round2/print">Round 2 printables</Link><span>Answer sheets, slips, score sheet</span></li>
             <li><a href="/admin/inbox-kit">Chapter 1 evidence kit</a><span>Optional legacy QR card (no longer needed: players open the snapshot in-app)</span></li>
             <li><a href="/admin/insider-kit">Insider Evidence Wall kit</a><span>Envelope fragments and wall cards</span></li>
-            <li><a href="/admin/containment-kit">Containment CCTV kit</a><span>Security-room snapshots by variant</span></li>
           </ul>
         </Panel>
         <Panel id="demo" eyebrow="SAFE PREVIEW" title="Showing the game to someone?" className="cc-demo">

@@ -103,9 +103,9 @@ try {
 === ROUND 1 FULL REHEARSAL (real five-chapter app, disposable database) ===
 Teams DEMO-A / DEMO-B / DEMO-C start with ZERO progress (variants A/B/C), same code as organizer (printed above).
  1. Organizer window: ${origin.origin}/organizer/login  -> Start Round 1.
- 2. Organizer: open /admin/inbox-kit (print/scan QR), /admin/insider-kit (prepare PRIVATE A + PUBLIC B), /admin/containment-kit.
+ 2. Organizer: open /admin/inbox-kit (print/scan QR), /admin/insider-kit (prepare the three shared fragment pairs).
  3. Participant in a SEPARATE browser profile: ${origin.origin}/login?role=team, Team ID DEMO-A.
- 4. Play Inbox -> Trail -> Insider (enter both physical fragments) -> Containment (organizer may authorize accessible CCTV copy) -> Final Verdict.
+ 4. Play Inbox -> Trail -> Insider (enter both physical fragments) -> Containment (the security-room evidence is on screen) -> Final Verdict.
  5. See CASE CLOSED; refresh and log in again to confirm the saved score (max 105 with Tamper Alert).
  6. Organizer: review the leaderboard, Stop the round, inspect qualification (Top 10 + 2 standby) and CSV export.
 Ctrl+C drops the temporary PostgreSQL database. After a forced close run: node -e "import('./scripts/pg-temp.mjs').then(m=>m.dropStaleTempDatabases())" (drops only ghostt_* databases on the local test server).`);

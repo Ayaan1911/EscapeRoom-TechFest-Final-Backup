@@ -25,24 +25,17 @@ test("Containment enforces sessions, waiting round, exact team isolation and an 
   expect((await page.request.get("/api/game/containment")).status()).toBe(403); expect((await page.request.get("/api/game/containment?teamId=CONTAIN-A")).status()).toBe(403);
   const override = admin.locator("section").filter({ has: admin.getByRole("heading", { name: "Unlock next chapter", exact: true }) }); await override.getByLabel("Team ID", { exact: true }).fill("CONTAIN-LOCKED"); await override.getByLabel("Reason", { exact: true }).fill("Containment browser regression: approved Insider progression override"); await override.getByRole("button", { name: "Record override", exact: true }).click(); await confirmDialog(admin);
   await expect(admin.locator("section").filter({ has: admin.getByRole("heading", { name: "Recent audit events", exact: true }) }).getByText(/Containment browser regression: approved Insider progression override/)).toBeVisible(); await page.goto("/play/containment"); await expect(page.getByRole("heading", { name: "Containment", exact: true })).toBeVisible(); await expect(page.getByText("Saved score: 40 / 105", { exact: true })).toBeVisible();
-  const own = await (await page.request.get("/api/game/containment")).json(); expect(own.evidence.caseId).toBe("NEXUS-CONTAINMENT-C"); expect(own.fallbackCctv).toBeNull(); expect(JSON.stringify(own)).not.toMatch(/fragmentA|fragmentB/);
+  const own = await (await page.request.get("/api/game/containment")).json(); expect(own.evidence.caseId).toBe("NEXUS-CONTAINMENT-C"); expect(own.cctv.id).toBe("CCTV-C-08"); /* on screen, no grant */ expect(JSON.stringify(own)).not.toMatch(/fragmentA|fragmentB/);
   await page.goto("/admin/containment-kit"); await expect(page).toHaveURL(/\/organizer\/login/); organizerCookies = await context.cookies(); await context.close();
 });
 
-test("organizer prints fictional A4 CCTV sheets without solutions and authorizes one audited accessible copy", async ({ page }, info) => {
-  await organizer(page); await page.getByRole("link", { name: "Print Containment CCTV kit", exact: true }).click();
-  await expect(page.getByText("3 fictional A4 snapshots prepared.", { exact: true })).toBeVisible(); await expect(page.locator(".containment-cctv")).toHaveCount(3);
-  const html = await page.content(); expect(/ACT-[ABC]-|REC-[ABC]-|INC-[ABC]-|containmentSolution|eventOrder|fragmentA|fragmentB/.test(html)).toBe(false);
-  for (const variant of ["A", "B", "C"]) { const snapshot = page.getByRole("article", { name: `Fictional snapshot CCTV-${variant}-08`, exact: true }); await expect(snapshot).toContainText("2026-11-16T09:10:11Z"); await expect(snapshot).toContainText(`CUST-${variant}-01`); await expect(snapshot).toContainText("No person is depicted"); }
-  await page.pdf({ path: info.outputPath("cctv-all-variants.pdf"), format: "A4", printBackground: true, preferCSSPageSize: true });
-  await page.getByRole("combobox", { name: "Print variant", exact: true }).selectOption("B"); await page.getByRole("button", { name: "Prepare CCTV sheets", exact: true }).click(); await expect(page).toHaveURL(/variant=B/); await expect(page.locator(".containment-cctv")).toHaveCount(1); await expect(page.getByRole("heading", { name: "CCTV-B-08", exact: true })).toBeVisible();
-  await page.pdf({ path: info.outputPath("cctv-variant-B.pdf"), format: "A4", printBackground: true, preferCSSPageSize: true });
-  await page.getByLabel("Team ID", { exact: true }).fill("CONTAIN-A"); await page.getByLabel("Copy authorization reason", { exact: true }).fill("Browser regression: printed sheet inaccessible at the desk"); await page.getByRole("button", { name: "Authorize evidence copy", exact: true }).click(); await expect(page.getByText(/Accessible copy authorized and audited/)).toBeVisible();
-  await page.getByRole("link", { name: "Event operations", exact: false }).click(); await expect(page.getByText(/Browser regression: printed sheet inaccessible at the desk/)).toBeVisible();
+test("the CCTV kit is retired: organizer-only notice, no printable sheets, no copy authorization, no dashboard link", async ({ page }) => {
+  await organizer(page); await expect(page.getByRole("link", { name: /Containment CCTV kit/ })).toHaveCount(0);
+  await page.goto("/admin/containment-kit"); await expect(page.getByRole("heading", { name: "Containment CCTV kit: retired" })).toBeVisible(); await expect(page.locator(".containment-cctv")).toHaveCount(0);
+  await expect(page.getByLabel("Copy authorization reason")).toHaveCount(0); await expect(page.getByRole("button", { name: "Authorize evidence copy" })).toHaveCount(0);
 });
 
-async function openClue(page: Page) { const summary = page.locator("summary", { hasText: "Security-room clue" }); if (!(await summary.evaluate(el => (el.parentElement as HTMLDetailsElement).open))) await summary.click(); }
-for (const variant of ["A", "B", "C"] as const) test(`Containment ${variant}: keyboard timeline, evidence, safe equivalent recovery, hints, score and saved history`, async ({ page, browser }, info) => {
+for (const variant of ["A", "B", "C"] as const) test(`Containment ${variant}: keyboard timeline, evidence, safe equivalent recovery, hints, score and saved history`, async ({ page }, info) => {
   test.setTimeout(90000);
   const answer = containmentAnswers[variant], id = `CONTAIN-${variant}`;
   const external: string[] = []; page.on("request", request => { if (new URL(request.url()).origin !== "http://127.0.0.1:3000") external.push(request.url()); });
@@ -50,12 +43,9 @@ for (const variant of ["A", "B", "C"] as const) test(`Containment ${variant}: ke
   expect(/containmentSolution|containmentValidator|"edges"|answerKey/.test(await page.content())).toBe(false);
   const response = await page.request.get("/api/game/containment"); expect(response.headers()["cache-control"]).toBe("no-store"); const data = await response.json(); expect(data.evidence.caseId).toBe(`NEXUS-CONTAINMENT-${variant}`); expect(data.evidence.events).toHaveLength(7);
   expect((await page.request.get("/api/game/containment?variant=A&teamId=CONTAIN-A")).status()).toBe(403);
-  if (variant === "A") await expect(page.getByRole("article", { name: "Fictional snapshot CCTV-A-08", exact: true })).toBeVisible();
-  else { expect(data.fallbackCctv).toBeNull(); await openClue(page); await page.getByRole("button", { name: "Check authorized CCTV copy", exact: true }).click(); await expect(page.getByText(/No accessible copy granted/)).toBeVisible(); }
-  if (variant === "B") {
-    const context = await browser.newContext(), admin = await context.newPage(); await organizer(admin); await admin.goto("/admin/containment-kit"); await admin.getByLabel("Team ID", { exact: true }).fill(id); await admin.getByLabel("Copy authorization reason", { exact: true }).fill("Browser regression: damaged B clue needs accessible copy"); await admin.getByRole("button", { name: "Authorize evidence copy", exact: true }).click(); await expect(admin.getByText(/Accessible copy authorized and audited/)).toBeVisible(); await context.close();
-    await openClue(page); await page.getByRole("button", { name: "Check authorized CCTV copy", exact: true }).click(); await expect(page.getByRole("article", { name: "Fictional snapshot CCTV-B-08", exact: true })).toBeVisible(); await expect(page.getByRole("article", { name: "Fictional snapshot CCTV-A-08", exact: true })).toHaveCount(0);
-  }
+  const mine = page.getByRole("article", { name: `Fictional snapshot CCTV-${variant}-08`, exact: true }); await expect(mine).toBeVisible(); // the security-room evidence is on screen for every variant, with no grant
+  for (const other of ["A", "B", "C"].filter(v => v !== variant)) await expect(page.getByRole("article", { name: `Fictional snapshot CCTV-${other}-08`, exact: true })).toHaveCount(0); expect(data.cctv.id).toBe(`CCTV-${variant}-08`);
+  await expect(page.locator("body")).not.toContainText(/evidence station|accessible copy|Check authorized CCTV copy|ask an organizer/i); await expect(page.getByRole("button", { name: "Check authorized CCTV copy" })).toHaveCount(0);
   const first = data.evidence.events[0].id;
   await page.getByRole("button", { name: `Move event ${first} down`, exact: true }).focus(); await page.keyboard.press("Space"); await expect(page.getByText(`${first} moved to position 2 of 7.`, { exact: true })).toBeVisible();
   await arrange(page, "event", answer.eventOrder);
@@ -91,5 +81,5 @@ test("closed rounds preserve authorized historical evidence and block new plans 
   const context = await browser.newContext(), admin = await context.newPage(); await organizer(admin); await admin.getByRole("button", { name: "Stop round", exact: true }).click(); await confirmDialog(admin, "STOP"); await expect(admin.getByRole("button", { name: "Stop round", exact: true })).toBeDisabled();
   await login(page, "CONTAIN-A"); await page.goto("/play/containment"); await expect(page.getByRole("timer", { name: "Round time remaining" })).toHaveText("FINISHED"); await expect(page.getByRole("article", { name: "Fictional snapshot CCTV-A-08", exact: true })).toBeVisible();
   for (const action of ["hint", "submit"]) { const response = await page.request.post("/api/game", { headers: { Origin: "http://127.0.0.1:3000" }, data: { action, chapter: 3, answer: containmentAnswers.A } }); expect(response.status()).toBe(409); expect((await response.json()).error).toContain("not active"); }
-  expect((await page.request.get("/api/game/containment")).status()).toBe(200); await admin.goto("/admin/containment-kit"); await admin.getByLabel("Team ID", { exact: true }).fill("CONTAIN-C"); await admin.getByLabel("Copy authorization reason", { exact: true }).fill("Closed round cannot authorize a new copy"); await admin.getByRole("button", { name: "Authorize evidence copy", exact: true }).click(); await expect(admin.getByRole("alert").filter({ hasText: "Copy unavailable" })).toBeVisible(); await context.close();
+  expect((await page.request.get("/api/game/containment")).status()).toBe(200); await context.close();
 });

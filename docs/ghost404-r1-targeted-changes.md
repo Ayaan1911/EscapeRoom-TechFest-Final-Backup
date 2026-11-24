@@ -9,8 +9,8 @@ Scope of this pass: four changes only. Not touched: Round 1 scoring, Round 2 (sc
 - **No new clues:** the description is a FIXED sentence per event type (the same for every event of that type, every team), e.g. "A session token was issued." The free-text `details`, `method`, `device` and `conditionalAccess` fields are NOT listed because they carry the Tamper Alert text and policy wording; they remain in the inspector. A legend sentence states that Allowed/Denied/Challenged says nothing about intent. No red/green correctness styling beyond the existing outcome badges.
 - **One scroll:** no new inner scrollbars.
 
-## 2. Evidence Wall: one assigned group per team
-See `ghost404-evidence-wall.md`. 30 teams → 10/10/10, one private fragment, one matching public card, additive migration `20261127000000_insider_group_assignment`. No team accounts or passwords were created; the final roster is prepared later with one organizer action.
+## 2. Evidence Wall
+**Superseded by the final shared-pairs design** (see `ghost404-evidence-wall.md`): six fragments for the whole event, ten teams per pair. The per-team codes and decoys described in the first version of this pass were a misreading of the event design.
 
 ## 3. Projector: Top 12 as the main content
 - **Layout** (`src/components/admin/broadcast.tsx`, `src/lib/game/projector-board.ts`, CSS appended to `command.css`): compact top band (brand, phase label, small server-driven timer with a thin progress line in Round 2), then the board as the main region: two columns of six, large ranks and names, tabular scores, restrained brass/green emphasis for the top three, shared ranks shown with "=", a footer with the "+N more teams" count and a note when teams tied at the cut are not listed. Fits 1920x1080 and 1366x768 without scrolling. Rows glide to new positions (no jumping; none with reduced motion). A stale connection announces itself and dims the board.
@@ -29,3 +29,18 @@ Screenshots (local only): `D:/Ghost404-TestWorkspace/shots/changes`, `.../shots/
 
 ## Not verified / deferred
 Real college LAN, a second PC, projector hardware. Full Playwright regression and the Round 1 chain specs were not re-run (DEFERRED). Specs that assert the old projector layout (`phase5-event-control`, `phase5-ghostos-layout`, `ui-projector`) were not all re-run.
+
+## Final corrections (shared pairs, password eye, digital Containment)
+- **Evidence Wall:** exactly THREE shared pairs (6 unique fragments); migration `20261128000000_insider_shared_pairs`; explicit backup-gated conversion for an already-prepared database. Details in `ghost404-evidence-wall.md`.
+- **Password Show/Hide:** `src/components/ui/password-field.tsx`, used by the team login and the organizer login, the only two masked fields in the application (audit: the other `password` matches in the code are event-log text, not inputs). Hidden by default; the eye button (`type="button"`, Show/Hide password label, `aria-pressed`, visible focus, 44x40 px) switches the input type only; the typed value is untouched and the field re-masks on submit. The button sits outside the label so the field is still named "Access code"; `autocomplete="current-password"` is unchanged so password managers keep working.
+- **Containment fully digital:** the fictional security-room snapshot (CCTV-A/B/C-08) is returned with the chapter evidence for every eligible team and shown open on screen; nothing to collect. Removed: the "Security-room clue" station text, the "Check authorized CCTV copy" button, the audited copy grant (`authorizeContainmentCopy`), the CCTV print workflow (`containmentPrintData`), the organizer dashboard entry. `/admin/containment-kit` remains only as an organizer-only "retired" notice so bookmarks do not break; earlier `containment-copy` audit entries stay as history. Unchanged: tasks, scoring, hints, penalties, unlock thresholds, case-variant evidence, Demo Mode. The Insider A/B/C groups and the Containment A/B/C case variants are independent.
+
+### Round 1 physical/digital contract (final)
+| Chapter | Physical material |
+|---|---|
+| Inbox | none (in-app Forensic Snapshot) |
+| Trail | none |
+| Insider | team access card (ID, password, private A/B/C) + the group's public fragment in the building |
+| Containment | none |
+| Final Verdict | none |
+Round 2 keeps its approved paper answer sheets and jury marking.

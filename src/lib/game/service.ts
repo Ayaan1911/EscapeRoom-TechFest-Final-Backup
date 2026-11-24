@@ -3,7 +3,7 @@ import { applyRaw, bonus, current, hints, overrideChapter, permit, points, progr
 import { catalog, criterionPoints, gradeTask, MAX_SCORED_ATTEMPTS, taskIds, taskMax } from "./scoring";
 import { taskDefs, validators } from "./validators";
 import { matchesInsiderFragments } from "./insider-fragments.server";
-import { groupView, pairsView, solvePair } from "./evidence-wall.server";
+import { groupView, pairsView, solvePair, usesWall } from "./evidence-wall.server";
 import { attemptCap, POLICY_BEST } from "../attempts";
 import { answerHash } from "../round2/safe-json";
 import { round2Entry } from "../round2/access.server";
@@ -62,7 +62,7 @@ export async function mutateTeam(id: string, chapter: number, action: "submit" |
     if (action === "unlock" && team.insiderAccess?.unlockedAt) return { unlocked: true };
     const previous = await tx.submission.findFirst({ where: { teamId: id, chapter }, orderBy: { createdAt: "desc" } });
     if (previous && now - previous.createdAt.getTime() < 3000) return { error: "Please wait between evidence submissions.", retryAfter: Math.max(1, Math.ceil((3000 - (now - previous.createdAt.getTime())) / 1000)) };
-    if (action === "unlock" && await tx.insiderPair.count({ where: { teamId: id } }) > 0) { // three-pair Evidence Wall (this team was issued pairs)
+    if (action === "unlock" && await usesWall(tx, id)) { // three-pair Evidence Wall (this team was issued pairs)
       const result = await solvePair(tx, { id, variant: team.variant }, answer, now);
       await tx.submission.create({ data: { teamId: id, chapter, accepted: false, reason: result.ok ? `pair-solved:${result.pair}` : "fragment-rejected", answer: null } });
       if (!result.ok) return { unlocked: false, matched: false, pairMode: true };

@@ -25,7 +25,7 @@ export default async function DemoChapter({ params, searchParams }: { params: Pr
     {chapter === "inbox" && inbox && <InboxDesk evidence={{ caseId: inbox.caseId, recipient: inbox.recipient, emails: inbox.emails, artifacts: inbox.artifacts }} initialState={state} initialDrafts={[]} />}
     {chapter === "trail" && <TrailDesk evidence={trailEvidence(v)} initialState={state} initialDrafts={[]} />}
     {chapter === "insider" && <InsiderDesk initialDossier={insiderDossier(v)} initialState={state} initialDrafts={[]} />}
-    {chapter === "containment" && <ContainmentDesk evidence={containmentEvidence(v)} initialCctv={containmentCctv(v)} initialState={state} initialDrafts={[]} />}
+    {chapter === "containment" && <ContainmentDesk evidence={containmentEvidence(v)} cctv={containmentCctv(v)} initialState={state} initialDrafts={[]} />}
     {chapter === "verdict" && <VerdictDesk evidence={verdictEvidence(v)} team={{ id: "DEMO", name: "Demonstration team" }} initialState={state} initialDrafts={[]} />}
   </DemoProvider></main>;
 }

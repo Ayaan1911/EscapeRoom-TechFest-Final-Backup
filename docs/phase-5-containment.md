@@ -1,5 +1,7 @@
 # Phase 5: Containment — Stop the Breach
 
+> **Update 2026-11-25:** the physical CCTV kit, the station and the audited "accessible copy" authorization described below are RETIRED. Chapter 4 is fully digital: the fictional security-room snapshot is shown on each team's screen with the chapter evidence. The evidence content, tasks and scoring are unchanged. See `ghost404-r1-targeted-changes.md`. The physical-kit sections below are kept as history only.
+
 This records the Phase 5 delivery. Final Verdict and the Round 1 qualification review are now implemented in [Phase 6](phase-6-final-verdict.md); pending-content statements below describe the earlier phase.
 
 Chapter 4 runs at `/play/containment`, validator index 3, for 20 raw points. It continues the verified Phase 4 commit `1cf39d0b55a468744b37fceffa48f9c7edafcd71`. The existing shared 60-minute round, sequential progress, session security, serializable submission transaction, three-second cooldown, ranking and global +5 Tamper Alert remain unchanged. Final Verdict becomes current at index 4 after completion but is still a placeholder. This is verified gameplay, not a production-readiness claim.

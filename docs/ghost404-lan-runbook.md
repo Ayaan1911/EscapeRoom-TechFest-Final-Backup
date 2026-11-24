@@ -35,9 +35,9 @@ Run it under `systemd` or `tmux` so it survives the SSH session. Open the port i
 
 ## Before the event: three things the scripts do NOT do for you
 1. **Install the private answer key** at `<repo>\private\round2-key-v2.json` (the folder the server is started from) or point `GHOST_R2_KEY_FILE` at it. It is re-read at most every 30 s, so no restart is needed. Check `/admin/round2` -> "Kill Switch · terminal review" says "Answer key installed (approved)". Without it the Kill Switch terminal is offline for every team and consumes no attempts. Never commit or e-mail the file.
-2. **Migrations**: `prepare-lab.ps1` (or `npx prisma migrate deploy`) must apply, in order, `20261125000000_round2_paper_marks`, `20261126000000_insider_wall_pairs` and `20261127000000_insider_group_assignment`. Both are additive. Back up first.
-3. **Insider physical fragments**: once the FINAL team accounts exist, use "Prepare group assignment (all teams)" in `/admin/insider-kit` ONCE (30 teams -> 10 A / 10 B / 10 C, one private fragment and one matching public card per team). Re-running or reprinting never changes anything. Teams with no group fall back to the old two-fragment gate.
-4. **Chapter 1 needs no QR card or phone**: players use the in-app "Open Forensic Snapshot" button; do not print `/admin/inbox-kit`.
+2. **Migrations**: `prepare-lab.ps1` (or `npx prisma migrate deploy`) must apply, in order, `20261125000000_round2_paper_marks`, `20261126000000_insider_wall_pairs`, `20261127000000_insider_group_assignment` and `20261128000000_insider_shared_pairs`. Both are additive. Back up first.
+3. **Insider physical fragments**: once the FINAL team accounts exist, use "Prepare shared fragments and groups (all teams)" in `/admin/insider-kit` ONCE (30 teams -> 10 A / 10 B / 10 C; SIX unique fragments: private A/B/C go on the team access cards, public A/B/C are placed in the building). Re-running or reprinting never changes anything. An earlier per-team preparation must be converted explicitly (backup first).
+4. **Chapters 1 and 4 need no printed material**: Chapter 1 uses the in-app "Open Forensic Snapshot" button (do not print `/admin/inbox-kit`); Chapter 4 shows its security-room evidence on screen (the CCTV kit is retired).
 5. **Projector** (`/admin/projector`, organizer signed in): shows the Top 12 only after the organizer switches on "Round 1 standings" (or finalist names) in `/admin/leaderboard`.
 
 ## Dry run on the lab server (what to do tomorrow)

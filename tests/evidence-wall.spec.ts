@@ -2,85 +2,79 @@ import { expect, test, type Page } from "@playwright/test";
 import { PrismaClient } from "@prisma/client";
 import { mkdirSync } from "node:fs";
 
-// Evidence Wall, GROUP MODE: one assigned group A/B/C per team, one private fragment + its own public card. Run: node scripts/redesign-e2e.mjs tests/evidence-wall.spec.ts
+// Evidence Wall, SHARED PAIRS: six fragments for the whole event; teams of a group share that group's pair. Run: node scripts/redesign-e2e.mjs tests/evidence-wall.spec.ts
 // (disposable local database; Round 1 active; UI-A..D are fixture teams; no real roster or credential is created).
 test.skip(!process.env.GHOST_E2E_REDESIGN, "Run: node scripts/redesign-e2e.mjs tests/evidence-wall.spec.ts (disposable local database)");
 test.describe.configure({ mode: "serial" });
-const prisma = new PrismaClient(), SHOTS = "D:/Ghost404-TestWorkspace/shots/wall"; mkdirSync(SHOTS, { recursive: true });
+const prisma = new PrismaClient(), SHOTS = "D:/Ghost404-TestWorkspace/shots/final"; mkdirSync(SHOTS, { recursive: true });
 const code = () => process.env.GHOST_E2E_TEAM_CODE!;
 test.afterAll(async () => { await prisma.$disconnect(); });
 
-async function organizerSheets(page: Page) {
+type Group = { group: string; priv: string; pub: string; teams: string[] };
+async function organizerKit(page: Page): Promise<Group[]> {
   await page.goto("/organizer/login"); await page.getByLabel("Access code").fill(process.env.GHOST_E2E_ADMIN_CODE ?? code()); await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Event operations" })).toBeVisible({ timeout: 30_000 });
   await page.goto("/admin/insider-kit");
   const summary = page.getByRole("region", { name: "Evidence Wall group summary" });
-  await expect(summary).toContainText("Not prepared yet"); await expect(summary).toContainText("Teams registered"); await page.screenshot({ path: `${SHOTS}/0-kit-before.png`, fullPage: true });
-  await page.locator('select[name="view"]').selectOption("map"); await page.getByRole("button", { name: "Prepare group assignment (all teams)" }).click();
-  const map = page.getByRole("region", { name: "Organizer code map" }); await expect(map).toBeVisible();
-  await expect(summary).toContainText(/Demonstration roster: \d+ teams/); // not the final 30: labelled, never called "final"
-  const slips: Record<string, { group: string; code: string }> = {}, cards: { group: string; role: string; team: string; code: string }[] = [];
-  for (const row of await map.locator("tr[data-team-id]").all()) slips[(await row.getAttribute("data-team-id"))!] = { group: (await row.getAttribute("data-group"))!, code: (await row.locator("code").innerText()).trim() };
-  for (const row of await map.locator("tr[data-wall-role]").all()) { const [group, , team, cardCode] = (await row.locator("td").allInnerTexts()).map(t => t.trim()); cards.push({ group, role: (await row.getAttribute("data-wall-role"))!, team, code: cardCode }); }
-  await page.screenshot({ path: `${SHOTS}/1-kit-after-map.png`, fullPage: true });
-  return { slips, cards, summary };
+  await expect(summary).toContainText("Not prepared yet"); await expect(page.getByRole("group", { name: "Unique fragment definitions" })).toContainText("Total unique fragments"); await page.screenshot({ path: `${SHOTS}/kit-0-before.png`, fullPage: true });
+  await page.locator('select[name="view"]').selectOption("map"); await page.getByRole("button", { name: "Prepare shared fragments and groups (all teams)" }).click();
+  const map = page.getByRole("region", { name: "Organizer code map" }); await expect(map).toBeVisible({ timeout: 20_000 });
+  await expect(summary).toContainText(/Demonstration roster: 4 teams/); await expect(summary).toContainText("Unique private fragments"); await expect(summary).toContainText("Definitions vs physical copies");
+  const groups: Group[] = [];
+  for (const row of await map.locator("tr[data-group]").all()) { const cells = (await row.locator("td").allInnerTexts()).map(t => t.trim()); groups.push({ group: cells[0], priv: cells[1], pub: cells[2], teams: cells[3] === "-" ? [] : cells[3].split(",").map(t => t.trim()) }); }
+  return groups;
 }
-async function team(page: Page, id: string) { await page.goto("/login"); await page.getByLabel("Team ID").fill(id); await page.getByLabel("Access code").fill(code()); await page.getByRole("button", { name: "Sign in", exact: true }).click(); await page.waitForURL(/\/play/); }
+async function team(page: Page, id: string) { await page.goto("/login"); await page.getByLabel("Access code").fill(code()); await page.getByLabel("Team ID").fill(id); await page.getByRole("button", { name: "Sign in", exact: true }).click(); await page.waitForURL(/\/play/); }
 async function match(page: Page, priv: string, pub: string) {
   const button = page.getByRole("button", { name: "Match fragments" }); await expect(button).toBeEnabled({ timeout: 15_000 }); // the 3-second spacing between attempts is real
-  await page.getByLabel("Private fragment code").fill(priv); await page.getByLabel("Wall card code").fill(pub); await button.click();
+  await page.getByLabel("Private fragment code").fill(priv); await page.getByLabel("Public fragment code").fill(pub); await button.click();
 }
 
-test("organizer prepares groups once; a player matches ONE assigned pair and the whole dossier opens", async ({ browser, page }) => {
+test("organizer prepares ONE shared pair per group; two teams of a group unlock with the same codes", async ({ browser, page }) => {
   test.setTimeout(240_000);
-  for (const id of ["UI-A", "UI-B"]) { const p = JSON.parse((await prisma.team.findUniqueOrThrow({ where: { id } })).progress); p.chapters[0].score = 15; p.chapters[0].unlockedAt = 1; p.chapters[1].score = 25; p.chapters[1].unlockedAt = 1; p.chapters[2].unlockedAt = 1; await prisma.team.update({ where: { id }, data: { progress: JSON.stringify(p) } }); }
-  const { slips, cards, summary } = await organizerSheets(page);
-  expect(Object.keys(slips)).toEqual(expect.arrayContaining(["UI-A", "UI-B", "UI-C", "UI-D"])); // exactly one private fragment per team (the map has one row per team)
-  const counts = ["A", "B", "C"].map(g => Object.values(slips).filter(s => s.group === g).length); expect(Math.max(...counts) - Math.min(...counts)).toBeLessThanOrEqual(1);
-  expect(cards.filter(c => c.role === "match")).toHaveLength(Object.keys(slips).length); expect(cards.filter(c => c.role === "decoy")).toHaveLength(6);
-  const mine = slips["UI-A"], myCard = cards.find(c => c.role === "match" && c.team === "UI-A")!, theirCard = cards.find(c => c.role === "match" && c.team === "UI-B")!, decoy = cards.find(c => c.role === "decoy" && c.group === mine.group)!;
-  expect(myCard.group).toBe(mine.group);
+  for (const id of ["UI-A", "UI-B", "UI-C", "UI-D"]) { const p = JSON.parse((await prisma.team.findUniqueOrThrow({ where: { id } })).progress); p.chapters[0].score = 15; p.chapters[0].unlockedAt = 1; p.chapters[1].score = 25; p.chapters[1].unlockedAt = 1; p.chapters[2].unlockedAt = 1; await prisma.team.update({ where: { id }, data: { progress: JSON.stringify(p) } }); }
+  const groups = await organizerKit(page);
+  // exactly six unique fragments, three pairs; every team has exactly one group; no per-team codes
+  expect(groups.map(g => g.group)).toEqual(["A", "B", "C"]); const six = groups.flatMap(g => [g.priv, g.pub]); expect(new Set(six).size).toBe(6);
+  expect(groups.flatMap(g => g.teams).sort()).toEqual(["UI-A", "UI-B", "UI-C", "UI-D"]);
+  const mates = groups.find(g => g.teams.length >= 2)!, solo = groups.find(g => g.teams.length === 1)!; expect(mates.teams).toHaveLength(2); // 4 teams over 3 groups: two share one pair
+  expect(await prisma.insiderGroupCode.count()).toBe(3); expect(await prisma.insiderWallCard.count()).toBe(0);
 
-  // reprint and re-prepare change nothing; public wall sheet carries codes only; private sheet carries only slips
-  await page.goto("/admin/insider-kit"); await page.locator('select[name="view"]').selectOption("wall"); await page.getByRole("button", { name: "Show prepared teams" }).click();
-  await expect(page.locator("article[data-group]").first()).toBeVisible({ timeout: 20_000 }); const wallText = (await page.locator(".print-kit-page").allInnerTexts()).join(" "); for (const c of cards) expect(wallText).toContain(c.code);
-  for (const s of Object.values(slips)) expect(wallText).not.toContain(s.code); expect(wallText).not.toMatch(/UI-[A-D]\b|decoy|matching card|intended/i); await page.screenshot({ path: `${SHOTS}/2-public-wall-sheet.png`, fullPage: true });
-  await page.locator('select[name="view"]').selectOption("slips"); await page.getByRole("button", { name: "Prepare group assignment (all teams)" }).click();
-  await expect(page.locator("article[data-team-id]").first()).toBeVisible({ timeout: 20_000 }); const slipText = (await page.locator(".print-kit-page").allInnerTexts()).join(" "); for (const s of Object.values(slips)) expect(slipText).toContain(s.code); for (const c of cards) expect(slipText).not.toContain(c.code);
-  await expect(page.locator("article[data-team-id='UI-A']")).toContainText(`GROUP ${mine.group}`); await page.screenshot({ path: `${SHOTS}/3-private-slips.png`, fullPage: true });
-  await page.locator('select[name="view"]').selectOption("map"); await page.getByRole("button", { name: "Prepare group assignment (all teams)" }).click();
-  const again = page.getByRole("region", { name: "Organizer code map" }); expect((await again.locator("tr[data-team-id='UI-A'] code").innerText()).trim()).toBe(mine.code); await expect(summary).toContainText("Demonstration roster");
+  // the printable public cards: exactly three, with the shared public codes; private codes never appear there
+  await page.goto("/admin/insider-kit"); await page.locator('select[name="view"]').selectOption("public"); await page.getByRole("button", { name: "Show", exact: true }).click();
+  const cards = page.locator("article.sf-card"); await expect(cards).toHaveCount(3, { timeout: 20_000 });
+  const printed = (await page.locator(".sf-sheet").allInnerTexts()).join(" "); for (const g of groups) { expect(printed).toContain(g.pub); expect(printed).not.toContain(g.priv); } expect(printed).toContain("PUBLIC EVIDENCE FRAGMENT"); expect(printed).toContain("OPERATION GHOST_404");
+  await page.waitForTimeout(500); await page.screenshot({ path: `${SHOTS}/kit-1-three-public-cards.png`, fullPage: true });
+  await page.locator('input[name="copies"]').fill("3"); await page.getByRole("button", { name: "Show", exact: true }).click(); await expect(cards).toHaveCount(9); // extra copies are the SAME fragments
+  expect(new Set(await cards.locator("code").allInnerTexts()).size).toBe(3);
+  await page.locator('input[name="copies"]').fill("1"); await page.locator('select[name="view"]').selectOption("private"); await page.getByRole("button", { name: "Show", exact: true }).click(); await expect(cards).toHaveCount(3);
+  const privText = (await page.locator(".sf-sheet").allInnerTexts()).join(" "); for (const g of groups) { expect(privText).toContain(g.priv); expect(privText).not.toContain(g.pub); }
+  await page.locator('select[name="view"]').selectOption("public"); await page.getByRole("button", { name: "Prepare shared fragments and groups (all teams)" }).click(); // re-running changes nothing
+  expect(await prisma.insiderGroupCode.findMany({ orderBy: { group: "asc" } }).then(r => r.map(x => x.publicCode))).toEqual(groups.map(g => g.pub)); expect(await prisma.insiderGroupMember.count()).toBe(4);
 
+  const [first, second] = mates.teams, other = solo.teams[0], wrong = groups.find(g => g.group !== mates.group)!;
   const ctx = await browser.newContext({ viewport: { width: 1366, height: 768 } }), p1 = await ctx.newPage(), problems: string[] = [];
   p1.on("pageerror", e => problems.push(e.message)); p1.on("console", m => { if (m.type() === "error" && !/Failed to load resource/.test(m.text())) problems.push(m.text()); });
-  await team(p1, "UI-A"); await p1.goto("/play/insider");
-  await expect(p1.getByRole("heading", { name: `Match your Group ${mine.group} fragment` })).toBeVisible();
-  await expect(p1.getByText("Sealed folder")).toHaveCount(0); await expect(p1.getByText(/Evidence set|folders? reconstructed/i)).toHaveCount(0); // no three-folder wording for a group team
-  await expect(p1.getByRole("heading", { name: "The Evidence Wall", exact: true })).toHaveCount(0); // nothing of the dossier before a match
-  const html = await p1.content(); for (const c of [...Object.values(slips).map(s => s.code), ...cards.map(c => c.code)]) expect(html).not.toContain(c);
-  const others = Object.entries(slips).filter(([id]) => id !== "UI-A").map(([, s]) => s.group); void others; await p1.screenshot({ path: `${SHOTS}/4-before-matching.png` });
-
-  await match(p1, mine.code, mine.group); await expect(p1.getByRole("status").filter({ hasText: "do not fit together" })).toBeVisible(); // the letter alone is not an answer
-  await match(p1, mine.code, decoy.code); await expect(p1.getByRole("status").filter({ hasText: "do not fit together" })).toBeVisible(); // a lookalike
-  await match(p1, mine.code, theirCard.code); await expect(p1.getByRole("status").filter({ hasText: "do not fit together" })).toBeVisible(); // another team's card
-  await expect(p1.getByRole("heading", { name: `Match your Group ${mine.group} fragment` })).toBeVisible();
-
-  await match(p1, mine.code, myCard.code);
-  await expect(p1.getByRole("heading", { name: `GROUP ${mine.group} MATCHED — DOSSIER OPEN` })).toBeVisible({ timeout: 15_000 });
-  await expect(p1.getByRole("status").filter({ hasText: "Match confirmed" })).toBeVisible();
-  await expect(p1.getByRole("heading", { name: "The Evidence Wall", exact: true })).toBeVisible({ timeout: 15_000 });
-  await expect(p1.getByRole("region", { name: "Scored tasks" })).toBeVisible({ timeout: 15_000 }); await expect(p1.getByRole("button", { name: "Match fragments" })).toHaveCount(0); // no other folder or fragment is asked for
-  expect(await p1.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(1);
-  await p1.screenshot({ path: `${SHOTS}/5-dossier-unlocked.png`, fullPage: true });
-  await p1.reload(); await expect(p1.getByRole("heading", { name: `GROUP ${mine.group} MATCHED — DOSSIER OPEN` })).toBeVisible(); // survives a refresh
-  const again2 = await ctx.newPage(); await again2.goto("/play/insider"); await expect(again2.getByRole("heading", { name: `GROUP ${mine.group} MATCHED — DOSSIER OPEN` })).toBeVisible(); await again2.close(); // and a new tab
-  await ctx.clearCookies(); await team(p1, "UI-A"); await p1.goto("/play/insider"); await expect(p1.getByRole("heading", { name: `GROUP ${mine.group} MATCHED — DOSSIER OPEN` })).toBeVisible(); // and a re-login
-
-  // a different team cannot ride on UI-A's fragments, and sees only its own group letter
-  const ctx2 = await browser.newContext(), p2 = await ctx2.newPage(); await team(p2, "UI-B");
-  const stateB = await (await p2.request.get("/api/game")).json(); expect(stateB.insiderGroup).toEqual({ group: slips["UI-B"].group, solved: false }); expect(JSON.stringify(stateB)).not.toContain(mine.code); expect(JSON.stringify(stateB)).not.toContain(myCard.code);
-  await p2.goto("/play/insider"); await match(p2, mine.code, myCard.code); await expect(p2.getByRole("status").filter({ hasText: "do not fit together" })).toBeVisible();
-  expect((await (await p2.request.get("/api/game")).json()).insiderUnlocked).toBe(false); await ctx2.close();
+  await team(p1, first); await p1.goto("/play/insider");
+  await expect(p1.getByRole("heading", { name: `Match your Group ${mates.group} fragment` })).toBeVisible(); await expect(p1.getByText("Sealed folder")).toHaveCount(0); await expect(p1.getByRole("heading", { name: "The Evidence Wall", exact: true })).toHaveCount(0);
+  const html = await p1.content(); for (const c of six) expect(html).not.toContain(c); // no code is in the participant page before it is earned
+  await p1.screenshot({ path: `${SHOTS}/wall-1-pairing-screen.png` });
+  await match(p1, mates.priv, mates.group); await expect(p1.getByRole("status").filter({ hasText: "do not fit together" })).toBeVisible(); // the letter alone is not an answer
+  await match(p1, wrong.priv, wrong.pub); await expect(p1.getByRole("status").filter({ hasText: "do not fit together" })).toBeVisible(); // another group's pair
+  await match(p1, mates.priv, wrong.pub); await expect(p1.getByRole("status").filter({ hasText: "do not fit together" })).toBeVisible(); // half of each
+  await match(p1, mates.priv, mates.pub);
+  await expect(p1.getByRole("heading", { name: `GROUP ${mates.group} MATCHED — DOSSIER OPEN` })).toBeVisible({ timeout: 15_000 }); await expect(p1.getByRole("status").filter({ hasText: "Match confirmed" })).toBeVisible();
+  await expect(p1.getByRole("heading", { name: "The Evidence Wall", exact: true })).toBeVisible({ timeout: 15_000 }); await expect(p1.getByRole("region", { name: "Scored tasks" })).toBeVisible({ timeout: 15_000 }); await expect(p1.getByRole("button", { name: "Match fragments" })).toHaveCount(0); // no other pair is asked for
+  expect(await p1.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(1); await p1.waitForTimeout(600); await p1.screenshot({ path: `${SHOTS}/wall-2-dossier-unlocked.png`, fullPage: true });
+  await p1.reload(); await expect(p1.getByRole("heading", { name: `GROUP ${mates.group} MATCHED — DOSSIER OPEN` })).toBeVisible(); // survives a refresh
+  await ctx.clearCookies(); await team(p1, first); await p1.goto("/play/insider"); await expect(p1.getByRole("heading", { name: `GROUP ${mates.group} MATCHED — DOSSIER OPEN` })).toBeVisible(); // and a re-login
   expect((await (await p1.request.get("/api/game")).json()).score).toBe(40); // 15 + 25: the match scored nothing
+
+  // the team-mate of the same group: still sealed, then unlocks with the very same two codes
+  const ctx2 = await browser.newContext({ viewport: { width: 1366, height: 768 } }), p2 = await ctx2.newPage(); await team(p2, second); await p2.goto("/play/insider");
+  await expect(p2.getByRole("heading", { name: `Match your Group ${mates.group} fragment` })).toBeVisible(); await match(p2, mates.priv, mates.pub); await expect(p2.getByRole("heading", { name: `GROUP ${mates.group} MATCHED — DOSSIER OPEN` })).toBeVisible({ timeout: 15_000 });
+  // a team of ANOTHER group cannot use this pair
+  const ctx3 = await browser.newContext(), p3 = await ctx3.newPage(); await team(p3, other); await p3.goto("/play/insider"); await match(p3, mates.priv, mates.pub); await expect(p3.getByRole("status").filter({ hasText: "do not fit together" })).toBeVisible();
+  expect((await (await p3.request.get("/api/game")).json()).insiderUnlocked).toBe(false); await ctx2.close(); await ctx3.close();
   expect(problems).toEqual([]); await ctx.close();
 });

@@ -20,6 +20,7 @@ model Team {
   r2Finalist R2Finalist?
   insiderPairs InsiderPair[]
   wallCards InsiderWallCard[]
+  groupMember InsiderGroupMember?
 }
 model InsiderAccess {
   teamId String @id
@@ -50,6 +51,23 @@ model InsiderWallCard {
   team Team? @relation(fields: [teamId], references: [id], onDelete: Cascade)
   @@index([variant, pair])
   @@index([teamId])
+}
+// Evidence Wall, FINAL design ("shared pairs"): exactly SIX fragments for the whole event = Private A/Public A, Private B/Public B, Private C/Public C.
+// Every team in a group shares that group's pair. The codes live ONLY here (random, created once, never regenerated); a team's membership is one row.
+// Earlier per-team modes (InsiderPair / InsiderWallCard) stay readable; a team with a member row always uses this model.
+model InsiderGroupCode {
+  group String @id // "A" | "B" | "C"
+  privateCode String @unique
+  publicCode String @unique
+  createdAt DateTime @default(now())
+}
+model InsiderGroupMember {
+  teamId String @id
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  group String // "A" | "B" | "C"
+  solvedAt DateTime?
+  assignedAt DateTime @default(now())
+  @@index([group])
 }
 model TeamSession {
   tokenHash String @id

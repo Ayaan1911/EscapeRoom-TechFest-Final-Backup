@@ -1,4 +1,5 @@
 import { OsHeader } from "@/components/ui/os-header";
+import { PasswordField } from "@/components/ui/password-field";
 import { signIn } from "./actions";
 import { SignInButton } from "@/components/ui/sign-in-button";
 
@@ -29,7 +30,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
             <form action={signIn} className="k-form">
               {next && <input type="hidden" name="next" value={next} />}
               <label>Team ID<input name="id" required maxLength={80} autoComplete="username" autoCapitalize="characters" spellCheck={false} /></label>
-              <label>Access code<input type="password" name="code" required minLength={12} maxLength={256} autoComplete="current-password" /></label>
+              <PasswordField label="Access code" name="code" required minLength={12} maxLength={256} />
               <SignInButton />
             </form>
           </div>

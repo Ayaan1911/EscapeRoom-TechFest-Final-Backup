@@ -24,19 +24,19 @@ export function EvidenceReconstruction({ pairs, onMatch, disabled, feedback, ope
   </section>;
 }
 
-/** Group mode: ONE assigned group per team. The team's private slip (Group letter printed on it) fits exactly one public wall card; one match opens the whole dossier. */
+/** Shared pairs: ONE assigned group per team. The team's access card carries the group's private fragment; its public fragment is placed in the building. One match opens the whole dossier. */
 export function GroupMatch({ group, solved, onMatch, disabled, feedback }: { group: "A" | "B" | "C"; solved: boolean; onMatch: (event: FormEvent<HTMLFormElement>) => void; disabled: boolean; feedback: string }) {
   return <section className="ew ew-group" aria-labelledby="ew-g-h">
     <header className="ew-head"><div><span className="k-eyebrow">EVIDENCE WALL · GROUP {group}</span>
       <h2 id="ew-g-h">{solved ? `GROUP ${group} MATCHED — DOSSIER OPEN` : `Match your Group ${group} fragment`}</h2>
-      <p>{solved ? "Your private fragment and its public counterpart fit together. The whole dossier is open below." : `Your envelope holds ONE private fragment, marked Group ${group}. Its matching public card is on the Evidence Wall in the Group ${group} section. Read the clues on both pieces, then enter the two codes.`}</p></div>
+      <p>{solved ? "Your private fragment and its public counterpart fit together. The whole dossier is open below." : `Your team access card shows ONE private fragment, marked Group ${group}. Its public counterpart is placed somewhere in the building. Find the Group ${group} public fragment, then enter both codes.`}</p></div>
       <div className="ew-badge" role="img" aria-label={`Assigned group ${group}${solved ? ", matched" : ""}`}><b>{solved ? "✓" : group}</b><small>GROUP {group}</small></div></header>
     {!solved && <form className="ew-form" onSubmit={onMatch}>
-      <fieldset disabled={disabled}><legend>Match your fragment to a wall card</legend>
-        <label>Private fragment code<input name="privateCode" required maxLength={64} autoComplete="off" spellCheck={false} placeholder="from your envelope" /></label>
-        <label>Wall card code<input name="publicCode" required maxLength={64} autoComplete="off" spellCheck={false} placeholder="from the Evidence Wall" /></label>
+      <fieldset disabled={disabled}><legend>Match your fragment to the public fragment</legend>
+        <label>Private fragment code<input name="privateCode" required maxLength={64} autoComplete="off" spellCheck={false} placeholder="from your access card" /></label>
+        <label>Public fragment code<input name="publicCode" required maxLength={64} autoComplete="off" spellCheck={false} placeholder="found in the building" /></label>
         <button className="k-btn k-btn-primary">Match fragments</button></fieldset>
-      <p className="ew-hint">The group letter only tells you where to look. Several cards in the section look alike; only the one that fits your fragment works. A wrong pair costs nothing but a short wait.</p></form>}
+      <p className="ew-hint">The group letter only tells you which public fragment to look for; it is not an answer. Only your group&apos;s two codes together unlock the dossier. A wrong pair costs nothing but a short wait.</p></form>}
     <p role="status" className="pg-live ew-status">{feedback}</p>
   </section>;
 }

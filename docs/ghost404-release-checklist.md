@@ -36,10 +36,12 @@ Tick every line on the day. Any unchecked **MUST** is a no-go. Evidence for what
 - [ ] **Publish results** only when every finalist is complete (reason + confirmation). Publishing locks marks and puts the ranking on the projector.
 - [ ] Projector content: Round 1 standings and finalist names are hidden until switched on in `/admin/leaderboard` (audited).
 
-## Added by the targeted changes (2026-11-25)
-- [ ] **MUST** back up, then apply migration `20261127000000_insider_group_assignment` (additive: one nullable column on `InsiderWallCard`).
-- [ ] Once the FINAL 30 team accounts exist: `/admin/insider-kit` -> "Prepare group assignment (all teams)" ONCE; the summary must read A 10 / B 10 / C 10 and "Final split complete". Print the private fragments (envelopes) and the public wall cards (by group) from the read-only views; keep the organizer code map private. Never re-create teams after printing.
-- [ ] Chapter 1 no longer needs a QR card: do NOT print `/admin/inbox-kit`. Players use the "Open Forensic Snapshot" button.
+## Added by the targeted and final corrections (2026-11-25)
+- [ ] **MUST** back up, then apply migrations `20261127000000_insider_group_assignment` and `20261128000000_insider_shared_pairs` (both additive).
+- [ ] Once the FINAL 30 team accounts exist: `/admin/insider-kit` -> "Prepare shared fragments and groups (all teams)" ONCE. The summary must read A 10 / B 10 / C 10, "Unique private fragments 3 / Unique public fragments 3 / Total 6" and "Final split complete". Print the three PUBLIC cards (View: Public fragments) and place one per building location (extra copies = the same fragment). The PRIVATE fragments go onto each team's access card in the credential phase (View: Private fragments / code map). Keep the organizer code map private.
+- [ ] A database that was prepared with the earlier per-team codes: back up, then use "Convert earlier preparation" in `/admin/insider-kit` (type CONVERT), then reprint. Old per-team cards stop working.
+- [ ] Chapter 1 and Chapter 4 need no printed material: do NOT print `/admin/inbox-kit`; the Containment CCTV kit is retired (`/admin/containment-kit` is only a notice).
+- [ ] Round 1 needs only ONE physical item per team (access card) plus the three public fragments in the building.
 - [ ] Projector: sign in as organizer on the projector PC, `/admin/projector`; the Top 12 appears only after "Round 1 standings" (or finalist names) is switched on in `/admin/leaderboard`.
 
 ## No-go triggers

@@ -100,9 +100,9 @@ The pre-restore database is kept as `<db>.before-restore-<stamp>`; stale `-wal/-
 1. `powershell -ExecutionPolicy Bypass -File scripts\start-event.ps1` (second window: `scripts\backup-loop.ps1`).
 2. Check `/api/health`; log in at `/login?role=admin`.
 3. Provision teams (above) *before* the event; confirm count in the admin “Registered teams” table.
-4. Print kits: `/admin/inbox-kit` (QR), `/admin/insider-kit` (Part A private cards per team, Part B public wall cards), `/admin/containment-kit` (CCTV by variant). Keep the A/B stacks separate until play.
+4. (Superseded 2026-11-25: no QR and no CCTV kit are needed any more; the Insider fragments are now three shared pairs. See `ghost404-release-checklist.md`.) Print kits: `/admin/inbox-kit` (QR), `/admin/insider-kit` (Part A private cards per team, Part B public wall cards), `/admin/containment-kit` (CCTV by variant). Keep the A/B stacks separate until play.
 5. **Start Round 1** on `/admin` (this fixes the single 60-minute deadline; it cannot be restarted).
-6. Monitor team scores/hints; use the accessible-CCTV authorization on `/admin/containment-kit` or the **progression override** on `/admin` only with a written reason (audited).
+6. Monitor team scores/hints; (the accessible-CCTV authorization is retired: the evidence is on screen) use the **progression override** on `/admin` only with a written reason (audited).
 7. When time ends (or **Stop**), review the PROVISIONAL → final table, Top 10 + 2 standby, incomplete teams, then **Confirm results**. Export `/api/admin/scores` (CSV, formula-safe). No automatic Round 2 advancement.
 
 Volunteer cheat-sheet: teams log in with Team ID + code only; never read codes aloud; a team that loses its A card is re-issued by reprinting that team's page from `/admin/insider-kit` (the fragment is unchanged; log it); a missing public B card is reprinted from its station page; if a participant's page shows “Round is not active” the clock has expired or not started.

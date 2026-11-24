@@ -11,7 +11,7 @@ npm run rehearsal:round1
 Expected: prints `Temporary Chapter 1 demo: http://127.0.0.1:3000`, a generated access code, and the step list. Keep the window open.
 
 1. Browser window 1 (organizer): open `http://127.0.0.1:3000/login?role=admin`, Team ID not needed, paste the generated code → **Event operations** page. Click **Start Round 1**; a 60-minute clock appears.
-2. Still as organizer, open `/admin/inbox-kit` (QR evidence), `/admin/insider-kit` (prepare **Part A private** and **Part B public** cards), `/admin/containment-kit` (CCTV sheets). Print preview should show A4 pages without cut-off.
+2. (Superseded: no QR or CCTV kit; see `ghost404-release-checklist.md`.) Still as organizer, open `/admin/inbox-kit` (QR evidence), `/admin/insider-kit` (prepare **Part A private** and **Part B public** cards), `/admin/containment-kit` (CCTV sheets). Print preview should show A4 pages without cut-off.
 3. Browser window 2 (a **separate profile or private window**): `http://127.0.0.1:3000/login?role=team`, Team ID `DEMO-A`, same code.
 4. Play: Inbox → Trail → Insider (enter the Part A and Part B fragments of DEMO-A from the kit) → Containment → Final Verdict.
 5. Expected after each correct submission: the next chapter unlocks. A wrong answer shows a rejection and, after the cooldown (3 s), you can retry. Hints cost −3 (first) and −9 total for two.

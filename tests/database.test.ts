@@ -399,7 +399,7 @@ describe.runIf(process.env.GHOST_DB_TEST === "1")("Prisma persistence and sessio
     await db.submission.updateMany({ where: { teamId: id, chapter: 2 }, data: { createdAt: new Date(0) } });
     expect((await service.mutateTeam(id, 2, "submit", insiderAnswers[variant])).accepted).toBe(true);
     const response = await get(); expect(response.status).toBe(200); expect(response.headers.get("Cache-Control")).toBe("no-store");
-    const data = await response.json(); expect(data.evidence.caseId).toBe(`NEXUS-CONTAINMENT-${variant}`); expect(data.fallbackCctv).toBeNull();
+    const data = await response.json(); expect(data.evidence.caseId).toBe(`NEXUS-CONTAINMENT-${variant}`); expect(data.cctv.id).toBe(`CCTV-${variant}-08`); /* the fictional security-room evidence is on screen with no organizer grant */
     expect(JSON.stringify(data)).not.toContain(pair.fragmentA); expect(JSON.stringify(data)).not.toContain(pair.fragmentB); expect(JSON.stringify(data)).not.toMatch(/eventOrder|recoveryOrder|containmentSolution/);
     expect((await get("?teamId=CONTAIN-B")).status).toBe(403); expect((await get("?variant=B")).status).toBe(403);
     await db.gameSession.update({ where: { id: 1 }, data: { deadline: new Date(Date.now() - 1) } });
@@ -427,25 +427,21 @@ describe.runIf(process.env.GHOST_DB_TEST === "1")("Prisma persistence and sessio
     expect(JSON.stringify(await db.insiderAccess.findMany({ where: { teamId: { not: { startsWith: "CONTAIN-" } } }, orderBy: { teamId: "asc" } }))).toBe(preservedAccess);
     await auth.logout();
   });
-  it("authorizes and audits only eligible CCTV fallback copies, including a zero-point progression override and historical access", async () => {
-    const { containmentPrintData, authorizeContainmentCopy } = await import("../src/lib/game/containment-access.server");
+  it("Containment is fully digital: the security-room snapshot is part of the chapter for every eligible team, with no printed copy, station or organizer grant", async () => {
     const endpoint = await import("../src/app/api/game/containment/route"), get = () => endpoint.GET(new Request("http://127.0.0.1:3000/api/game/containment"));
-    expect(await containmentPrintData(["A", "B", "C"])).toBeNull(); await expect(authorizeContainmentCopy("CONTAIN-A", "No session")).rejects.toThrow("Organizer");
+    const access = await import("../src/lib/game/containment-access.server"); expect((access as Record<string, unknown>).authorizeContainmentCopy).toBeUndefined(); expect((access as Record<string, unknown>).containmentPrintData).toBeUndefined(); // the physical-copy workflow is gone
     const id = "CONTAIN-OVERRIDE"; await db.team.create({ data: { id, name: id, participants: '[]', codeHash: hashPassword(code), variant: "B", progress: JSON.stringify(initialProgress()) } });
     await db.gameSession.update({ where: { id: 1 }, data: { startsAt: new Date(), deadline: new Date(Date.now() + 3600000), endedAt: null } });
-    await auth.login("team", id, code); expect((await get()).status).toBe(403); expect(await containmentPrintData(["B"])).toBeNull(); await expect(authorizeContainmentCopy(id, "Participant cannot grant")).rejects.toThrow("Organizer");
-    await auth.logout(); await auth.login("admin", "organizer", code); expect((await get()).status).toBe(401); expect((await containmentPrintData(["A", "B", "C", "D"]))?.map(item => item.variant)).toEqual(["A", "B", "C"]);
-    await expect(authorizeContainmentCopy(id, "Premature request")).rejects.toThrow("active Containment");
-    for (let i = 0; i < 3; i++) await service.control("unlock", id, "Test verified organizer progression override");
-    await Promise.allSettled([authorizeContainmentCopy(id, "Damaged printed clue"), authorizeContainmentCopy(id, "Damaged printed clue")]);
-    expect(await db.auditLog.count({ where: { actor: "organizer", action: "containment-copy", detail: { contains: id } } })).toBe(1);
-    await expect(authorizeContainmentCopy("UNREGISTERED", "Unknown team")).rejects.toThrow();
-    await auth.logout(); await auth.login("team", id, code);
-    const copied = await (await get()).json(); expect(copied.fallbackCctv.id).toBe("CCTV-B-08"); expect(copied.evidence.caseId).toBe("NEXUS-CONTAINMENT-B"); expect((await service.teamState(id)).score).toBe(0); expect((await service.teamState(id)).current).toBe(3); expect((await service.teamState(id)).insiderUnlocked).toBe(false);
-    await auth.logout(); await auth.login("team", "CONTAIN-C", code); expect((await (await get()).json()).fallbackCctv).toBeNull();
+    await auth.login("team", id, code); expect((await get()).status).toBe(403); // the chapter itself is still gated by progression
+    for (let i = 0; i < 3; i++) await service.control("unlock", id, "Test verified organizer progression override"); // a zero-point organizer override
+    const first = await get(); expect(first.status).toBe(200); const data = await first.json();
+    expect(data.cctv.id).toBe("CCTV-B-08"); expect(data.evidence.caseId).toBe("NEXUS-CONTAINMENT-B"); expect(data.evidence.cctvReference).toEqual({ id: "CCTV-B-08" }); expect(JSON.stringify(data)).not.toMatch(/evidence station|accessible copy|ask an organizer|security-room evidence station/i);
+    expect(data.fallbackCctv).toBeUndefined(); expect(data.cctv.sourceId).toMatch(/^REC-|^ACT-|-/); expect((await service.teamState(id)).score).toBe(0); expect((await service.teamState(id)).current).toBe(3); expect((await service.teamState(id)).insiderUnlocked).toBe(false);
+    await auth.logout(); await auth.login("team", "CONTAIN-C", code); expect((await (await get()).json()).cctv.id).toBe("CCTV-C-08"); // each team sees its own variant
     await db.gameSession.update({ where: { id: 1 }, data: { deadline: new Date(Date.now() - 1) } });
-    await auth.logout(); await auth.login("team", id, code); expect((await (await get()).json()).fallbackCctv.id).toBe("CCTV-B-08");
-    await auth.logout(); await auth.login("admin", "organizer", code); await expect(authorizeContainmentCopy("CONTAIN-C", "Expired new grant")).rejects.toThrow("active Containment"); await auth.logout();
+    await auth.logout(); await auth.login("team", id, code); expect((await (await get()).json()).cctv.id).toBe("CCTV-B-08"); // historical access after the round ends
+    await auth.logout(); expect((await get()).status).toBe(401);
+    expect(await db.auditLog.count({ where: { action: "containment-copy" } })).toBe(0); // no grant is ever recorded or needed
   });
   it("prepares Final Verdict scenarios without changing earlier scores, physical access or authentication policy", async () => {
     await db.loginAttempt.updateMany({ data: { windowStart: new Date(0) } }); // Fresh test-only rate window for the new chapter scenarios.

@@ -6,5 +6,5 @@ export type ContainmentEvidence = {
   events: ContainmentRecord[]; observations: ContainmentRecord[];
   artifacts: { id: string; title: string; facts: Record<string, string> }[];
   immediateOptions: ResponseOption[]; recoveryOptions: ResponseOption[];
-  cctvReference: { id: string; placement: string };
+  cctvReference: { id: string };
 };
