@@ -3,6 +3,7 @@ import { applyRaw, bonus, current, hints, overrideChapter, permit, points, progr
 import { catalog, criterionPoints, gradeTask, MAX_SCORED_ATTEMPTS, taskIds, taskMax } from "./scoring";
 import { taskDefs, validators } from "./validators";
 import { matchesInsiderFragments } from "./insider-fragments.server";
+import { pairsView, solvePair } from "./evidence-wall.server";
 import { attemptCap, POLICY_BEST } from "../attempts";
 import { answerHash } from "../round2/safe-json";
 import { round2Entry } from "../round2/access.server";
@@ -24,8 +25,8 @@ export async function teamState(id: string) {
   const round = await roundState();
   const taskRows = await db.taskScore.findMany({ where: { teamId: id }, select: { taskId: true, earned: true, attempts: true } });
   const earned = new Map(taskRows.map(row => [row.taskId, row.earned])), usedBy = new Map(taskRows.map(row => [row.taskId, row.attempts])), policy = roundPolicy(round);
-  const round2 = await round2Entry(id);
-  return { id: team.id, name: team.name, participants: JSON.parse(team.participants) as string[], variant: team.variant, progress, score: score(progress), hints: hints(progress), current: current(progress), round, status: status(round), serverNow: Date.now(), round2, chapterHints: progress.chapters.map((chapter, i) => validators[i]?.hints.slice(0, chapter.hints) ?? []), insiderUnlocked: !!team.insiderAccess?.unlockedAt, unlocked: points.map((_, i) => unlocked(progress, i)), unlockThresholds, policy, tasks: catalog.map(list => list.map(task => ({ id: task.id, title: task.title, earned: earned.get(task.id) ?? 0, max: taskMax(task), attempts: policy === POLICY_BEST ? attemptsView(task.id, usedBy.get(task.id) ?? 0) : null }))) };
+  const [round2, insiderPairs] = await Promise.all([round2Entry(id), pairsView(id)]);
+  return { id: team.id, name: team.name, participants: JSON.parse(team.participants) as string[], variant: team.variant, progress, score: score(progress), hints: hints(progress), current: current(progress), round, status: status(round), serverNow: Date.now(), round2, insiderPairs, chapterHints: progress.chapters.map((chapter, i) => validators[i]?.hints.slice(0, chapter.hints) ?? []), insiderUnlocked: !!team.insiderAccess?.unlockedAt, unlocked: points.map((_, i) => unlocked(progress, i)), unlockThresholds, policy, tasks: catalog.map(list => list.map(task => ({ id: task.id, title: task.title, earned: earned.get(task.id) ?? 0, max: taskMax(task), attempts: policy === POLICY_BEST ? attemptsView(task.id, usedBy.get(task.id) ?? 0) : null }))) };
 }
 export async function leaderboard() {
   const teams = await db.team.findMany({ select: { id: true, name: true, progress: true, variant: true, participants: true } });
@@ -61,6 +62,14 @@ export async function mutateTeam(id: string, chapter: number, action: "submit" |
     if (action === "unlock" && team.insiderAccess?.unlockedAt) return { unlocked: true };
     const previous = await tx.submission.findFirst({ where: { teamId: id, chapter }, orderBy: { createdAt: "desc" } });
     if (previous && now - previous.createdAt.getTime() < 3000) return { error: "Please wait between evidence submissions.", retryAfter: Math.max(1, Math.ceil((3000 - (now - previous.createdAt.getTime())) / 1000)) };
+    if (action === "unlock" && await tx.insiderPair.count({ where: { teamId: id } }) > 0) { // three-pair Evidence Wall (this team was issued pairs)
+      const result = await solvePair(tx, { id, variant: team.variant }, answer, now);
+      await tx.submission.create({ data: { teamId: id, chapter, accepted: false, reason: result.ok ? `pair-solved:${result.pair}` : "fragment-rejected", answer: null } });
+      if (!result.ok) return { unlocked: false, matched: false, pairMode: true };
+      if (!result.already) await tx.auditLog.create({ data: { actor: id, action: "pair-solve", detail: JSON.stringify({ chapter, pair: result.pair, all: result.all }) } });
+      if (result.all && !result.already) await tx.auditLog.create({ data: { actor: id, action: "dossier-unlock", detail: JSON.stringify({ chapter, via: "pairs" }) } });
+      return { unlocked: result.all, matched: true, pair: result.pair, already: result.already, pairMode: true };
+    }
     if (action === "unlock") {
       const access = await tx.insiderAccess.findUnique({ where: { teamId: id } });
       const unlocked = !!access && matchesInsiderFragments(access, answer);

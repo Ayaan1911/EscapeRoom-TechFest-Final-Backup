@@ -18,6 +18,7 @@ model Team {
   taskScores TaskScore[]
   drafts ChapterDraft[]
   r2Finalist R2Finalist?
+  insiderPairs InsiderPair[]
 }
 model InsiderAccess {
   teamId String @id
@@ -25,6 +26,25 @@ model InsiderAccess {
   fragmentA String @unique
   fragmentB String @unique
   unlockedAt DateTime?
+}
+// Evidence Wall (Insider chapter), three independent pairs per team: a PRIVATE slip (team-specific code, in the team's envelope) fits exactly one
+// PUBLIC wall card of the team's variant. A solved pair opens its evidence folder; all three solved sets InsiderAccess.unlockedAt.
+// No row for a team = legacy two-fragment unlock (InsiderAccess.fragmentA/B), unchanged.
+model InsiderPair {
+  teamId String
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  pair String // "A" | "B" | "C" (organizer-side structure; never printed on both halves)
+  privateCode String @unique
+  solvedAt DateTime?
+  @@id([teamId, pair])
+}
+// Shared public cards per variant. The intended match and its decoys live ONLY in the event database (random codes), never in source.
+model InsiderWallCard {
+  code String @id
+  variant String
+  pair String
+  role String // "match" | "decoy"
+  @@index([variant, pair])
 }
 model TeamSession {
   tokenHash String @id

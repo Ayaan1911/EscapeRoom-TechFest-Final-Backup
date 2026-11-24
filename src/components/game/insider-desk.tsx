@@ -9,6 +9,8 @@ import { ActivityTimeline } from "./case-visuals";
 import { OsDesktop, ToolWindow, useOs } from "@/components/os/os-windows";
 import { FolderSearch } from "lucide-react";
 import type { InsiderDossier, InsiderRecord } from "@/types/insider";
+import { EvidenceReconstruction } from "./evidence-reconstruction";
+import { FOLDERS, PAIRS } from "@/lib/game/evidence-wall-meta";
 
 const KIND: Record<InsiderRecord["kind"], { label: string; icon: string; tone: "info" | "amber" | "alert" | "ok" | "neutral" }> = {
   message: { label: "Message", icon: "✉", tone: "info" }, access: { label: "Access", icon: "⎆", tone: "neutral" }, policy: { label: "Policy change", icon: "⌘", tone: "alert" },
@@ -23,17 +25,20 @@ function InsiderWorkspace({ initialDossier, initialState, initialDrafts }: { ini
   const [dossier, setDossier] = useState(initialDossier), [loadError, setLoadError] = useState("");
   const [suspect, setSuspect] = useState(""), [kind, setKind] = useState(""), [search, setSearch] = useState(""), [selected, setSelected] = useState(""), [copyStatus, setCopyStatus] = useState("");
   const pinned = f.arr("insider.corroboration", "supportingEvidenceIds");
-  const sealed = !state.insiderUnlocked;
-  useEffect(() => {
-    if (!state.insiderUnlocked || dossier) return;
+  const sealed = !state.insiderUnlocked, pairs = state.insiderPairs ?? null, solvedKey = pairs ? PAIRS.filter(p => pairs[p]).join("") : "";
+  useEffect(() => { // legacy teams load the dossier once; teams on the three-pair wall reload it each time a folder opens
+    if (!state.insiderUnlocked && !solvedKey) return;
+    if (!pairs && dossier) return;
     let alive = true;
     async function load() {
-      try { const response = await fetch("/api/game/insider", { cache: "no-store" }); if (!response.ok) throw new Error(); const data = await response.json(); if (alive && data.dossier) { setDossier(data.dossier); setLoadError(""); } }
+      try { const response = await fetch("/api/game/insider", { cache: "no-store" }); if (!response.ok) throw new Error(); const data = await response.json(); if (alive && data.dossier) { setDossier(data.dossier); setLoadError(""); clearInterval(retry); } }
       catch { if (alive) setLoadError("Unable to load the dossier. Your unlock is saved; retrying."); }
     }
-    void load(); const retry = setInterval(load, 5000);
+    const retry = setInterval(load, 5000); void load();
     return () => { alive = false; clearInterval(retry); };
-  }, [state.insiderUnlocked, dossier]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.insiderUnlocked, solvedKey, !pairs && !!dossier]);
+  const opened: Record<string, number> = Object.fromEntries(PAIRS.map(p => [p, dossier?.records.filter(r => FOLDERS[p].kinds.includes(r.kind)).length ?? 0]));
   async function copy(id: string) { try { await navigator.clipboard.writeText(id); setCopyStatus(`Copied ${id}`); } catch { setCopyStatus(`Select and copy ${id}`); } }
   function unlock(event: FormEvent<HTMLFormElement>) { event.preventDefault(); const form = event.currentTarget; void send("unlock", Object.fromEntries(new FormData(form))).finally(() => form.reset()); }
   async function submit(task: string) {
@@ -48,7 +53,8 @@ function InsiderWorkspace({ initialDossier, initialState, initialDrafts }: { ini
   const countFor = (id: string) => dossier?.records.filter(r => r.employees.includes(id)).length ?? 0;
 
   return <DeskFrame chapter={2} title="Insider" caseId="PHYSICAL + DIGITAL" state={state} remaining={remaining} drafts={drafts} result={result} connection={connection} objective="Who deliberately weakened the controls? Access shows opportunity, not intent." banner={<><StateBanner state={state} chapter={2} /><ConnectionBanner text={connection || loadError} next="/play/insider" /></>}>
-    {sealed && <section className="pg-gate-card k-gate" aria-labelledby="gate-h">
+    {pairs && <EvidenceReconstruction pairs={pairs} onMatch={unlock} disabled={!editable || busy || retrySeconds > 0} feedback={feedback} opened={opened} />}
+    {!pairs && sealed && <section className="pg-gate-card k-gate" aria-labelledby="gate-h">
       <div><span className="k-eyebrow">DOSSIER SEALED</span><h2 id="gate-h">Combine your two physical fragments</h2><p>Fragment A: your registration envelope. Fragment B: your team’s card on the Evidence Wall. Ask a volunteer if one is missing.</p></div>
       <form onSubmit={unlock}><fieldset disabled={!editable || busy || retrySeconds > 0}><div className="pg-fields">
         <label>Fragment A<input name="fragmentA" required maxLength={64} autoComplete="off" spellCheck={false} /></label>
@@ -56,7 +62,7 @@ function InsiderWorkspace({ initialDossier, initialState, initialDrafts }: { ini
         <button className="k-btn k-btn-primary">Unlock dossier</button></fieldset></form>
       <p role="status" className="pg-live">{feedback}</p>
     </section>}
-    {!sealed && !dossier && <p role="status" className="k-banner k-banner-ok">Unlock saved. Loading dossier…</p>}
+    {!sealed && !dossier && !pairs && <p role="status" className="k-banner k-banner-ok">Unlock saved. Loading dossier…</p>}
 
     {dossier && <>
       <ChainDiagram label="Your insider case so far" nodes={[
@@ -111,7 +117,7 @@ function InsiderWorkspace({ initialDossier, initialState, initialDrafts }: { ini
     </div>
       </ToolWindow>
 
-      <section className="pg-tasks" aria-label="Scored tasks">
+      {!sealed ? <section className="pg-tasks" aria-label="Scored tasks">
         <h2 className="pg-h">Tasks <small>Scored one by one</small></h2>
         <TaskPanel step={1} task={taskOf(state, 2, "insider.suspect")} editable={editable} busy={busy} retrySeconds={retrySeconds} result={result} ready={!!f.str("insider.suspect", "employeeId")} why="Choose the employee." onSubmit={() => void submit("insider.suspect")}>
           <div className="pg-fields"><label>Insider employee<select disabled={!editable} value={f.str("insider.suspect", "employeeId")} onChange={e => f.set("insider.suspect", "employeeId", e.target.value)}><option value="">Select…</option>{dossier.suspects.map(item => <option value={item.id} key={item.id}>{item.id} · {item.name}</option>)}</select></label></div></TaskPanel>
@@ -120,7 +126,7 @@ function InsiderWorkspace({ initialDossier, initialState, initialDrafts }: { ini
         <TaskPanel step={3} task={taskOf(state, 2, "insider.corroboration")} editable={editable} busy={busy} retrySeconds={retrySeconds} result={result} ready={pinned.length >= 3} why="Pin 3 to 8 records: intent, console access, approval." onSubmit={() => void submit("insider.corroboration")}>
           <div className="k-tray" aria-label="Pinned evidence">{pinned.length ? pinned.map(id => <span className="k-chip" key={id}><span className="k-mono">{id}</span>{editable && <button type="button" aria-label={`Unpin ${id}`} onClick={() => f.toggle("insider.corroboration", "supportingEvidenceIds", id)}>×</button>}</span>) : <small>Pin records from the dossier.</small>}</div></TaskPanel>
         <ResultStrip result={result} /><p role="status" className="pg-live">{feedback}</p>
-      </section></>}
+      </section> : <p className="k-banner" role="note">The scored tasks open when all three evidence folders are reconstructed. Read what you have opened so far.</p>}</>}
 
     <div className="pg-aux">
       <HintBox chapter={2} state={state} editable={editable} busy={busy} onHint={() => void send("hint")} />
