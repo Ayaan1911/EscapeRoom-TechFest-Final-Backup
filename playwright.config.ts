@@ -11,5 +11,6 @@ export default defineConfig({
   // Phase 2 specs need the seeded P2-* teams from scripts/phase2-e2e.mjs.
   testIgnore: [...(process.env.GHOST_R2_LEGACY ? [] : ["**/phase4-round2.spec.ts", "**/phase5-round2.spec.ts", "**/phase5-visual.spec.ts", "**/organizer-ties.spec.ts"]), ...(process.env.GHOST_PHASE2 ? [] : ["**/phase6a*.spec.ts"]),...(process.env.GHOST_PHASE2 ? [] : ["**/phase2*.spec.ts"]), ...(process.env.GHOST_PHASE4 ? [] : ["**/phase4*.spec.ts"]), ...(process.env.GHOST_PHASE5 ? [] : ["**/phase5*.spec.ts"])],
   use: { baseURL: hosted ?? `http://127.0.0.1:${port}`, trace: "retain-on-failure" },
-  webServer: hosted ? undefined : { command: `npm run dev -- --hostname 127.0.0.1 --port ${port}`, url: `http://127.0.0.1:${port}`, reuseExistingServer: !process.env.CI },
+  // GHOST_E2E_PROD=1 runs the suites against the production build (`next start`, needs `npm run build`) instead of the dev server.
+  webServer: hosted ? undefined : { command: `npm run ${process.env.GHOST_E2E_PROD ? "start" : "dev"} -- --hostname 127.0.0.1 --port ${port}`, url: `http://127.0.0.1:${port}`, reuseExistingServer: !process.env.CI },
 });

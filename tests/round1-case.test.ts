@@ -74,6 +74,11 @@ describe("private Round 1 case parameters", () => {
     expect(bad(k => { k.variants.C.inbox.session = "nx-a-123"; })).toThrow();
     expect(bad(k => { k.extra = 1; })).toThrow();
   });
+  it("production refuses to serve the public tables when the private file is missing (fail closed)", async () => {
+    vi.resetModules(); vi.stubEnv("NODE_ENV", "production"); vi.stubEnv("GHOST_R1_CASE_FILE", "/nonexistent/round1-case.json");
+    try { const m = await import("../src/lib/game/case-key.server"); expect(() => m.round1Case("A")).toThrow(/refusing to serve the public answer tables/); }
+    finally { vi.unstubAllEnvs(); vi.resetModules(); }
+  });
   it.skipIf(!existsSync("private/round1-case-v1.json"))("the INSTALLED private case file is valid and solvable", () => {
     checkCase(parseRound1Case(JSON.parse(readFileSync("private/round1-case-v1.json", "utf8"))));
   });

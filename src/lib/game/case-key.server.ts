@@ -10,8 +10,8 @@ import { z } from "zod";
 // correct. For the event, an organizer installs a PRIVATE file (default `private/round1-case-v1.json`, or GHOST_R1_CASE_FILE) with
 // fresh values. The generators, narrative and grading rules are unchanged; only these labels/selections move out of the repository.
 //
-// The file is read ONCE per server process: answers never change while a round is running. Without the file the built-in (public)
-// tables are used, which keeps tests and demos working; `round1CaseSource()` reports which one is active.
+// The file is read ONCE per server process: answers never change while a round is running. In production a missing file is an
+// error (fail closed); outside production the built-in (public) tables keep tests and demos working. An invalid file always throws.
 
 const two = z.string().regex(/^\d{2}$/);
 const distinct = (list: string[]) => new Set(list).size === list.length;
@@ -56,10 +56,14 @@ function load() {
   if (override) return { key: override, source: "private" as const, path: "(test override)" };
   if (loaded) return loaded;
   const path = process.env.GHOST_R1_CASE_FILE || join(/* turbopackIgnore: true */ process.cwd(), "private", "round1-case-v1.json");
-  if (existsSync(path)) {
+  // Unit tests are written against the built-in tables: under Vitest the default private path is ignored (an explicit GHOST_R1_CASE_FILE still applies).
+  const ignoreDefault = !!process.env.VITEST && !process.env.GHOST_R1_CASE_FILE;
+  if (!ignoreDefault && existsSync(path)) {
     loaded = { key: parseRound1Case(JSON.parse(readFileSync(path, "utf8"))), source: "private", path }; // invalid file: throw (fail closed), never silently fall back
   } else {
-    if (process.env.NODE_ENV === "production") console.warn(`[round1-case] ${path} not found: using the PUBLIC built-in case tables`);
+    // Production fails closed: the built-in tables are public, so serving them would hand every team a lookup table.
+    // (Development and tests keep the built-in tables; a deliberate public-table rehearsal can opt in explicitly.)
+    if (process.env.NODE_ENV === "production" && process.env.GHOST_R1_ALLOW_PUBLIC_CASE !== "1") throw new Error(`[round1-case] private case file missing (${path}); refusing to serve the public answer tables`);
     loaded = { key: BUILTIN_CASE, source: "builtin", path };
   }
   return loaded;
