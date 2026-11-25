@@ -11,5 +11,5 @@ export default async function InsiderPage() {
   if (access.status === 403) redirect("/play");
   const { state } = access;
   const drafts = await initialDrafts(state.id, 2);
-  return <div className="site-shell"><OsHeader area="Round 1 · Insider"><form action={signOut}><button className="button-primary">Log out</button></form></OsHeader><main className="dashboard-main insider-main"><a className="back-link" href="/play">← Investigation dashboard</a><InsiderDesk initialDossier={access.dossier} initialState={initialChapterState(state)} initialDrafts={drafts} /></main></div>;
+  return <div className="site-shell"><OsHeader area="Round 1 · Insider"><form action={signOut}><button className="button-primary">Log out</button></form></OsHeader><main className="dashboard-main insider-main"><a className="back-link" href="/play">← Investigation dashboard</a><InsiderDesk initialDossier={null /* fetched by the desk from /api/game/insider after the server-side fragment gate; never serialized into this page */} initialState={initialChapterState(state)} initialDrafts={drafts} /></main></div>;
 }
