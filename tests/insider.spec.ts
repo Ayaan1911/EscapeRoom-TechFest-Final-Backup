@@ -47,7 +47,7 @@ test("anonymous, organizer and premature participant requests cannot reveal a do
   await insiderLogin(page, "INSIDER-LOCKED");
   expect((await page.request.get("/api/game/insider?teamId=INSIDER-01&variant=A")).status()).toBe(403);
   await page.goto("/play/insider"); await expect(page).toHaveURL(/\/play$/);
-  const premature = await page.request.post("/api/game", { headers: { Origin: "http://127.0.0.1:3000" }, data: { action: "unlock", chapter: 2, answer: { fragmentA: printedPairs().A[0].fragment, fragmentB: printedPairs().B[0].fragment } } });
+  const premature = await page.request.post("/api/game", { headers: { Origin: `http://127.0.0.1:${process.env.GHOST_E2E_PORT ?? 3000}` }, data: { action: "unlock", chapter: 2, answer: { fragmentA: printedPairs().A[0].fragment, fragmentB: printedPairs().B[0].fragment } } });
   expect(premature.status()).toBe(409); expect((await premature.json()).error).toContain("locked");
   await page.goto("/admin/insider-kit?part=A&scope=all"); await expect(page).toHaveURL(/\/organizer\/login/); await expect(page.locator(".fragment-card")).toHaveCount(0);
 });
@@ -61,7 +61,7 @@ for (const [index, variant] of (["A", "B", "C"] as const).entries()) test(`Insid
   expect(await page.content()).not.toMatch(/EMP-[ABC]-0\d|UPDATE existing-session-export-policy|insiderSolution|supportingEvidenceIds/);
   expect(await page.content()).not.toContain(a); expect(await page.content()).not.toContain(b);
   const sealed = await page.request.get("/api/game/insider?teamId=INSIDER-50&variant=Z"); expect(sealed.headers()["cache-control"]).toBe("no-store"); expect(await sealed.json()).toEqual({ unlocked: false, dossier: null });
-  const post = (action: string, data: unknown) => page.request.post("/api/game", { headers: { Origin: "http://127.0.0.1:3000" }, data: { action, chapter: 2, answer: data } });
+  const post = (action: string, data: unknown) => page.request.post("/api/game", { headers: { Origin: `http://127.0.0.1:${process.env.GHOST_E2E_PORT ?? 3000}` }, data: { action, chapter: 2, answer: data } });
   const early = await post("submit", answer); expect(early.status()).toBe(409); expect((await early.json()).error).toContain("Unlock");
   await page.locator("summary", { hasText: "Hints" }).click();
   await page.getByRole("button", { name: /Reveal hint 1/ }).click();
@@ -98,7 +98,7 @@ for (const [index, variant] of (["A", "B", "C"] as const).entries()) test(`Insid
     await expect(page.getByRole("article", { name: "Evidence detail", exact: true })).toContainText(evidenceId);
     await page.getByRole("button", { name: /^☆ Pin evidence ID/ }).click();
   }
-  await page.bringToFront(); await page.context().grantPermissions(["clipboard-read", "clipboard-write"], { origin: "http://127.0.0.1:3000" });
+  await page.bringToFront(); await page.context().grantPermissions(["clipboard-read", "clipboard-write"], { origin: `http://127.0.0.1:${process.env.GHOST_E2E_PORT ?? 3000}` });
   await page.getByRole("button", { name: "Copy ID", exact: true }).click();
   await expect(page.getByText(`Copied ${answer.supportingEvidenceIds[2]}`, { exact: true })).toBeVisible(); expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(answer.supportingEvidenceIds[2]);
   await expect(page.getByRole("button", { name: /^Unpin / })).toHaveCount(3);
@@ -131,6 +131,6 @@ test("closed rounds retain unlocked history and block sealed-team unlock, hints 
   await logout(page); await insiderLogin(page, "INSIDER-04");
   await page.goto("/play/insider"); await expect(page.getByRole("button", { name: "Unlock dossier", exact: true })).toBeDisabled();
   const pairs = printedPairs(), fragments = { fragmentA: pairs.A.find(card => card.teamId === "INSIDER-04")!.fragment, fragmentB: pairs.B.find(card => card.teamId === "INSIDER-04")!.fragment };
-  for (const action of ["unlock", "hint", "submit"]) { const response = await page.request.post("/api/game", { headers: { Origin: "http://127.0.0.1:3000" }, data: { action, chapter: 2, answer: action === "unlock" ? fragments : insiderAnswers.A } }); expect(response.status()).toBe(409); expect((await response.json()).error).toContain("not active"); }
+  for (const action of ["unlock", "hint", "submit"]) { const response = await page.request.post("/api/game", { headers: { Origin: `http://127.0.0.1:${process.env.GHOST_E2E_PORT ?? 3000}` }, data: { action, chapter: 2, answer: action === "unlock" ? fragments : insiderAnswers.A } }); expect(response.status()).toBe(409); expect((await response.json()).error).toContain("not active"); }
   expect(await (await page.request.get("/api/game/insider")).json()).toEqual({ unlocked: false, dossier: null }); await context.close();
 });

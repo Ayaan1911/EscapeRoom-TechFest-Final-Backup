@@ -27,7 +27,7 @@ test("Tier A (Inbox 'Unauthorized export', 2 attempts): counter, wording, exhaus
   await expect(panel.getByText("Attempts 2/2")).toBeVisible();
   await expect(panel.getByText(/No attempts remaining\. Your highest score has been saved\./).first()).toBeVisible();
   await expect(panel.getByRole("button", { name: "No attempts remaining" })).toBeDisabled();
-  const res = await page.request.post("/api/game", { data: { action: "submit", chapter: 0, task: "inbox.impact", answer: { databaseId: right } }, headers: { origin: "http://127.0.0.1:3000" } });
+  const res = await page.request.post("/api/game", { data: { action: "submit", chapter: 0, task: "inbox.impact", answer: { databaseId: right } }, headers: { origin: `http://127.0.0.1:${process.env.GHOST_E2E_PORT ?? 3000}` } });
   expect([409, 429]).toContain(res.status()); expect((await res.json()).error).toMatch(/No attempts remaining|wait/i);
 });
 

@@ -5,7 +5,7 @@ import { submitTask } from "./fixtures/ui";
 
 test.skip(!process.env.GHOST_E2E_REDESIGN, "Run: node scripts/redesign-e2e.mjs (disposable local database)");
 test.describe.configure({ mode: "serial" });
-const ORIGIN = "http://127.0.0.1:3000";
+const ORIGIN = `http://127.0.0.1:${process.env.GHOST_E2E_PORT ?? 3000}`;
 async function login(page: Page, id: string) {
   await page.goto("/login"); await page.getByLabel("Team ID").fill(id); await page.getByLabel("Access code").fill(process.env.GHOST_E2E_TEAM_CODE!);
   await page.getByRole("button", { name: "Sign in", exact: true }).click(); await expect(page.getByRole("heading", { name: "Investigation dashboard", exact: true })).toBeVisible({ timeout: 30_000 });

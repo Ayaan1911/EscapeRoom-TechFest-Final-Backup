@@ -8,7 +8,7 @@ import { confirmTop10 } from "./fixtures/advance-top10";
 //   GHOST_P5_REAL_KEY=1 node scripts/phase5-e2e.mjs tests/lan-dryrun.spec.ts
 test.skip(!existsSync("private/round2-key-v2.json") || process.env.GHOST_P5_REAL_KEY !== "1", "needs the real private key and GHOST_P5_REAL_KEY=1");
 test.describe.configure({ mode: "serial" });
-const prisma = new PrismaClient(), origin = "http://127.0.0.1:3000", seen = new Set<string>();
+const prisma = new PrismaClient(), origin = `http://127.0.0.1:${process.env.GHOST_E2E_PORT ?? 3000}`, seen = new Set<string>();
 const key = existsSync("private/round2-key-v2.json") ? JSON.parse(readFileSync("private/round2-key-v2.json", "utf8")).inject2 as { malicious: string[]; cleared: string[]; wrongMessages: Record<string, string>; status: string } : null!;
 const ROGUE = key?.malicious ?? [], LEGIT = key?.cleared ?? [];
 const code = () => process.env.GHOST_E2E_TEAM_CODE!;

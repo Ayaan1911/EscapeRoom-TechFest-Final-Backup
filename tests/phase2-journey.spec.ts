@@ -60,7 +60,7 @@ for (const V of ["A", "B", "C"] as const) test(`critical journey, variant ${V}`,
   expect(raw(await state(page)).slice(0, 2)).toEqual([15, 13]);
   expect((await state(page)).score).toBe(28);
   // a completed chapter is read-only: replaying a solved task over the API changes nothing
-  await page.request.post("/api/game", { headers: { Origin: "http://127.0.0.1:3000" }, data: { action: "submit", chapter: 0, task: "inbox.impact", answer: ident } });
+  await page.request.post("/api/game", { headers: { Origin: `http://127.0.0.1:${process.env.GHOST_E2E_PORT ?? 3000}` }, data: { action: "submit", chapter: 0, task: "inbox.impact", answer: ident } });
   expect(raw(await state(page)).slice(0, 2)).toEqual([15, 13]);
 
   // 10-13. back to Trail: work is still there; one more task; notes draft survives a reload
@@ -82,7 +82,7 @@ for (const V of ["A", "B", "C"] as const) test(`critical journey, variant ${V}`,
   // 16. Insider is reachable by points but the physical fragments still gate it
   await page.goto("/play/insider"); await expect(page.getByText("Combine your two physical fragments")).toBeVisible();
   await expect(page.getByRole("button", { name: "Submit task" })).toHaveCount(0);
-  const denied = await page.request.post("/api/game", { headers: { Origin: "http://127.0.0.1:3000" }, data: { action: "submit", chapter: 2, task: "insider.suspect", answer: { employeeId: "EMP-A-04" } } });
+  const denied = await page.request.post("/api/game", { headers: { Origin: `http://127.0.0.1:${process.env.GHOST_E2E_PORT ?? 3000}` }, data: { action: "submit", chapter: 2, task: "insider.suspect", answer: { employeeId: "EMP-A-04" } } });
   expect(denied.status()).toBeGreaterThanOrEqual(400); expect(raw(await state(page))[2]).toBe(0);
 
   // 18. direct URLs: locked chapters bounce back, history navigation works

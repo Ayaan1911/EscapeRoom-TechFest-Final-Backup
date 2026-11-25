@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 // Fast visual/responsive checks on a SEEDED disposable round (GHOST_P5_SEED=1 node scripts/phase5-e2e.mjs tests/phase5-visual.spec.ts).
 // Independent of the lifecycle spec. Round 2 is at minute 10 of a test clock; nothing here starts a real timer.
-const code = process.env.GHOST_E2E_TEAM_CODE!, origin = process.env.GHOST_BASE_URL ?? "http://127.0.0.1:3000", shots = process.env.GHOST_SHOTS === "1";
+const code = process.env.GHOST_E2E_TEAM_CODE!, origin = process.env.GHOST_BASE_URL ?? `http://127.0.0.1:${process.env.GHOST_E2E_PORT ?? 3000}`, shots = process.env.GHOST_SHOTS === "1";
 test.setTimeout(120_000);
 const sizes = [["laptop", { width: 1366, height: 800 }], ["tablet", { width: 820, height: 1100 }], ["phone", { width: 390, height: 844 }]] as const;
 for (const [name, vp] of sizes) {

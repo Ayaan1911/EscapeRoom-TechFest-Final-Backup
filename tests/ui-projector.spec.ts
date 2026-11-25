@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 test.skip(!process.env.GHOST_E2E_REDESIGN, "Run: node scripts/redesign-e2e.mjs tests/ui-projector.spec.ts (disposable local database)");
-const ORIGIN = "http://127.0.0.1:3000";
+const ORIGIN = `http://127.0.0.1:${process.env.GHOST_E2E_PORT ?? 3000}`;
 
 test("projector is private by default: anonymous and team sessions are refused, the page redirects to organizer sign-in", async ({ page, request }) => {
   test.setTimeout(90_000);

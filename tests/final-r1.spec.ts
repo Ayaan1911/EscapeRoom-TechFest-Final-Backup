@@ -54,7 +54,7 @@ test("Containment is fully digital: the security-room evidence is on screen, no 
   const data = await (await page.request.get("/api/game/containment")).json(); expect(data.cctv.id).toBe("CCTV-C-08"); expect(data.evidence.cctvReference).toEqual({ id: "CCTV-C-08" }); expect(JSON.stringify(data)).not.toMatch(/eventOrder|recoveryOrder|containmentSolution/);
   await page.getByRole("button", { name: /Phase 5: Preserve/ }).click(); await expect(page.getByText(/include the security-room snapshot/)).toBeVisible(); // the snapshot is still part of the evidence task
   await page.waitForTimeout(600); await page.screenshot({ path: `${SHOTS}/containment-digital-evidence.png`, fullPage: true });
-  expect([...origins].every(o => o === "http://127.0.0.1:3000")).toBe(true); expect(problems).toEqual([]);
+  expect([...origins].every(o => o === `http://127.0.0.1:${process.env.GHOST_E2E_PORT ?? 3000}`)).toBe(true); expect(problems).toEqual([]);
   // organizer side: no CCTV kit in navigation, the old route only says it is retired
   const actx = await browser.newContext(), admin = await actx.newPage(); await admin.goto("/organizer/login"); await admin.getByLabel("Access code").fill(process.env.GHOST_E2E_ADMIN_CODE ?? code()); await admin.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(admin.getByRole("heading", { name: "Event operations" })).toBeVisible({ timeout: 30_000 }); await expect(admin.getByRole("link", { name: /Containment CCTV kit/ })).toHaveCount(0);

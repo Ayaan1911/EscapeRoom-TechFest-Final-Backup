@@ -14,7 +14,7 @@ let status = 1;
 try {
   await db.gameSession.create({ data: { id: 1, startsAt: new Date(), deadline: new Date(Date.now() + 3_600_000), scoringPolicy: "best-v1" } });
   for (const [id, variant] of [["UI-A", "A"], ["UI-B", "B"], ["UI-C", "C"], ["UI-D", "A"]]) await db.team.create({ data: { id, name: `UI fixture ${id}`, participants: JSON.stringify(["Investigator One"]), codeHash: hashPassword(code), variant, progress: JSON.stringify(initialProgress()) } });
-  const env = { ...process.env, DATABASE_URL: temp.url, DIRECT_URL: temp.url, ADMIN_ACCESS_HASH: hashPassword(code), APP_ORIGIN: "http://127.0.0.1:3000", GHOST_E2E_TEAM_CODE: code, GHOST_E2E_ADMIN_CODE: code, GHOST_E2E_REDESIGN: "1" };
+  const env = { ...process.env, DATABASE_URL: temp.url, DIRECT_URL: temp.url, ADMIN_ACCESS_HASH: hashPassword(code), APP_ORIGIN: `http://127.0.0.1:${process.env.GHOST_E2E_PORT ?? 3000}`, GHOST_E2E_TEAM_CODE: code, GHOST_E2E_ADMIN_CODE: code, GHOST_E2E_REDESIGN: "1" };
   status = spawnSync(process.platform === "win32" ? "npx.cmd" : "npx", ["playwright", "test", ...specs, "--workers=1", "--reporter=list"], { env, stdio: "inherit", shell: process.platform === "win32" }).status ?? 1;
 } finally { await db.$disconnect(); await temp.drop(); }
 process.exit(status);

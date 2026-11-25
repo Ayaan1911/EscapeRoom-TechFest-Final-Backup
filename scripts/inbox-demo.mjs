@@ -119,11 +119,15 @@ Ctrl+C drops the temporary PostgreSQL database. After a forced close run: node -
   const commands = testing && journey ? [["node_modules/@playwright/test/cli.js", "test", "tests/journey.spec.ts", "--output", "test-results/journey"]] : testing ? trail ? [["node_modules/@playwright/test/cli.js", "test", "tests/routes.spec.ts", "tests/inbox.spec.ts"], ["node_modules/@playwright/test/cli.js", "test", "tests/trail.spec.ts", "tests/continue.spec.ts"], ...(insider ? [["node_modules/@playwright/test/cli.js", "test", "tests/insider.spec.ts", "--output", "test-results/insider-main"], ["node_modules/@playwright/test/cli.js", "test", "tests/insider-restart.spec.ts", "--output", "test-results/insider-restart"]] : [])] : [["node_modules/@playwright/test/cli.js", "test"]] : [["node_modules/next/dist/bin/next", "dev", "--hostname", origin.hostname, "--port", origin.port || "80"]];
   if (testing && containment) commands.push(["node_modules/@playwright/test/cli.js", "test", "tests/containment.spec.ts", "--output", "test-results/containment-main"], ["node_modules/@playwright/test/cli.js", "test", "tests/containment-restart.spec.ts", "--output", "test-results/containment-restart"]);
   if (testing && verdict) commands.push(["node_modules/@playwright/test/cli.js", "test", "tests/verdict.spec.ts", "--output", "test-results/verdict-main"], ["node_modules/@playwright/test/cli.js", "test", "tests/verdict-restart.spec.ts", "--output", "test-results/verdict-restart"]);
+  // GHOST_E2E_ONLY=<regex> runs only the Playwright groups whose arguments match (e.g. "containment|verdict").
+  // Groups are skipped in place (not removed) because fixture seeding below is keyed to each group's position.
+  const only = process.env.GHOST_E2E_ONLY ? new RegExp(process.env.GHOST_E2E_ONLY) : null;
   for (const [index, args] of commands.entries()) {
     if (testing && trail && index === 1) await seedTrail();
     if (testing && insider && index === 2) await seedInsider();
     if (testing && containment && index === 4) await seedContainment();
     if (testing && verdict && index === 6) await seedContainment(true);
+    if (only && !only.test(args.join(" "))) continue;
     child = spawn(process.execPath, args, { env, stdio: [testing ? "inherit" : "ignore", "inherit", "inherit"], windowsHide: true });
     process.exitCode = await new Promise((accept, reject) => { child.once("error", reject); child.once("exit", code => accept(code ?? 1)); });
     if (process.exitCode !== 0) break;

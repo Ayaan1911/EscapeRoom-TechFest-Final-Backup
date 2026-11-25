@@ -162,9 +162,9 @@ test("after the deadline every chapter is read-only on the server and in the UI"
     await page.reload();
     await expect(page.getByText(/Round finished/)).toBeVisible({ timeout: 10_000 });
     await expect(page.getByRole("button", { name: "Submit task" }).first()).toBeDisabled();
-    const response = await page.request.post("/api/game", { headers: { origin: "http://127.0.0.1:3000" }, data: { action: "submit", chapter: 3, task: "containment.identity", answer: taskAnswer("containment.identity", "C") } });
+    const response = await page.request.post("/api/game", { headers: { origin: `http://127.0.0.1:${process.env.GHOST_E2E_PORT ?? 3000}` }, data: { action: "submit", chapter: 3, task: "containment.identity", answer: taskAnswer("containment.identity", "C") } });
     expect(await response.json()).toMatchObject({ error: "Round is not active" });
-    const draft = await page.request.put("/api/game/drafts", { headers: { origin: "http://127.0.0.1:3000" }, data: { chapter: 3, taskId: "notes", data: { text: "x" }, baseVersion: 0 } });
+    const draft = await page.request.put("/api/game/drafts", { headers: { origin: `http://127.0.0.1:${process.env.GHOST_E2E_PORT ?? 3000}` }, data: { chapter: 3, taskId: "notes", data: { text: "x" }, baseVersion: 0 } });
     expect(draft.status()).toBe(403);
   } finally { await db.gameSession.update({ where: { id: 1 }, data: { deadline: new Date(Date.now() + 3_600_000) } }); await db.$disconnect(); }
 });

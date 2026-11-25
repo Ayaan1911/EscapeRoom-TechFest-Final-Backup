@@ -5,7 +5,7 @@ import { PrismaClient } from "@prisma/client";
 // The lifecycle is the legitimate one: confirm qualification -> enroll -> verify readiness -> start, all through the real UI.
 // Elapsed time is simulated by moving the TEST session's stored start time (no real 50-minute clock is ever run).
 // The lifecycle tests share one timeline, so they run serially; every gameplay test re-establishes the minute it needs.
-const code = process.env.GHOST_E2E_TEAM_CODE!, origin = process.env.GHOST_BASE_URL ?? "http://127.0.0.1:3000", prisma = new PrismaClient({ datasourceUrl: process.env.DATABASE_URL });
+const code = process.env.GHOST_E2E_TEAM_CODE!, origin = process.env.GHOST_BASE_URL ?? `http://127.0.0.1:${process.env.GHOST_E2E_PORT ?? 3000}`, prisma = new PrismaClient({ datasourceUrl: process.env.DATABASE_URL });
 const shots = process.env.GHOST_SHOTS === "1";
 test.describe.configure({ mode: "serial" });
 test.setTimeout(180_000);

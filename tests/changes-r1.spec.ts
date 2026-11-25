@@ -65,7 +65,7 @@ test("Forensic Snapshot: direct in-app button replaces the QR card; evidence ope
   await expect(page.locator("body")).not.toContainText(/scan|QR/i); await expect(page.locator("input, form, iframe")).toHaveCount(0); await expect(page.getByText("GHOST//OS")).toBeVisible();
   expect(await overflow(page)).toBeLessThanOrEqual(1); await page.screenshot({ path: `${SHOTS}/snapshot-2-opened.png`, fullPage: true });
   await page.getByRole("link", { name: /Return to Inbox/ }).click(); await expect(page).toHaveURL(/\/play\/inbox$/); await expect(page.getByRole("heading", { name: "The Inbox", exact: true })).toBeVisible();
-  expect([...origins].every(o => o === "http://127.0.0.1:3000")).toBe(true); // nothing external
+  expect([...origins].every(o => o === `http://127.0.0.1:${process.env.GHOST_E2E_PORT ?? 3000}`)).toBe(true); // nothing external
   for (const path of ["/admin/inbox-kit", "/admin/demo/round1/inbox/snapshot", "/admin/insider-kit"]) { await page.goto(path); await expect(page).toHaveURL(/\/organizer\/login/); await expect(page.locator("body")).not.toContainText(/NEXUS Workspace|physical evidence kit|Insider Evidence Wall kit/); } // organizer resources stay protected from a team session
   await ctx.close();
   // the organizer's Demo Mode opens the same evidence without touching a team

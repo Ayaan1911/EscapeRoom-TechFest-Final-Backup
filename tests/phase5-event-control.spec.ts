@@ -59,7 +59,7 @@ test("jury marking: validation, terminal score read-only, pending is not zero, p
   // participants cannot read or write marks
   const t = await browser.newContext(), tp = await t.newPage(); await team(tp, "P5-02");
   expect((await tp.request.get("/api/round2/admin?view=marking")).status()).toBe(401);
-  expect((await tp.request.post("/api/round2/admin", { data: { action: "mark", teamId: "P5-02", inject: 1, score: 15, marker: "Self" }, headers: { origin: "http://127.0.0.1:3000" } })).status()).toBe(401);
+  expect((await tp.request.post("/api/round2/admin", { data: { action: "mark", teamId: "P5-02", inject: 1, score: 15, marker: "Self" }, headers: { origin: `http://127.0.0.1:${process.env.GHOST_E2E_PORT ?? 3000}` } })).status()).toBe(401);
   await t.close();
   // results stay off the projector until publication
   await page.goto("/admin/projector"); await expect(page.getByRole("heading", { name: "PENS DOWN" })).toBeVisible({ timeout: 15_000 });

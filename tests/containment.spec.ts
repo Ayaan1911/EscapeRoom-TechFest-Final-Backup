@@ -17,7 +17,7 @@ test("Containment enforces sessions, waiting round, exact team isolation and an 
   await page.goto("/play/containment"); await expect(page).toHaveURL(/\/login\?next=/);
   await page.goto("/admin/containment-kit"); await expect(page).toHaveURL(/\/organizer\/login/);
   await login(page, "CONTAIN-A"); expect((await page.request.get("/api/game/containment")).status()).toBe(403);
-  const post = await page.request.post("/api/game", { headers: { Origin: "http://127.0.0.1:3000" }, data: { action: "submit", chapter: 3, answer: containmentAnswers.A } }); expect(post.status()).toBe(409); expect((await post.json()).error).toContain("not active");
+  const post = await page.request.post("/api/game", { headers: { Origin: `http://127.0.0.1:${process.env.GHOST_E2E_PORT ?? 3000}` }, data: { action: "submit", chapter: 3, answer: containmentAnswers.A } }); expect(post.status()).toBe(409); expect((await post.json()).error).toContain("not active");
   await page.goto("/play/containment"); await expect(page).toHaveURL(/\/play$/); await expect(page.getByRole("timer", { name: "Round time remaining" })).toHaveText("WAITING");
   const context = await browser.newContext(), admin = await context.newPage(); await login(admin, "admin"); expect((await admin.request.get("/api/game/containment")).status()).toBe(401);
   await admin.getByRole("button", { name: "Start 60-minute round", exact: true }).click(); await confirmDialog(admin); await expect(admin.getByRole("button", { name: "Stop round", exact: true })).toBeEnabled();
@@ -38,7 +38,7 @@ test("the CCTV kit is retired: organizer-only notice, no printable sheets, no co
 for (const variant of ["A", "B", "C"] as const) test(`Containment ${variant}: keyboard timeline, evidence, safe equivalent recovery, hints, score and saved history`, async ({ page }, info) => {
   test.setTimeout(90000);
   const answer = containmentAnswers[variant], id = `CONTAIN-${variant}`;
-  const external: string[] = []; page.on("request", request => { if (new URL(request.url()).origin !== "http://127.0.0.1:3000") external.push(request.url()); });
+  const external: string[] = []; page.on("request", request => { if (new URL(request.url()).origin !== `http://127.0.0.1:${process.env.GHOST_E2E_PORT ?? 3000}`) external.push(request.url()); });
   await login(page, id); await page.getByRole("link", { name: "Open Chapter 4", exact: true }).click(); await expect(page.getByRole("heading", { name: "Containment", exact: true })).toBeVisible();
   expect(/containmentSolution|containmentValidator|"edges"|answerKey/.test(await page.content())).toBe(false);
   const response = await page.request.get("/api/game/containment"); expect(response.headers()["cache-control"]).toBe("no-store"); const data = await response.json(); expect(data.evidence.caseId).toBe(`NEXUS-CONTAINMENT-${variant}`); expect(data.evidence.events).toHaveLength(7);
@@ -60,7 +60,7 @@ for (const variant of ["A", "B", "C"] as const) test(`Containment ${variant}: ke
   if (variant === "B") { await phase(page, 2); await page.getByLabel("Affected account", { exact: true }).fill(answer.account); await page.getByLabel("Affected session", { exact: true }).fill(answer.sessionId); await submitTask(page, "Affected account and session", /\+2 points\. Task 2\/2/);
     await phase(page, 4); for (const action of r) await page.getByRole("checkbox", { name: `Select recovery ${action}`, exact: true }).setChecked(true); await arrange(page, "recovery", [r[4], ...safe.filter(id => id !== r[4])]); await submitTask(page, "Ordered recovery"); }
   if (variant === "C") { await phase(page, 2); await page.getByLabel("Affected account", { exact: true }).fill(answer.account); await page.getByLabel("Affected session", { exact: true }).fill("nx-c-managed"); await submitTask(page, "Affected account and session", /\+1 points\. Task 1\/2/); }
-  const probe = await page.request.post("/api/game", { headers: { Origin: "http://127.0.0.1:3000" }, data: { action: "submit", chapter: 3, answer } }); expect(probe.status()).toBe(429); expect(Number(probe.headers()["retry-after"])).toBeGreaterThan(0);
+  const probe = await page.request.post("/api/game", { headers: { Origin: `http://127.0.0.1:${process.env.GHOST_E2E_PORT ?? 3000}` }, data: { action: "submit", chapter: 3, answer } }); expect(probe.status()).toBe(429); expect(Number(probe.headers()["retry-after"])).toBeGreaterThan(0);
   await expect(page.getByText("Chapter 4 completed. Chapter 5 unlocked.", { exact: true })).toHaveCount(0);
   expect((await (await page.request.get("/api/game")).json()).current).toBe(3);
   await solveContainment(page, variant, safe);
@@ -80,6 +80,6 @@ for (const variant of ["A", "B", "C"] as const) test(`Containment ${variant}: ke
 test("closed rounds preserve authorized historical evidence and block new plans and hints", async ({ page, browser }) => {
   const context = await browser.newContext(), admin = await context.newPage(); await organizer(admin); await admin.getByRole("button", { name: "Stop round", exact: true }).click(); await confirmDialog(admin, "STOP"); await expect(admin.getByRole("button", { name: "Stop round", exact: true })).toBeDisabled();
   await login(page, "CONTAIN-A"); await page.goto("/play/containment"); await expect(page.getByRole("timer", { name: "Round time remaining" })).toHaveText("FINISHED"); await expect(page.getByRole("article", { name: "Fictional snapshot CCTV-A-08", exact: true })).toBeVisible();
-  for (const action of ["hint", "submit"]) { const response = await page.request.post("/api/game", { headers: { Origin: "http://127.0.0.1:3000" }, data: { action, chapter: 3, answer: containmentAnswers.A } }); expect(response.status()).toBe(409); expect((await response.json()).error).toContain("not active"); }
+  for (const action of ["hint", "submit"]) { const response = await page.request.post("/api/game", { headers: { Origin: `http://127.0.0.1:${process.env.GHOST_E2E_PORT ?? 3000}` }, data: { action, chapter: 3, answer: containmentAnswers.A } }); expect(response.status()).toBe(409); expect((await response.json()).error).toContain("not active"); }
   expect((await page.request.get("/api/game/containment")).status()).toBe(200); await context.close();
 });

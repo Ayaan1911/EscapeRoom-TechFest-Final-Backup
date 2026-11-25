@@ -3,7 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 // Organizer exact-tie flow with ORDINARY Playwright clicks only (no dispatchEvent, no force). Seeded, already-finished disposable round:
 //   GHOST_P5_SEED=1 GHOST_P5_FINISHED=1 node scripts/phase5-e2e.mjs tests/organizer-ties.spec.ts
 // Covers: auto-refresh left running, a slow network, a refresh while the dialog is open, cancel and re-open, audit record, publication gating.
-const code = process.env.GHOST_E2E_TEAM_CODE!, origin = process.env.GHOST_BASE_URL ?? "http://127.0.0.1:3000";
+const code = process.env.GHOST_E2E_TEAM_CODE!, origin = process.env.GHOST_BASE_URL ?? `http://127.0.0.1:${process.env.GHOST_E2E_PORT ?? 3000}`;
 test.skip(process.env.GHOST_P5_FINISHED !== "1", "needs the seeded finished round");
 test.setTimeout(240_000);
 

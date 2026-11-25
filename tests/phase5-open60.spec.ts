@@ -91,7 +91,7 @@ test("Kill Switch: one attempt left turns red, exhaustion locks with the volunte
   await shot(page, "6-one-attempt-left");
   await cmd(page, `block ${W4}`); await expect(term(page)).toContainText("[FAIL] Out of attempts. Terminal locked. See a volunteer."); await expect(term(page)).not.toContainText("CALL THE VOLUNTEERS");
   await shot(page, "7-out-of-attempts");
-  const direct = await page.request.post("/api/round2/terminal", { headers: { Origin: "http://127.0.0.1:3000" }, data: { command: `block ${T1}` } }); expect((await direct.json()).lines[0].text).toBe("Terminal locked.");
+  const direct = await page.request.post("/api/round2/terminal", { headers: { Origin: `http://127.0.0.1:${process.env.GHOST_E2E_PORT ?? 3000}` }, data: { command: `block ${T1}` } }); expect((await direct.json()).lines[0].text).toBe("Terminal locked.");
   expect(await prisma.r2BlockAttempt.count({ where: { teamId: "P5-04" } })).toBe(4);
   await ctx.close();
   const again = await browser.newContext(), p2 = await again.newPage(); await team(p2, "P5-04"); await p2.goto("/round2"); await inject(p2, 2); await expect(term(p2)).toContainText("OUT OF ATTEMPTS"); await again.close();
@@ -101,7 +101,7 @@ test("pens down at 60:00 closes everything and locks the terminal; the retired f
   await prisma.r2Session.update({ where: { id: 1 }, data: { startsAt: new Date(Date.now() - min(60) - 2000) } });
   await team(page, "P5-05"); await page.goto("/round2"); await expect(page.getByRole("heading", { name: "PENS DOWN" })).toBeVisible();
   for (const s of ["ALR-0214", "SENTINEL-AI", "IT-4518"]) expect(await page.content()).not.toContain(s);
-  expect((await (await page.request.post("/api/round2/terminal", { headers: { Origin: "http://127.0.0.1:3000" }, data: { command: `block ${T1}` } })).json()).lines[0].text).toMatch(/not running/);
+  expect((await (await page.request.post("/api/round2/terminal", { headers: { Origin: `http://127.0.0.1:${process.env.GHOST_E2E_PORT ?? 3000}` }, data: { command: `block ${T1}` } })).json()).lines[0].text).toMatch(/not running/);
   await prisma.r2Session.update({ where: { id: 1 }, data: { startsAt: new Date(Date.now() - min(9)), format: null } }); // a historical 40-minute row (this test database only)
   await page.goto("/round2"); await expect(page.getByRole("heading", { name: "Round 2 is closed" })).toBeVisible(); await expect(page.locator(".rp-head")).toHaveCount(0);
   for (const path of ["/round2/chapter/2", "/round2/3"]) expect((await page.request.get(path)).status()).toBe(404);

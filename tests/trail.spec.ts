@@ -46,7 +46,7 @@ for (const variant of ["A", "B", "C"] as const) test(`Trail ${variant}: filters,
   const datasetResponse = await page.request.get(`/api/game/trail?variant=${variant === "A" ? "B" : "A"}&teamId=another-team`);
   expect(datasetResponse.headers()["cache-control"]).toBe("no-store");
   const dataset = await datasetResponse.json(); expect(dataset.caseId).toBe(`NEXUS-TRAIL-${variant}`); expect(dataset.rows).toHaveLength(144);
-  const post = (body: unknown) => page.request.post("/api/game", { headers: { Origin: "http://127.0.0.1:3000" }, data: { action: "submit", chapter: 1, answer: body } });
+  const post = (body: unknown) => page.request.post("/api/game", { headers: { Origin: `http://127.0.0.1:${process.env.GHOST_E2E_PORT ?? 3000}` }, data: { action: "submit", chapter: 1, answer: body } });
   let externalSubmissionAt = 0;
   if (variant === "A") {
     await page.locator("summary", { hasText: "Tamper Alert" }).click();
@@ -85,7 +85,7 @@ for (const variant of ["A", "B", "C"] as const) test(`Trail ${variant}: filters,
   await page.getByRole("button", { name: `Inspect ${trailTamper(variant).eventId}`, exact: true }).click();
   await expect(page.getByRole("complementary", { name: "Selected event details" })).toContainText("UNTRUSTED CLIENT TEXT");
   await page.bringToFront();
-  await page.context().grantPermissions(["clipboard-read", "clipboard-write"], { origin: "http://127.0.0.1:3000" });
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"], { origin: `http://127.0.0.1:${process.env.GHOST_E2E_PORT ?? 3000}` });
   await page.getByRole("complementary", { name: "Selected event details" }).getByRole("button", { name: "Copy ID", exact: true }).click();
   await expect(page.getByText(`Copied ${trailTamper(variant).eventId}`, { exact: true })).toBeVisible();
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(trailTamper(variant).eventId);
@@ -146,7 +146,7 @@ test("closed rounds keep Trail history readable and reject further mutation", as
   await page.goto("/play/trail"); await expect(page.getByRole("heading", { name: "Trail", exact: true })).toBeVisible();
   await expect(page.getByRole("timer", { name: "Round time remaining" })).toHaveText("FINISHED");
   for (const action of ["hint", "submit"]) {
-    const response = await page.request.post("/api/game", { headers: { Origin: "http://127.0.0.1:3000" }, data: { action, chapter: 1, answer: trailAnswers.C } });
+    const response = await page.request.post("/api/game", { headers: { Origin: `http://127.0.0.1:${process.env.GHOST_E2E_PORT ?? 3000}` }, data: { action, chapter: 1, answer: trailAnswers.C } });
     expect(response.status()).toBe(409); expect((await response.json()).error).toContain("not active");
   }
   expect((await page.request.get("/api/game/trail/csv")).status()).toBe(200);

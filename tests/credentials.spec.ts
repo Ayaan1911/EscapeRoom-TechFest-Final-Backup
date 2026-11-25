@@ -33,7 +33,7 @@ test("the 32 provisioned accounts sign in with the printed credentials; the rese
   const rctx = await browser.newContext({ viewport: { width: 1366, height: 768 } }), reserve = await rctx.newPage(); await signIn(reserve, "TEAM-31", pw("TEAM-31"));
   await expect(reserve.getByText("This reserve account is not active")).toBeVisible({ timeout: 20_000 }); await expect(reserve.getByText("Awaiting organizer start")).toHaveCount(0);
   await reserve.goto("/play/inbox"); await expect(reserve).toHaveURL(/\/play$/); await reserve.screenshot({ path: `${SHOTS}/reserve-waiting.png` });
-  const post = await reserve.request.post("/api/game", { headers: { Origin: "http://127.0.0.1:3000" }, data: { action: "hint", chapter: 0 } }); expect((await post.json()).error ?? "").toMatch(/reserve account is not active|not active|not open/i);
+  const post = await reserve.request.post("/api/game", { headers: { Origin: `http://127.0.0.1:${process.env.GHOST_E2E_PORT ?? 3000}` }, data: { action: "hint", chapter: 0 } }); expect((await post.json()).error ?? "").toMatch(/reserve account is not active|not active|not open/i);
   expect(problems).toEqual([]); await ctx.close(); await rctx.close();
 });
 

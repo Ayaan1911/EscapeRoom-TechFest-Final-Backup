@@ -13,7 +13,7 @@ async function signIn(page: import("@playwright/test").Page, id?: string, code?:
 
 test("Round 2 APIs and pages reject anonymous visitors", async ({ page, request }) => {
   for (const url of ["/api/round2/status", "/api/round2/evidence", "/api/round2/drafts", "/api/round2/results", "/api/round2/admin?view=readiness"]) expect((await request.get(url)).status(), url).toBe(401);
-  expect((await request.post("/api/round2/admin", { data: { action: "start" }, headers: { origin: "http://127.0.0.1:3000" } })).status()).toBeGreaterThanOrEqual(400);
+  expect((await request.post("/api/round2/admin", { data: { action: "start" }, headers: { origin: `http://127.0.0.1:${process.env.GHOST_E2E_PORT ?? 3000}` } })).status()).toBeGreaterThanOrEqual(400);
   await page.goto("/round2"); await expect(page).toHaveURL(/\/login/);
   await page.goto("/admin/round2"); await expect(page).toHaveURL(/\/organizer\/login/);
 });
