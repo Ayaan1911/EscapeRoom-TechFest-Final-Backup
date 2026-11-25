@@ -20,7 +20,8 @@ describe.each(["A", "B", "C"] as const)("Final Verdict %s", variant => {
     expect(evidence.records.find(item => item.id === inbox.snapshot.id)!.facts).toMatchObject({ Time: inbox.snapshot.capturedAt, Campaign: inbox.snapshot.campaign, Recipient: inbox.snapshot.recipient, "Redirect from": inbox.snapshot.redirectFrom, Destination: inbox.snapshot.url });
     const timeline = [...evidence.timeline].sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp));
     expect(timeline.map(item => item.timestamp.slice(11, 19))).toEqual(["09:11:18", "09:14:05", "09:14:07", "09:16:22", "09:18:04", "09:18:34", "09:32:00"]);
-    expect(new Set(evidence.records.map(item => item.id)).size).toBe(18); expect(evidence.records).toHaveLength(18);
+    // Full candidate sets (all emails, both sign-ins, the whole insider policy/approval/message/access set) so the record list does not pre-select the answer.
+    expect(new Set(evidence.records.map(item => item.id)).size).toBe(41); expect(evidence.records).toHaveLength(41);
     expect(new Set(evidence.records.map(item => item.chapter))).toEqual(new Set(["Inbox", "Trail", "Insider", "Containment"]));
     expect(JSON.stringify(evidence)).not.toMatch(/evidenceMap|verdictSolution|answerKey|fragmentA|fragmentB|correctHypothesis/);
     expect(evidence.summary.join(" ")).toContain("prepared an evidence-preserving response plan");

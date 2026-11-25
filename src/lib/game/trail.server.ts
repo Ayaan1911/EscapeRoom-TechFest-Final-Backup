@@ -2,20 +2,17 @@ import "server-only";
 import { z } from "zod";
 import { inboxEvidence, inboxSolution } from "./inbox.server";
 import type { ChapterValidator } from "./engine";
+import { round1Case } from "./case-key.server";
 import { earnedIds, gradeAll, type TaskDef } from "./scoring";
 import type { TrailArtifact, TrailEvidence, TrailEvent } from "@/types/trail";
 
-const slots = {
-  A: { mint: 22, replay: 74, trap: 109 },
-  B: { mint: 57, replay: 113, trap: 37 },
-  C: { mint: 103, replay: 52, trap: 82 },
-} as const;
+const slots = { A: true, B: true, C: true } as const; // positions come from the private case file
 function incident(variant: string) {
   if (!Object.hasOwn(slots, variant)) throw new Error("Unsupported Trail variant");
   const inbox = inboxEvidence(variant);
   const solution = inboxSolution(variant);
   const authentication = inbox.artifacts.find(artifact => artifact.id === solution.authenticationId)!;
-  return { inbox, solution, authentication, positions: slots[variant as keyof typeof slots] };
+  return { inbox, solution, authentication, positions: round1Case(variant).trail };
 }
 const eventId = (variant: string, number: number) => `EV-${variant}-${String(number).padStart(3, "0")}`;
 
@@ -101,7 +98,7 @@ export const trailValidator: ChapterValidator = {
     if (!parsed.success || !Object.hasOwn(slots, variant)) return { correct: false, points: 0 };
     const value = parsed.data;
     const expected = trailSolution(variant);
-    const tamperDetected = value.tamper?.eventId === eventId(variant, slots[variant as keyof typeof slots].trap) && value.tamper.field === "details" && value.tamper.technique === "instruction-override";
+    const tamperDetected = value.tamper?.eventId === eventId(variant, round1Case(variant).trail.trap) && value.tamper.field === "details" && value.tamper.technique === "instruction-override";
     const correct = value.kind === "conclusion" && value.account === expected.account && value.sourceIp === expected.sourceIp && value.sessionId === expected.sessionId && value.eventId === expected.eventId && expected.supportingEvidenceIds.every(id => value.supportingEvidenceIds.includes(id));
     return { correct, points: correct ? 25 : 0, tamperDetected };
   },

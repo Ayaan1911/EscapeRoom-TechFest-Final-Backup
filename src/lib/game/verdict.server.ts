@@ -5,24 +5,25 @@ import { trailEvidence, trailSolution } from "./trail.server";
 import { insiderDossier, insiderSolution } from "./insider.server";
 import { containmentEvidence } from "./containment.server";
 import type { ChapterValidator } from "./engine";
+import { round1Case } from "./case-key.server";
 import { earnedIds, gradeAll, type TaskDef } from "./scoring";
 import type { VerdictEvidence, VerdictRecord } from "@/types/verdict";
 
-const hypotheses = { A: { replay: "27", employee: "64", maintenance: "91" }, B: { replay: "83", employee: "16", maintenance: "42" }, C: { replay: "38", employee: "72", maintenance: "15" } } as const;
+const hypotheses = { A: true, B: true, C: true } as const; // hypothesis ids come from the private case file
 function context(variant: string) {
   if (!Object.hasOwn(hypotheses, variant)) throw new Error("Unsupported Verdict variant");
-  return { inbox: inboxEvidence(variant), entry: inboxSolution(variant), trail: trailEvidence(variant), replay: trailSolution(variant), insider: insiderDossier(variant), accomplice: insiderSolution(variant), containment: containmentEvidence(variant), hypotheses: hypotheses[variant as keyof typeof hypotheses] };
+  return { inbox: inboxEvidence(variant), entry: inboxSolution(variant), trail: trailEvidence(variant), replay: trailSolution(variant), insider: insiderDossier(variant), accomplice: insiderSolution(variant), containment: containmentEvidence(variant), hypotheses: round1Case(variant).verdict };
 }
 export function verdictEvidence(variant: string): VerdictEvidence {
   const c = context(variant), records: VerdictRecord[] = [];
   const add = (chapter: string, source: string, item: { id: string; title: string; facts: Record<string, string> }) => records.push({ chapter, source, ...item });
-  const email = c.inbox.emails.find(item => item.id === c.entry.emailId)!;
-  add("Inbox", "Recovered mailbox", { id: email.id, title: email.subject, facts: { Time: email.timestamp, From: email.address, Recipient: email.recipient, Links: email.links.join("; "), Handling: "Recovered untrusted message; provenance and gateway records must corroborate its role" } });
+  // Candidate sets are included whole (not pre-selected by the solution), so WHICH records appear does not reveal the answer.
+  for (const email of c.inbox.emails) add("Inbox", "Recovered mailbox", { id: email.id, title: email.subject, facts: { Time: email.timestamp, From: email.address, Recipient: email.recipient, Links: email.links.join("; "), Handling: "Recovered untrusted message; provenance and gateway records must corroborate its role" } });
   for (const item of c.inbox.artifacts.filter(item => [c.entry.deliveryId, `GW-${variant}-01`].includes(item.id))) add("Inbox", "Independent mail/web gateway", item);
   add("Inbox", "Retained browser capture", { id: c.inbox.snapshot.id, title: c.inbox.snapshot.title, facts: { Time: c.inbox.snapshot.capturedAt, Campaign: c.inbox.snapshot.campaign, Recipient: c.inbox.snapshot.recipient, "Redirect from": c.inbox.snapshot.redirectFrom, Destination: c.inbox.snapshot.url, Handling: "Inert captured page; do not follow its fictional destination" } });
-  for (const row of c.trail.rows.filter(row => [c.replay.supportingEvidenceIds[0], c.replay.eventId].includes(row.id))) add("Trail", "Identity-provider audit", { id: row.id, title: `${row.eventType} / ${row.account}`, facts: { Time: row.timestamp, Principal: row.account, Source: row.sourceIp, Device: row.device, Session: row.sessionId, Method: row.method, Result: row.result, "Conditional access": row.conditionalAccess, Correlation: row.correlationId } });
-  for (const item of c.inbox.artifacts.filter(item => item.kind === "database" || item.kind === "authentication" && item.id !== c.entry.authenticationId)) add("Inbox", item.kind === "database" ? "Database audit" : "Identity-provider audit", item);
-  for (const item of c.insider.records.filter(item => [c.accomplice.actionId, ...c.accomplice.supportingEvidenceIds, `CUST-${variant}-01`, `POL-${variant}-STAFF-3`].includes(item.id))) add("Insider", item.provenance, { id: item.id, title: item.title, facts: { Time: item.timestamp, ...item.facts } });
+  for (const row of c.trail.rows.filter(row => [c.replay.supportingEvidenceIds[0], c.replay.eventId].includes(row.id) || row.eventType === "client-note")) add("Trail", "Identity-provider audit", { id: row.id, title: `${row.eventType} / ${row.account}`, facts: { Time: row.timestamp, Principal: row.account, Source: row.sourceIp, Device: row.device, Session: row.sessionId, Method: row.method, Result: row.result, "Conditional access": row.conditionalAccess, Correlation: row.correlationId } });
+  for (const item of c.inbox.artifacts.filter(item => item.kind === "database" || item.kind === "authentication")) add("Inbox", item.kind === "database" ? "Database audit" : "Identity-provider audit", item);
+  for (const item of c.insider.records.filter(item => ["policy", "approval", "message", "access", "custody"].includes(item.kind))) add("Insider", item.provenance, { id: item.id, title: item.title, facts: { Time: item.timestamp, ...item.facts } });
   for (const item of c.trail.artifacts.filter(item => [ `CHG-${variant}-219`, `DB-${variant}-MAINT` ].includes(item.id))) add("Trail", item.id.startsWith("CHG") ? "Original approved change ticket" : "Database audit", item);
   add("Containment", "Incident lead / response authority", c.containment.artifacts.find(item => item.id === `IR-${variant}-11`)!);
   const ids = c.hypotheses;

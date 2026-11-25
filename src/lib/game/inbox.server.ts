@@ -1,18 +1,20 @@
 import "server-only";
 import { z } from "zod";
 import type { ChapterValidator } from "./engine";
+import { round1Case } from "./case-key.server";
 import { earnedIds, gradeAll, type TaskDef } from "./scoring";
 import type { InboxArtifact, InboxEmail, InboxEvidence } from "@/types/inbox";
 
+// Fixed narrative per variant; the evidence-chain selections (entry, auth, database, session, campaign) come from the private case file.
 const variants = {
-  A: { person: "Maya Rao", user: "maya.rao", entry: "payroll", campaign: "NX-41", session: "nx-a-72c", auth: 2, database: 1 },
-  B: { person: "Ishan Sen", user: "ishan.sen", entry: "supplier", campaign: "NX-73", session: "nx-b-19f", auth: 1, database: 2 },
-  C: { person: "Leena Das", user: "leena.das", entry: "security", campaign: "NX-26", session: "nx-c-84d", auth: 2, database: 1 },
+  A: { person: "Maya Rao", user: "maya.rao" },
+  B: { person: "Ishan Sen", user: "ishan.sen" },
+  C: { person: "Leena Das", user: "leena.das" },
 } as const;
 const kinds = ["security", "payroll", "project", "supplier", "alert", "employee"] as const;
 function variantConfig(variant: string) {
   if (!Object.hasOwn(variants, variant)) throw new Error("Unsupported Inbox variant");
-  return variants[variant as keyof typeof variants];
+  return { ...variants[variant as keyof typeof variants], ...round1Case(variant).inbox };
 }
 
 export function inboxEvidence(variant: string): InboxEvidence {

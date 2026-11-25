@@ -4,15 +4,12 @@ import { inboxEvidence, inboxSolution } from "./inbox.server";
 import { trailEvidence, trailSolution } from "./trail.server";
 import { insiderDossier, insiderSolution } from "./insider.server";
 import type { ChapterValidator } from "./engine";
+import { round1Case } from "./case-key.server";
 import { earnedIds, gradeAll, type TaskDef } from "./scoring";
 import type { ContainmentCctv, ContainmentEvidence, ContainmentRecord } from "@/types/containment";
 
 // IDs carry no chronology or dependency rank; only the retained evidence supports the order.
-const cases = {
-  A: { events: ["46", "12", "73", "28", "61", "34", "85"], immediate: ["57", "19", "83", "42"], recovery: ["68", "24", "91", "37", "52", "16"] },
-  B: { events: ["53", "82", "19", "64", "37", "91", "26"], immediate: ["32", "76", "15", "89"], recovery: ["43", "87", "21", "65", "18", "94"] },
-  C: { events: ["78", "31", "56", "92", "14", "63", "47"], immediate: ["84", "23", "69", "51"], recovery: ["96", "35", "72", "14", "83", "49"] },
-} as const;
+const cases = { A: true, B: true, C: true } as const; // event/action/step ids come from the private case file
 function context(variant: string) {
   if (!Object.hasOwn(cases, variant)) throw new Error("Unsupported Containment variant");
   const inbox = inboxEvidence(variant), prior = inboxSolution(variant), trail = trailEvidence(variant), replay = trailSolution(variant), insider = insiderDossier(variant), accomplice = insiderSolution(variant);
@@ -24,7 +21,7 @@ function context(variant: string) {
   const detectedAt = new Date(Date.parse(database.facts.Time) + 30_000).toISOString();
   const custody = insider.records.find(record => record.id === `CUST-${variant}-01`)!;
   const checkpoint = new Date(Date.parse(custody.timestamp) + 60_000).toISOString();
-  return { ids: cases[variant as keyof typeof cases], inbox, prior, trail, replay, insider, accomplice, policy, auth, database, click, detectedAt, custody, checkpoint };
+  return { ids: round1Case(variant).containment, inbox, prior, trail, replay, insider, accomplice, policy, auth, database, click, detectedAt, custody, checkpoint };
 }
 export function containmentCctv(variant: string): ContainmentCctv {
   const c = context(variant), access = c.insider.records.find(record => record.id === c.accomplice.supportingEvidenceIds[1])!;

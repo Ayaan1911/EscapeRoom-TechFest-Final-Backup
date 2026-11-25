@@ -13,7 +13,7 @@ const journey = process.argv.includes("--journey"); // fresh zero-progress team 
 const containment = process.argv.includes("--containment") || verdict;
 const insider = process.argv.includes("--insider") || containment;
 const trail = process.argv.includes("--trail") || insider;
-const origin = new URL(testing ? "http://127.0.0.1:3000" : process.env.DEMO_ORIGIN ?? "http://127.0.0.1:3000");
+const origin = new URL(testing ? `http://127.0.0.1:${process.env.GHOST_E2E_PORT ?? 3000}` : process.env.DEMO_ORIGIN ?? "http://127.0.0.1:3000");
 assert.equal(origin.protocol, "http:", "The local demo uses HTTP; deployed production must use HTTPS");
 assert.match(origin.hostname, /^[a-z\d.:-]+$/i);
 assert.equal(origin.pathname, "/");

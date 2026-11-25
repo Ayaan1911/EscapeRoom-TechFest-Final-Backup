@@ -7,7 +7,7 @@ import { solveInbox, solveTrail, solveInsider, solveContainment, solveVerdict } 
 test.skip(!process.env.GHOST_E2E_JOURNEY, "Run npm run test:e2e:journey (fresh zero-progress team on a disposable database)");
 
 const V = "A" as const, TEAM = "DEMO-A";
-const origin = "http://127.0.0.1:3000";
+const origin = `http://127.0.0.1:${process.env.GHOST_E2E_PORT ?? 3000}`;
 
 async function signIn(page: Page, role: "team" | "admin") {
   await page.goto(role === "admin" ? "/organizer/login" : "/login");

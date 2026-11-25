@@ -3,13 +3,14 @@ import { z } from "zod";
 import { inboxEvidence, inboxSolution } from "./inbox.server";
 import { trailEvidence } from "./trail.server";
 import type { ChapterValidator } from "./engine";
+import { round1Case } from "./case-key.server";
 import { earnedIds, gradeAll, type TaskDef } from "./scoring";
 import type { InsiderDossier, InsiderRecord, InsiderSuspect } from "@/types/insider";
 
-const cases = { A: { employee: 3, policy: "04", message: "09", access: "11", approval: "06" }, B: { employee: 1, policy: "07", message: "03", access: "14", approval: "08" }, C: { employee: 4, policy: "02", message: "12", access: "06", approval: "04" } } as const;
+const cases = { A: true, B: true, C: true } as const; // the accomplice and record ids come from the private case file
 function assignment(variant: string) {
   if (!Object.hasOwn(cases, variant)) throw new Error("Unsupported Insider variant");
-  return cases[variant as keyof typeof cases];
+  return round1Case(variant).insider;
 }
 export function insiderDossier(variant: string): InsiderDossier {
   const selected = assignment(variant);
